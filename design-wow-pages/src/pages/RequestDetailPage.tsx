@@ -13,6 +13,7 @@ import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { getBriefFields } from '../lib/briefFields';
+import { UpdateFieldModal } from '../components/UpdateFieldModal';
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -54,6 +55,7 @@ export function RequestDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
   const [tab, setTab] = useState<'brief' | 'output'>('brief');
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<CommentRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -197,36 +199,51 @@ export function RequestDetailPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid var(--line)' }}>
-            {(
-              [
-                { key: 'brief', label: 'Brief' },
-                { key: 'output', label: 'Output' },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  padding: '2px 0 10px',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
-                  borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
-                  marginBottom: -1,
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, borderBottom: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', gap: 20 }}>
+              {(
+                [
+                  { key: 'brief', label: 'Brief' },
+                  { key: 'output', label: 'Output' },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    padding: '2px 0 10px',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
+                    borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
+                    marginBottom: -1,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <a
+              href={`/vip/${request.id}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--teal)', textDecoration: 'none', paddingBottom: 10 }}
+            >
+              View VIP →
+            </a>
           </div>
 
           {tab === 'brief' && (
             <div style={cardStyle}>
-              <h2 style={cardTitleStyle}>Brief</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <h2 style={{ ...cardTitleStyle, margin: 0 }}>Brief</h2>
+                <button className="btn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setShowUpdateModal(true)}>
+                  Update VIP
+                </button>
+              </div>
               <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 22px', margin: 0 }}>
                 {getBriefFields(request).map((f) => (
                   <BriefItem key={f.label} label={f.label} value={f.value} full={f.full} />
@@ -383,6 +400,10 @@ export function RequestDetailPage() {
           note={`Payment for ${request.product_name}`}
           onClose={() => setPaymentModal(null)}
         />
+      )}
+
+      {showUpdateModal && (
+        <UpdateFieldModal request={request} onClose={() => setShowUpdateModal(false)} onUpdated={load} />
       )}
     </div>
   );

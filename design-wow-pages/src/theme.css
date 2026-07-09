@@ -110,6 +110,10 @@ button, input, textarea { font: inherit; color: inherit; }
   50% { opacity: 0.5; }
 }
 
+@media print {
+  .vip-no-print { display: none !important; }
+}
+
 .toast { animation: toast-in 0.18s ease-out; }
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px); }

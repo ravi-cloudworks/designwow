@@ -29,7 +29,7 @@ function labelFor(list: { value: string; label: string }[], value: string | null
   return list.find((i) => i.value === value)?.label ?? titleCase(value);
 }
 
-export type BriefField = { label: string; value: string; full?: boolean };
+export type BriefField = { label: string; value: string; full?: boolean; fieldKey?: string };
 
 // Single source of truth for rendering a request's structured brief — used
 // by both the customer and designer detail pages so the two views can't
@@ -37,7 +37,7 @@ export type BriefField = { label: string; value: string; full?: boolean };
 export function getBriefFields(request: RequestRow): BriefField[] {
   const goalLabel = labelFor(GOALS, request.goal) ?? titleCase(request.goal);
   const fields: BriefField[] = [
-    { label: 'Goal', value: goalLabel },
+    { label: 'Goal', value: goalLabel, fieldKey: 'goal' },
     { label: 'Platform', value: titleCase(request.platform) },
     { label: 'Length', value: `${request.video_length_sec || request.video_length_note || 'Custom'}s` },
     { label: 'Variants', value: String(request.variants_count) },
@@ -47,7 +47,7 @@ export function getBriefFields(request: RequestRow): BriefField[] {
   if (industryLabel) fields.push({ label: 'Industry', value: industryLabel });
 
   const audienceLabel = labelFor(TARGET_AUDIENCES, request.target_audience);
-  if (audienceLabel) fields.push({ label: 'Target audience', value: audienceLabel });
+  if (audienceLabel) fields.push({ label: 'Target audience', value: audienceLabel, fieldKey: 'target_audience' });
 
   const aspectRatioLabel = labelFor(ASPECT_RATIOS, request.aspect_ratio);
   if (aspectRatioLabel) fields.push({ label: 'Aspect ratio', value: aspectRatioLabel });
@@ -61,14 +61,14 @@ export function getBriefFields(request: RequestRow): BriefField[] {
   const subtitlesLabel = labelFor(SUBTITLE_OPTIONS, request.subtitles);
   if (subtitlesLabel) fields.push({ label: 'Subtitles', value: subtitlesLabel });
 
-  if (request.tone) fields.push({ label: 'Tone', value: titleCase(request.tone) });
+  if (request.tone) fields.push({ label: 'Tone', value: titleCase(request.tone), fieldKey: 'tone' });
 
   if (request.brand_color_primary || request.brand_color_secondary) {
     const colors = [request.brand_color_primary, request.brand_color_secondary].filter(Boolean).join(' / ');
-    fields.push({ label: 'Brand colors', value: colors });
+    fields.push({ label: 'Brand colors', value: colors, fieldKey: 'brand_color_primary' });
   }
 
-  fields.push({ label: 'Product description', value: request.product_description, full: true });
+  fields.push({ label: 'Product description', value: request.product_description, full: true, fieldKey: 'product_description' });
 
   const avatarChoice = parseChoice(request.avatar_choice);
   const avatarBackupChoice = parseChoice(request.avatar_backup_choice);
@@ -92,13 +92,17 @@ export function getBriefFields(request: RequestRow): BriefField[] {
   const moodChoice = parseChoice(request.mood_choice);
   if (moodChoice) fields.push({ label: 'Visual mood', value: moodChoice.label });
 
-  fields.push({ label: 'Story / script direction', value: request.story_direction, full: true });
+  fields.push({ label: 'Story / script direction', value: request.story_direction, full: true, fieldKey: 'story_direction' });
 
   const scriptStyleLabel = labelFor(SCRIPT_STYLES, request.script_style);
-  if (scriptStyleLabel) fields.push({ label: 'Script style', value: scriptStyleLabel });
+  if (scriptStyleLabel) fields.push({ label: 'Script style', value: scriptStyleLabel, fieldKey: 'script_style' });
 
   const ctaStyleLabel = labelFor(CTA_STYLES, request.cta_style);
-  fields.push({ label: 'Call to action', value: ctaStyleLabel ? `${ctaStyleLabel} — ${request.cta}` : request.cta });
+  fields.push({
+    label: 'Call to action',
+    value: ctaStyleLabel ? `${ctaStyleLabel} — ${request.cta}` : request.cta,
+    fieldKey: 'cta',
+  });
 
   if (request.color_preferences) fields.push({ label: 'Color preferences', value: request.color_preferences });
 
@@ -111,8 +115,9 @@ export function getBriefFields(request: RequestRow): BriefField[] {
       : `${titleCase(request.music_mode)}${request.music_note ? ' — ' + request.music_note : ''}`,
   });
 
-  if (request.restrictions) fields.push({ label: "Do's and don'ts", value: request.restrictions, full: true });
-  if (request.additional_notes) fields.push({ label: 'Additional notes', value: request.additional_notes, full: true });
+  if (request.restrictions) fields.push({ label: "Do's and don'ts", value: request.restrictions, full: true, fieldKey: 'restrictions' });
+  if (request.additional_notes)
+    fields.push({ label: 'Additional notes', value: request.additional_notes, full: true, fieldKey: 'additional_notes' });
 
   fields.push({ label: 'Terms confirmed', value: request.terms_confirmed_at ? 'Yes' : 'Not yet' });
 

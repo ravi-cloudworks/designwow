@@ -15,6 +15,7 @@ import { RequestDetailPage } from './pages/RequestDetailPage';
 import { DeliverPage } from './pages/DeliverPage';
 import { PublicDesignerPage } from './pages/PublicDesignerPage';
 import { HomePage } from './pages/HomePage';
+import { VipPage } from './pages/VipPage';
 
 export default function App() {
   return (
@@ -25,6 +26,8 @@ export default function App() {
         <Route path="/d/:id" element={<PublicDesignerPage />} />
 
         <Route element={<RequireAuth />}>
+          <Route path="/vip/:id" element={<VipPage />} />
+
           <Route element={<CustomerShell />}>
             <Route path="/dashboard" element={<MyRequestsPage />} />
             <Route path="/new" element={<NewRequestPage />} />

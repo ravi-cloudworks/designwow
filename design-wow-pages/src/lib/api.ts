@@ -198,6 +198,15 @@ export type CommentRow = {
 
 export type CommentAssetLink = { comment_id: string; asset_id: string };
 
+export type ChangeLogEntry = {
+  id: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string;
+  created_at: string;
+  changed_by_name: string;
+};
+
 export type PaymentAccountRow = {
   id: string;
   designer_id: string;
@@ -322,6 +331,12 @@ export const api = {
     approve: (id: string, rating?: FeedbackRating, note?: string) =>
       request<{ ok: boolean }>(`/api/requests/${id}/approve`, { method: 'POST', body: JSON.stringify({ rating, note }) }),
     revise: (id: string) => request<{ id: string }>(`/api/requests/${id}/revise`, { method: 'POST' }),
+    updateField: (id: string, field: string, newValue: string) =>
+      request<{ ok: boolean; commentId: string }>(`/api/requests/${id}/update-field`, {
+        method: 'POST',
+        body: JSON.stringify({ field, newValue }),
+      }),
+    changeLog: (id: string) => request<{ changes: ChangeLogEntry[] }>(`/api/requests/${id}/change-log`),
   },
 
   designers: {

@@ -4,6 +4,27 @@ import { currentUserId } from '../lib/auth';
 
 const requests = new Hono<{ Bindings: Bindings }>();
 
+// VIP (Video Implementation Plan) "Update a field" — the only way a
+// structured brief field can change post-submission (the plain draft-update
+// route is locked to status='draft'). Keeping this to a fixed whitelist both
+// prevents SQL injection via the column name and keeps the field picker in
+// the UI to a manageable, deliberately-chosen list rather than every column.
+const UPDATABLE_FIELDS: Record<string, { column: string; label: string; maxLength: number }> = {
+  product_name: { column: 'product_name', label: 'Product or brand name', maxLength: 100 },
+  product_description: { column: 'product_description', label: 'Product description', maxLength: 1000 },
+  goal: { column: 'goal', label: 'Goal', maxLength: 50 },
+  target_audience: { column: 'target_audience', label: 'Target audience', maxLength: 50 },
+  tone: { column: 'tone', label: 'Tone', maxLength: 50 },
+  script_style: { column: 'script_style', label: 'Script style', maxLength: 50 },
+  story_direction: { column: 'story_direction', label: 'Story direction / dialogue', maxLength: 2000 },
+  cta_style: { column: 'cta_style', label: 'Call-to-action style', maxLength: 50 },
+  cta: { column: 'cta', label: 'Call to action', maxLength: 200 },
+  brand_color_primary: { column: 'brand_color_primary', label: 'Brand color (primary)', maxLength: 20 },
+  brand_color_secondary: { column: 'brand_color_secondary', label: 'Brand color (secondary)', maxLength: 20 },
+  restrictions: { column: 'restrictions', label: "Do's and don'ts", maxLength: 1000 },
+  additional_notes: { column: 'additional_notes', label: 'Additional notes', maxLength: 1000 },
+};
+
 requests.get('/', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
@@ -407,6 +428,79 @@ requests.post('/:id/request-payment', async (c) => {
   await c.env.DB.batch(statements);
 
   return c.json({ ok: true, commentId });
+});
+
+requests.post('/:id/update-field', async (c) => {
+  // Designer-only. Updates one whitelisted brief field, logs the before/
+  // after to request_change_log, and auto-posts a note in the existing
+  // thread (same table/UI as any other note) linking to the VIP page.
+  const id = c.req.param('id');
+  const authorId = currentUserId(c);
+  if (!authorId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const { field, newValue } = await c.req.json<{ field?: string; newValue?: string }>();
+  const def = field ? UPDATABLE_FIELDS[field] : undefined;
+  if (!def) return c.json({ error: 'invalid_field' }, 400);
+  const trimmed = (newValue ?? '').trim();
+  if (!trimmed) return c.json({ error: 'empty_value' }, 400);
+  if (trimmed.length > def.maxLength) return c.json({ error: 'value_too_long', maxLength: def.maxLength }, 400);
+
+  const request = await c.env.DB.prepare(
+    `SELECT designer_id, ${def.column} AS current_value FROM requests WHERE id = ?`
+  ).bind(id).first<{ designer_id: string; current_value: string | null }>();
+  if (!request) return c.json({ error: 'not_found' }, 404);
+  if (request.designer_id !== authorId) return c.json({ error: 'forbidden' }, 403);
+
+  const changeId = crypto.randomUUID();
+  const commentId = crypto.randomUUID();
+  const preview = trimmed.length > 400 ? `${trimmed.slice(0, 400)}… (see VIP for full text)` : trimmed;
+  const message = `${def.label} updated: ${preview}\n\nView VIP: ${c.env.FRONTEND_ORIGIN}/vip/${id}`;
+
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE requests SET ${def.column} = ?, updated_at = datetime('now') WHERE id = ?`).bind(trimmed, id),
+      c.env.DB.prepare(
+        `INSERT INTO request_change_log (id, request_id, field_name, old_value, new_value, changed_by) VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(changeId, id, field, request.current_value, trimmed, authorId),
+      c.env.DB.prepare('INSERT INTO request_comments (id, request_id, author_id, message) VALUES (?, ?, ?, ?)').bind(
+        commentId,
+        id,
+        authorId,
+        message
+      ),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('CHECK')) {
+      return c.json({ error: 'invalid_value_for_field' }, 400);
+    }
+    throw err;
+  }
+
+  return c.json({ ok: true, commentId });
+});
+
+requests.get('/:id/change-log', async (c) => {
+  const id = c.req.param('id');
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const request = await c.env.DB.prepare('SELECT customer_id, designer_id FROM requests WHERE id = ?')
+    .bind(id)
+    .first<{ customer_id: string; designer_id: string }>();
+  if (!request) return c.json({ error: 'not_found' }, 404);
+  if (userId !== request.customer_id && userId !== request.designer_id) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT l.id, l.field_name, l.old_value, l.new_value, l.created_at, u.name AS changed_by_name
+     FROM request_change_log l
+     JOIN users u ON u.id = l.changed_by
+     WHERE l.request_id = ?
+     ORDER BY l.created_at ASC`
+  ).bind(id).all();
+
+  return c.json({ changes: results });
 });
 
 requests.post('/:id/deliver', async (c) => {

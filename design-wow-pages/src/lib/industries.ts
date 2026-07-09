@@ -106,3 +106,54 @@ export const APPROVAL_TERMS: string[] = [
   'Final HD video delivered after you approve the revision',
   'Remaining balance is settled directly with your designer via UPI',
 ];
+
+// Fields a designer can update post-submission, via the VIP "Update a
+// field" action — kept to a fixed whitelist matching the backend exactly.
+// Fields with `options` show a select (so the new value always matches a
+// real choice); everything else is free text.
+export type UpdatableFieldKey =
+  | 'product_name'
+  | 'product_description'
+  | 'goal'
+  | 'target_audience'
+  | 'tone'
+  | 'script_style'
+  | 'story_direction'
+  | 'cta_style'
+  | 'cta'
+  | 'brand_color_primary'
+  | 'brand_color_secondary'
+  | 'restrictions'
+  | 'additional_notes';
+
+export const UPDATABLE_FIELDS: {
+  key: UpdatableFieldKey;
+  label: string;
+  maxLength: number;
+  multiline?: boolean;
+  options?: { value: string; label: string }[];
+}[] = [
+  { key: 'product_name', label: 'Product or brand name', maxLength: 100 },
+  { key: 'product_description', label: 'Product description', maxLength: 1000, multiline: true },
+  { key: 'goal', label: 'Goal', maxLength: 50, options: GOALS },
+  { key: 'target_audience', label: 'Target audience', maxLength: 50, options: TARGET_AUDIENCES },
+  {
+    key: 'tone',
+    label: 'Tone',
+    maxLength: 50,
+    options: [
+      { value: 'funny', label: 'Funny' },
+      { value: 'emotional', label: 'Emotional' },
+      { value: 'energetic', label: 'Energetic' },
+      { value: 'professional', label: 'Professional' },
+    ],
+  },
+  { key: 'script_style', label: 'Script style', maxLength: 50, options: SCRIPT_STYLES },
+  { key: 'story_direction', label: 'Story direction / dialogue', maxLength: 2000, multiline: true },
+  { key: 'cta_style', label: 'Call-to-action style', maxLength: 50, options: CTA_STYLES },
+  { key: 'cta', label: 'Call to action', maxLength: 200 },
+  { key: 'brand_color_primary', label: 'Brand color (primary)', maxLength: 20 },
+  { key: 'brand_color_secondary', label: 'Brand color (secondary)', maxLength: 20 },
+  { key: 'restrictions', label: "Do's and don'ts", maxLength: 1000, multiline: true },
+  { key: 'additional_notes', label: 'Additional notes', maxLength: 1000, multiline: true },
+];

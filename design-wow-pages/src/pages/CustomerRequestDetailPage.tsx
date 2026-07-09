@@ -257,31 +257,41 @@ export function CustomerRequestDetailPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid var(--line)' }}>
-        {(
-          [
-            { key: 'brief', label: 'Brief' },
-            { key: 'output', label: 'Output' },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              padding: '2px 0 10px',
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
-              borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
-              marginBottom: -1,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', gap: 20 }}>
+          {(
+            [
+              { key: 'brief', label: 'Brief' },
+              { key: 'output', label: 'Output' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                padding: '2px 0 10px',
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
+                borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
+                marginBottom: -1,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <a
+          href={`/vip/${request.id}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--teal)', textDecoration: 'none', paddingBottom: 10 }}
+        >
+          View VIP →
+        </a>
       </div>
 
       {tab === 'brief' && (

@@ -294,6 +294,25 @@ CREATE TABLE request_comment_assets (
 );
 
 -- ---------------------------------------------------------------
+-- VIP (Video Implementation Plan) change log — the living-contract record.
+-- Every "Update a field" action writes one row here; the VIP page renders
+-- the request's current field values (already available via the request
+-- row itself) plus this timeline. A field's "original" value is simply the
+-- old_value of its earliest row here — no separate snapshot needed.
+-- ---------------------------------------------------------------
+CREATE TABLE request_change_log (
+  id            TEXT PRIMARY KEY,
+  request_id    TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+  field_name    TEXT NOT NULL,
+  old_value     TEXT,
+  new_value     TEXT NOT NULL,
+  changed_by    TEXT NOT NULL REFERENCES users(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_change_log_request ON request_change_log(request_id, created_at);
+
+-- ---------------------------------------------------------------
 -- Designer daily log (internal productivity/history, not customer-facing)
 -- ---------------------------------------------------------------
 CREATE TABLE designer_daily_logs (
