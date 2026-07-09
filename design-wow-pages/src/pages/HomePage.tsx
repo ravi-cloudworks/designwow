@@ -45,9 +45,20 @@ export function HomePage() {
   }, []);
 
   if (viewer === 'unknown') return null;
+  const currentUser: User | null = viewer;
 
-  const appHref = viewer?.role === 'designer' ? '/designer' : '/dashboard';
-  const appLabel = viewer?.role === 'designer' ? 'Go to Queue' : 'Go to Dashboard';
+  const appHref = currentUser?.role === 'designer' ? '/designer' : '/dashboard';
+  const appLabel = currentUser?.role === 'designer' ? 'Go to Queue' : 'Go to Dashboard';
+
+  // A logged-in designer has no "plan" of their own — send them back to
+  // their queue rather than offering to join a waitlist they're already
+  // past. A logged-in customer can actually switch plans in Account, so
+  // that's more useful here than a waitlist prompt.
+  function planCta(tier: string): { label: string; href?: string; onClick?: () => void } {
+    if (currentUser?.role === 'designer') return { label: 'Go to Queue', href: '/designer' };
+    if (currentUser?.role === 'customer') return { label: 'Manage in Account', href: '/account' };
+    return { label: `Join waitlist — ${tier}`, onClick: () => setWaitlistRole('customer') };
+  }
 
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 24px' }}>
@@ -138,8 +149,8 @@ export function HomePage() {
       <section style={{ padding: '40px 0' }}>
         <h2 style={sectionTitleStyle()}>Plans</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <PlanCard tier="Standard" price="₹2,999" sla="78h turnaround" onClick={() => setWaitlistRole('customer')} />
-          <PlanCard tier="Priority" price="₹6,999" sla="48h turnaround" highlight onClick={() => setWaitlistRole('customer')} />
+          <PlanCard tier="Standard" price="₹2,999" sla="78h turnaround" cta={planCta('Standard')} />
+          <PlanCard tier="Priority" price="₹6,999" sla="48h turnaround" highlight cta={planCta('Priority')} />
         </div>
         <p style={{ margin: '14px 0 0', fontSize: 12.5, color: 'var(--text-faint)', textAlign: 'center' }}>
           Unlimited requests, one active at a time. Pick your designer.
@@ -241,14 +252,15 @@ function PlanCard({
   price,
   sla,
   highlight,
-  onClick,
+  cta,
 }: {
   tier: string;
   price: string;
   sla: string;
   highlight?: boolean;
-  onClick: () => void;
+  cta: { label: string; href?: string; onClick?: () => void };
 }) {
+  const className = highlight ? 'btn btn-primary' : 'btn';
   return (
     <div
       className="card"
@@ -264,9 +276,15 @@ function PlanCard({
         <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-faint)' }}>/mo</span>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-faint)', marginBottom: 16 }}>{sla}</div>
-      <button className={highlight ? 'btn btn-primary' : 'btn'} style={{ width: '100%' }} onClick={onClick}>
-        Join waitlist — {tier}
-      </button>
+      {cta.href ? (
+        <a href={cta.href} className={className} style={{ width: '100%', textDecoration: 'none', display: 'block', textAlign: 'center', boxSizing: 'border-box' }}>
+          {cta.label}
+        </a>
+      ) : (
+        <button className={className} style={{ width: '100%' }} onClick={cta.onClick}>
+          {cta.label}
+        </button>
+      )}
     </div>
   );
 }
