@@ -75,6 +75,28 @@ CREATE TABLE designer_showcase_items (
 
 CREATE INDEX idx_showcase_designer ON designer_showcase_items(designer_id, created_at);
 
+-- A designer's reusable presets for the structured brief picker (avatar
+-- style, mood/visual style, music style — the categories that genuinely
+-- transfer across customers, unlike a background/setting which is tied to
+-- one specific brand). industry_tags is a JSON array; NULL/empty means
+-- "universal" — shown regardless of the customer's stated industry. Tags
+-- are multi-select (one asset can serve several industries) and share the
+-- same taxonomy used to sort designers by specialty match.
+CREATE TABLE designer_asset_library (
+  id            TEXT PRIMARY KEY,
+  designer_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category      TEXT NOT NULL CHECK (category IN ('avatar','mood','music')),
+  label         TEXT NOT NULL CHECK (length(label) <= 100),
+  r2_key        TEXT NOT NULL,
+  file_name     TEXT NOT NULL,
+  mime_type     TEXT NOT NULL,
+  size_bytes    INTEGER NOT NULL,
+  industry_tags TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_asset_library_designer ON designer_asset_library(designer_id, category);
+
 CREATE TABLE customer_profiles (
   user_id                 TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   preferred_designer_id   TEXT REFERENCES users(id)
@@ -146,6 +168,18 @@ CREATE TABLE requests (
   -- brief: misc
   restrictions          TEXT CHECK (length(restrictions) <= 1000),
   additional_notes      TEXT CHECK (length(additional_notes) <= 1000),
+
+  -- brief: structured picker (phase 1 of the AI-video pipeline) — not a DB
+  -- CHECK on the *_choice columns since their allowed values evolve with
+  -- each designer's library, not a fixed enum. industry drives both which
+  -- designers get recommended and which of a chosen designer's assets show.
+  -- Each *_choice is a JSON blob: {source:'library'|'upload', assetId, label}.
+  industry              TEXT,
+  avatar_choice         TEXT,
+  mood_choice           TEXT,
+  music_choice          TEXT,
+  script_style          TEXT,
+  cta_style             TEXT,
 
   -- timer
   sla_hours             INTEGER NOT NULL,          -- copied from subscription at submit time

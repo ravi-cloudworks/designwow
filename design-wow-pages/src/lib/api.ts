@@ -58,6 +58,12 @@ export type RequestRow = {
   music_note: string | null;
   restrictions: string | null;
   additional_notes: string | null;
+  industry: string | null;
+  avatar_choice: string | null;
+  mood_choice: string | null;
+  music_choice: string | null;
+  script_style: string | null;
+  cta_style: string | null;
   sla_hours: number;
   submitted_at: string | null;
   started_at: string | null;
@@ -90,6 +96,41 @@ export type RequestInput = {
   musicNote?: string | null;
   restrictions?: string | null;
   additionalNotes?: string | null;
+  industry?: string | null;
+  avatarChoice?: string | null;
+  moodChoice?: string | null;
+  musicChoice?: string | null;
+  scriptStyle?: string | null;
+  ctaStyle?: string | null;
+};
+
+// Stored as a JSON string in *_choice columns — either a pick from the
+// designer's own library, or the customer's own upload.
+export type AssetChoice = {
+  source: 'library' | 'upload';
+  assetId: string;
+  label: string;
+};
+
+export type LibraryCategory = 'avatar' | 'mood' | 'music';
+
+export type LibraryAssetRow = {
+  id: string;
+  category: LibraryCategory;
+  label: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  industry_tags: string | null;
+  created_at: string;
+};
+
+export type LibraryItem = {
+  id: string;
+  label: string;
+  file_name: string;
+  mime_type: string;
+  industry_tags: string | null;
 };
 
 export type AssetRow = {
@@ -299,6 +340,26 @@ export const api = {
     },
     public: (id: string) =>
       request<{ profile: PublicDesignerProfile; items: ShowcaseItem[] }>(`/api/designers/${id}/public`),
+    library: {
+      list: () => request<{ items: LibraryAssetRow[] }>('/api/designers/me/asset-library'),
+      upload: async (category: LibraryCategory, file: File, label: string, industries: string[]): Promise<{ id: string }> => {
+        const params = new URLSearchParams({ label, industries: industries.join(',') });
+        const res = await fetch(`${API_URL}/api/designers/me/asset-library/${category}/${encodeURIComponent(file.name)}?${params}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        return res.json();
+      },
+      remove: (itemId: string) => request<{ ok: boolean }>(`/api/designers/me/asset-library/${itemId}`, { method: 'DELETE' }),
+      fileUrl: (itemId: string) => `${API_URL}/api/designers/library-items/${itemId}/file`,
+      fetchFor: (designerId: string, category: LibraryCategory, industry?: string) => {
+        const params = new URLSearchParams({ category, ...(industry ? { industry } : {}) });
+        return request<{ items: LibraryItem[] }>(`/api/designers/${designerId}/library?${params}`);
+      },
+    },
   },
 
   subscriptions: {

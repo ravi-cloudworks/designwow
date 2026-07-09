@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type FeedbackStats, type PaymentAccountRow, type ShowcaseCandidate, type ShowcaseItem } from '../lib/api';
+import {
+  api,
+  type FeedbackStats,
+  type LibraryAssetRow,
+  type LibraryCategory,
+  type PaymentAccountRow,
+  type ShowcaseCandidate,
+  type ShowcaseItem,
+} from '../lib/api';
 import { formatDuration } from '../lib/timer';
 import { Avatar } from '../components/Avatar';
 import { ShowcaseThumbnail } from '../components/ShowcaseThumbnail';
 import { useToast } from '../components/ToastProvider';
 import { captureVideoThumbnailFromFile, captureVideoThumbnailFromUrl } from '../lib/videoThumbnail';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { INDUSTRIES } from '../lib/industries';
 
 export function ProfilePage() {
   useDocumentTitle('Profile — Design Wow');
@@ -33,6 +42,7 @@ export function ProfilePage() {
   const [uploadingPromo, setUploadingPromo] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const promoInput = useRef<HTMLInputElement>(null);
+  const [libraryItems, setLibraryItems] = useState<LibraryAssetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -45,6 +55,31 @@ export function ProfilePage() {
     const [{ items }, { candidates }] = await Promise.all([api.designers.showcase.list(), api.designers.showcase.candidates()]);
     setShowcaseItems(items);
     setShowcaseCandidates(candidates);
+  }
+
+  async function loadLibrary() {
+    const { items } = await api.designers.library.list();
+    setLibraryItems(items);
+  }
+
+  async function handleLibraryUpload(category: LibraryCategory, file: File, label: string, industries: string[]) {
+    try {
+      await api.designers.library.upload(category, file, label, industries);
+      await loadLibrary();
+      showToast('Added to your asset library');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Upload failed', 'error');
+    }
+  }
+
+  async function handleLibraryRemove(itemId: string) {
+    try {
+      await api.designers.library.remove(itemId);
+      await loadLibrary();
+      showToast('Removed from your asset library');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove', 'error');
+    }
   }
 
   useEffect(() => {
@@ -63,6 +98,7 @@ export function ProfilePage() {
     });
     loadAccounts();
     loadShowcase();
+    loadLibrary();
   }, []);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -328,6 +364,40 @@ export function ProfilePage() {
       </div>
 
       <div className="card">
+        <h2 style={cardTitle()}>Asset library</h2>
+        <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--text-faint)' }}>
+          Reusable presets customers pick from when building a brief — tag each with the industries it fits, or leave
+          untagged to show for every industry.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+          <AssetLibrarySection
+            category="avatar"
+            title="Avatar / presenter styles"
+            accept="image/png,image/jpeg"
+            items={libraryItems.filter((i) => i.category === 'avatar')}
+            onUpload={handleLibraryUpload}
+            onRemove={handleLibraryRemove}
+          />
+          <AssetLibrarySection
+            category="mood"
+            title="Mood / visual style"
+            accept="image/png,image/jpeg"
+            items={libraryItems.filter((i) => i.category === 'mood')}
+            onUpload={handleLibraryUpload}
+            onRemove={handleLibraryRemove}
+          />
+          <AssetLibrarySection
+            category="music"
+            title="Music styles"
+            accept="audio/mpeg,audio/wav"
+            items={libraryItems.filter((i) => i.category === 'music')}
+            onUpload={handleLibraryUpload}
+            onRemove={handleLibraryRemove}
+          />
+        </div>
+      </div>
+
+      <div className="card">
         <h2 style={cardTitle()}>Public showcase</h2>
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-faint)' }}>
           A public page customers can share and land on directly — pick which of your delivered work to feature. Nothing shows
@@ -540,6 +610,143 @@ function FeedbackPill({ label, count, color }: { label: string; count: number; c
     >
       <span style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700 }}>{count}</span>
       {label}
+    </div>
+  );
+}
+
+function AssetLibrarySection({
+  category,
+  title,
+  accept,
+  items,
+  onUpload,
+  onRemove,
+}: {
+  category: LibraryCategory;
+  title: string;
+  accept: string;
+  items: LibraryAssetRow[];
+  onUpload: (category: LibraryCategory, file: File, label: string, industries: string[]) => Promise<void>;
+  onRemove: (itemId: string) => Promise<void>;
+}) {
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [label, setLabel] = useState('');
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  function toggleIndustry(value: string) {
+    setIndustries((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  }
+
+  async function handleAdd() {
+    if (!pendingFile || !label.trim()) return;
+    setUploading(true);
+    try {
+      await onUpload(category, pendingFile, label.trim(), industries);
+      setPendingFile(null);
+      setLabel('');
+      setIndustries([]);
+      if (fileInput.current) fileInput.current.value = '';
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <h3 style={{ margin: '0 0 10px', fontSize: 13.5, fontWeight: 700 }}>{title}</h3>
+
+      {items.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          {items.map((item) => {
+            const tags: string[] = item.industry_tags ? JSON.parse(item.industry_tags) : [];
+            return (
+              <div key={item.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', width: 150 }}>
+                {item.mime_type.startsWith('image/') ? (
+                  <img
+                    src={api.designers.library.fileUrl(item.id)}
+                    alt={item.label}
+                    style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: 40,
+                      background: 'var(--surface-2)',
+                      borderRadius: 6,
+                      marginBottom: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10.5,
+                      color: 'var(--text-faint)',
+                    }}
+                  >
+                    ♪ Audio
+                  </div>
+                )}
+                <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.label}
+                </p>
+                <p style={{ margin: '0 0 6px', fontSize: 10.5, color: 'var(--text-faint)' }}>
+                  {tags.length > 0 ? tags.join(', ') : 'Universal'}
+                </p>
+                <button
+                  onClick={() => onRemove(item.id)}
+                  style={{ border: 'none', background: 'none', color: 'var(--crimson)', fontSize: 11.5, cursor: 'pointer', padding: 0 }}
+                >
+                  Remove
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ border: '1px dashed var(--line)', borderRadius: 8, padding: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={fileInput}
+            type="file"
+            accept={accept}
+            onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+            style={{ fontSize: 12.5, flex: '1 1 200px' }}
+          />
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label (e.g. South Indian Woman, Friendly)"
+            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5, flex: '1 1 220px' }}
+          />
+        </div>
+        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Industries (leave blank for Universal)
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {INDUSTRIES.map((ind) => (
+            <button
+              key={ind.value}
+              onClick={() => toggleIndustry(ind.value)}
+              style={{
+                border: `1px solid ${industries.includes(ind.value) ? 'var(--teal)' : 'var(--line)'}`,
+                background: industries.includes(ind.value) ? 'var(--teal-soft)' : 'transparent',
+                color: industries.includes(ind.value) ? 'var(--teal)' : 'var(--text-soft)',
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 11.5,
+                cursor: 'pointer',
+              }}
+            >
+              {ind.label}
+            </button>
+          ))}
+        </div>
+        <button className="btn" disabled={uploading || !pendingFile || !label.trim()} onClick={handleAdd}>
+          {uploading ? 'Adding…' : '+ Add to library'}
+        </button>
+      </div>
     </div>
   );
 }

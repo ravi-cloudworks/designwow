@@ -374,4 +374,124 @@ designers.get('/showcase-items/:itemId/thumbnail', async (c) => {
   });
 });
 
+// ---------------------------------------------------------------
+// Designer asset library — reusable presets (avatar/mood/music) for the
+// structured brief picker. Distinct from the public showcase: this is
+// private working material used to populate a customer's picker options,
+// never shown on the public /d/:id page.
+// ---------------------------------------------------------------
+
+const LIBRARY_ACCEPT: Record<string, string[]> = {
+  avatar: ['image/png', 'image/jpeg'],
+  mood: ['image/png', 'image/jpeg'],
+  music: ['audio/mpeg', 'audio/mp3', 'audio/wav'],
+};
+const LIBRARY_MAX_BYTES = 20 * 1024 * 1024;
+
+designers.get('/me/asset-library', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, category, label, file_name, mime_type, size_bytes, industry_tags, created_at
+     FROM designer_asset_library WHERE designer_id = ? ORDER BY category, created_at DESC`
+  ).bind(userId).all();
+
+  return c.json({ items: results });
+});
+
+designers.put('/me/asset-library/:category/:filename', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const category = c.req.param('category');
+  if (!LIBRARY_ACCEPT[category]) return c.json({ error: 'invalid_category' }, 400);
+
+  const contentType = c.req.header('Content-Type') ?? '';
+  if (!LIBRARY_ACCEPT[category].includes(contentType)) {
+    return c.json({ error: 'unsupported_type', allowed: LIBRARY_ACCEPT[category] }, 415);
+  }
+  const contentLength = Number(c.req.header('Content-Length') ?? 0);
+  if (!contentLength || contentLength > LIBRARY_MAX_BYTES) {
+    return c.json({ error: 'file_too_large', maxBytes: LIBRARY_MAX_BYTES }, 413);
+  }
+
+  // Label + industry tags travel as query params since this is a raw file
+  // PUT, same pattern as filename-in-path elsewhere in this app.
+  const label = (c.req.query('label') ?? '').trim().slice(0, 100);
+  if (!label) return c.json({ error: 'missing_label' }, 400);
+  const industries = (c.req.query('industries') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const filename = c.req.param('filename');
+  const id = crypto.randomUUID();
+  const key = `asset-library/${userId}/${id}-${filename}`;
+  await c.env.ASSETS.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+
+  await c.env.DB.prepare(
+    `INSERT INTO designer_asset_library (id, designer_id, category, label, r2_key, file_name, mime_type, size_bytes, industry_tags)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(id, userId, category, label, key, filename, contentType, contentLength, industries.length ? JSON.stringify(industries) : null).run();
+
+  return c.json({ id }, 201);
+});
+
+designers.delete('/me/asset-library/:itemId', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const itemId = c.req.param('itemId');
+
+  const item = await c.env.DB.prepare(
+    'SELECT r2_key FROM designer_asset_library WHERE id = ? AND designer_id = ?'
+  ).bind(itemId, userId).first<{ r2_key: string }>();
+  if (!item) return c.json({ ok: true });
+
+  await c.env.ASSETS.delete(item.r2_key);
+  await c.env.DB.prepare('DELETE FROM designer_asset_library WHERE id = ?').bind(itemId).run();
+  return c.json({ ok: true });
+});
+
+// Used while a customer is building a brief — needs auth (any logged-in
+// user), but not the designer's own session specifically, since it's the
+// customer fetching someone else's library.
+designers.get('/:id/library', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const designerId = c.req.param('id');
+  const category = c.req.query('category');
+  const industry = c.req.query('industry');
+  if (!category || !LIBRARY_ACCEPT[category]) return c.json({ error: 'invalid_category' }, 400);
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, label, file_name, mime_type, industry_tags FROM designer_asset_library
+     WHERE designer_id = ? AND category = ?
+     AND (industry_tags IS NULL OR industry_tags = '[]' OR ? IS NULL OR EXISTS (
+       SELECT 1 FROM json_each(industry_tags) WHERE json_each.value = ?
+     ))
+     ORDER BY created_at DESC`
+  ).bind(designerId, category, industry ?? null, industry ?? '').all();
+
+  return c.json({ items: results });
+});
+
+designers.get('/library-items/:itemId/file', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const item = await c.env.DB.prepare(
+    'SELECT r2_key, mime_type FROM designer_asset_library WHERE id = ?'
+  ).bind(c.req.param('itemId')).first<{ r2_key: string; mime_type: string }>();
+  if (!item) return c.json({ error: 'not_found' }, 404);
+
+  const object = await c.env.ASSETS.get(item.r2_key);
+  if (!object) return c.json({ error: 'not_found' }, 404);
+
+  return new Response(object.body, {
+    headers: { 'Content-Type': item.mime_type || 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' },
+  });
+});
+
 export default designers;

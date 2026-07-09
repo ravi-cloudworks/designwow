@@ -91,6 +91,12 @@ type RequestBody = {
   musicNote?: string | null;
   restrictions?: string | null;
   additionalNotes?: string | null;
+  industry?: string | null;
+  avatarChoice?: string | null;
+  moodChoice?: string | null;
+  musicChoice?: string | null;
+  scriptStyle?: string | null;
+  ctaStyle?: string | null;
 };
 
 requests.post('/', async (c) => {
@@ -108,8 +114,9 @@ requests.post('/', async (c) => {
        video_length_sec, video_length_note, variants_count,
        characters_mode, characters_desc, story_direction, tone, cta,
        color_preferences, music_mode, music_note, restrictions, additional_notes,
+       industry, avatar_choice, mood_choice, music_choice, script_style, cta_style,
        sla_hours
-     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, userId, body.designerId, body.subscriptionId,
     body.productName, body.productDescription, body.goal, body.platform,
@@ -117,6 +124,8 @@ requests.post('/', async (c) => {
     body.charactersMode, body.charactersDesc ?? null, body.storyDirection, body.tone ?? null, body.cta,
     body.colorPreferences ?? null, body.musicMode ?? 'pick_for_me', body.musicNote ?? null,
     body.restrictions ?? null, body.additionalNotes ?? null,
+    body.industry ?? null, body.avatarChoice ?? null, body.moodChoice ?? null, body.musicChoice ?? null,
+    body.scriptStyle ?? null, body.ctaStyle ?? null,
     body.slaHours
   ).run();
 
@@ -136,6 +145,7 @@ requests.patch('/:id', async (c) => {
        video_length_sec = ?, video_length_note = ?, variants_count = ?,
        characters_mode = ?, characters_desc = ?, story_direction = ?, tone = ?, cta = ?,
        color_preferences = ?, music_mode = ?, music_note = ?, restrictions = ?, additional_notes = ?,
+       industry = ?, avatar_choice = ?, mood_choice = ?, music_choice = ?, script_style = ?, cta_style = ?,
        updated_at = datetime('now')
      WHERE id = ? AND status = 'draft'`
   ).bind(
@@ -145,6 +155,8 @@ requests.patch('/:id', async (c) => {
     body.charactersMode, body.charactersDesc ?? null, body.storyDirection, body.tone ?? null, body.cta,
     body.colorPreferences ?? null, body.musicMode ?? 'pick_for_me', body.musicNote ?? null,
     body.restrictions ?? null, body.additionalNotes ?? null,
+    body.industry ?? null, body.avatarChoice ?? null, body.moodChoice ?? null, body.musicChoice ?? null,
+    body.scriptStyle ?? null, body.ctaStyle ?? null,
     id
   ).run();
 
