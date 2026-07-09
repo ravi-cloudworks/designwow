@@ -20,6 +20,7 @@ export function ImageCropModal({
 }) {
   const [index, setIndex] = useState(0);
   const [decisions, setDecisions] = useState<Record<number, File>>({});
+  const [cropSettings, setCropSettings] = useState<Record<number, { crop: { x: number; y: number }; zoom: number }>>({});
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
@@ -28,12 +29,27 @@ export function ImageCropModal({
   const objectUrls = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => objectUrls.forEach((u) => URL.revokeObjectURL(u)), [objectUrls]);
 
-  // Reset the live crop position whenever the viewed image changes.
+  // Restore whatever crop/zoom was last set for this image (e.g. after
+  // going Prev then Next again) instead of resetting to a fresh default —
+  // otherwise re-visiting an already-framed image and hitting "Use this
+  // crop" again would silently replace a good crop with a re-centered one.
   useEffect(() => {
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
+    const saved = cropSettings[index];
+    setCrop(saved?.crop ?? { x: 0, y: 0 });
+    setZoom(saved?.zoom ?? 1);
     setCroppedAreaPixels(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
+
+  function updateCrop(next: { x: number; y: number }) {
+    setCrop(next);
+    setCropSettings((prev) => ({ ...prev, [index]: { crop: next, zoom: prev[index]?.zoom ?? zoom } }));
+  }
+
+  function updateZoom(next: number) {
+    setZoom(next);
+    setCropSettings((prev) => ({ ...prev, [index]: { crop: prev[index]?.crop ?? crop, zoom: next } }));
+  }
 
   const onCropComplete = useCallback((_area: Area, areaPixels: Area) => setCroppedAreaPixels(areaPixels), []);
 
@@ -90,8 +106,8 @@ export function ImageCropModal({
             crop={crop}
             zoom={zoom}
             aspect={aspect}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
+            onCropChange={updateCrop}
+            onZoomChange={updateZoom}
             onCropComplete={onCropComplete}
           />
         </div>
@@ -102,7 +118,7 @@ export function ImageCropModal({
           max={3}
           step={0.05}
           value={zoom}
-          onChange={(e) => setZoom(Number(e.target.value))}
+          onChange={(e) => updateZoom(Number(e.target.value))}
           style={{ width: '100%', margin: '12px 0' }}
         />
 

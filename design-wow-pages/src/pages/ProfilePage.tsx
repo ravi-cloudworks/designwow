@@ -17,6 +17,8 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { INDUSTRIES } from '../lib/industries';
 import { LIBRARY_LIMITS, validateLibraryFiles, libraryCountMessage } from '../lib/libraryLimits';
 import { ImageCropModal } from '../components/ImageCropModal';
+import { AudioPlayButton } from '../components/AudioPlayButton';
+import { Spinner } from '../components/Spinner';
 
 const TABS = [
   { key: 'profile', label: 'Public profile' },
@@ -74,7 +76,11 @@ export function ProfilePage() {
     setLibraryItems(items);
   }
 
-  async function handleLibraryUpload(category: LibraryCategory, files: File[]) {
+  async function handleLibraryUpload(
+    category: LibraryCategory,
+    files: File[],
+    onProgress?: (current: number, total: number, fileName: string) => void,
+  ) {
     const existingCount = libraryItems.filter((i) => i.category === category).length;
     const typeOrSizeError = validateLibraryFiles(category, files);
     if (typeOrSizeError) {
@@ -88,7 +94,8 @@ export function ProfilePage() {
     }
 
     let failures = 0;
-    for (const file of files) {
+    for (const [i, file] of files.entries()) {
+      onProgress?.(i + 1, files.length, file.name);
       try {
         await api.designers.library.upload(category, file);
       } catch {
@@ -162,10 +169,12 @@ export function ProfilePage() {
     try {
       const { avatarUrl } = await api.users.uploadAvatar(file);
       setAvatarUrl(avatarUrl);
+      showToast('Profile photo updated');
       // The sidebar shell fetched the old avatar on mount and won't refetch on
       // its own (it doesn't remount on nested navigation) — reload so it picks
       // up the new photo everywhere at once, rather than only on this page.
-      window.location.reload();
+      // Delayed slightly so the toast above is actually visible first.
+      setTimeout(() => window.location.reload(), 700);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       setAvatarError(message);
@@ -455,6 +464,7 @@ export function ProfilePage() {
           <AssetLibrarySection
             category="avatar"
             title="Avatar / presenter styles"
+            description="The face customers pick to present their product on camera. Upload a range of presenter types so customers have real options instead of asking you to find someone — e.g. a friendly young woman, a confident male chef, a warm grandmother figure, a smart young professional, a factory worker in uniform."
             accept="image/png,image/jpeg"
             items={libraryItems.filter((i) => i.category === 'avatar')}
             onFilesSelected={handleLibraryUpload}
@@ -462,17 +472,9 @@ export function ProfilePage() {
             onRemove={handleLibraryRemove}
           />
           <AssetLibrarySection
-            category="mood"
-            title="Mood / visual style"
-            accept="image/png,image/jpeg"
-            items={libraryItems.filter((i) => i.category === 'mood')}
-            onFilesSelected={handleLibraryUpload}
-            onUpdate={handleLibraryUpdate}
-            onRemove={handleLibraryRemove}
-          />
-          <AssetLibrarySection
             category="background"
             title="Background scenes"
+            description="The setting a scene is filmed in — where the presenter stands, not how it feels. Upload real locations relevant to your industries — e.g. a modern kitchen, a retail counter, a workshop floor, a warehouse, a minimal studio backdrop."
             accept="image/png,image/jpeg"
             items={libraryItems.filter((i) => i.category === 'background')}
             onFilesSelected={handleLibraryUpload}
@@ -480,8 +482,19 @@ export function ProfilePage() {
             onRemove={handleLibraryRemove}
           />
           <AssetLibrarySection
+            category="mood"
+            title="Mood / visual style"
+            description="The overall look, color grade, and energy of the edit — independent of location. Upload reference stills that capture a feeling at a glance — e.g. bright & natural, premium & moody, warm & homely, bold & energetic."
+            accept="image/png,image/jpeg"
+            items={libraryItems.filter((i) => i.category === 'mood')}
+            onFilesSelected={handleLibraryUpload}
+            onUpdate={handleLibraryUpdate}
+            onRemove={handleLibraryRemove}
+          />
+          <AssetLibrarySection
             category="music"
             title="Music styles"
+            description="Background tracks customers can pick without sourcing their own (and without music-rights headaches). Upload a range of styles, 30-45 seconds each is plenty — e.g. upbeat acoustic, cinematic corporate build, chill lo-fi, traditional instrumental, energetic beat."
             accept="audio/mpeg,audio/wav"
             items={libraryItems.filter((i) => i.category === 'music')}
             onFilesSelected={handleLibraryUpload}
@@ -716,6 +729,7 @@ function FeedbackPill({ label, count, color }: { label: string; count: number; c
 function AssetLibrarySection({
   category,
   title,
+  description,
   accept,
   items,
   onFilesSelected,
@@ -724,26 +738,32 @@ function AssetLibrarySection({
 }: {
   category: LibraryCategory;
   title: string;
+  description: string;
   accept: string;
   items: LibraryAssetRow[];
-  onFilesSelected: (category: LibraryCategory, files: File[]) => Promise<void>;
+  onFilesSelected: (
+    category: LibraryCategory,
+    files: File[],
+    onProgress?: (current: number, total: number, fileName: string) => void,
+  ) => Promise<void>;
   onUpdate: (itemId: string, body: { label?: string; industries?: string[] }) => Promise<void>;
   onRemove: (itemId: string) => Promise<void>;
 }) {
-  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [cropQueue, setCropQueue] = useState<File[] | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const limits = LIBRARY_LIMITS[category];
   const atLimit = items.length >= limits.maxCount;
   const isImageCategory = category !== 'music';
+  const uploading = uploadProgress !== null;
 
   async function upload(files: File[]) {
-    setUploading(true);
+    setUploadProgress({ current: 0, total: files.length, fileName: '' });
     try {
-      await onFilesSelected(category, files);
+      await onFilesSelected(category, files, (current, total, fileName) => setUploadProgress({ current, total, fileName }));
     } finally {
-      setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -762,12 +782,13 @@ function AssetLibrarySection({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
         <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700 }}>{title}</h3>
         <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
           {items.length} / {limits.maxCount}
         </span>
       </div>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--text-faint)' }}>{description}</p>
 
       {items.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -790,8 +811,8 @@ function AssetLibrarySection({
           handleFiles(e.dataTransfer.files);
         }}
         style={{
-          border: `1.5px dashed ${dragOver ? 'var(--teal)' : 'var(--line)'}`,
-          background: dragOver ? 'var(--teal-soft)' : 'transparent',
+          border: `1.5px dashed ${uploading || dragOver ? 'var(--teal)' : 'var(--line)'}`,
+          background: uploading || dragOver ? 'var(--teal-soft)' : 'transparent',
           borderRadius: 8,
           padding: 18,
           textAlign: 'center',
@@ -811,11 +832,25 @@ function AssetLibrarySection({
           }}
           style={{ display: 'none' }}
         />
-        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-faint)' }}>
+        <p
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            margin: 0,
+            fontSize: 12.5,
+            fontWeight: uploading ? 700 : 400,
+            color: uploading ? 'var(--teal)' : 'var(--text-faint)',
+          }}
+        >
+          {uploading && <Spinner />}
           {atLimit
             ? `Library full (${limits.maxCount}/${limits.maxCount}) — remove one to add another.`
-            : uploading
-              ? 'Uploading…'
+            : uploadProgress
+              ? uploadProgress.total > 1
+                ? `Uploading ${uploadProgress.current} of ${uploadProgress.total} — ${uploadProgress.fileName}`
+                : `Uploading ${uploadProgress.fileName}…`
               : 'Drag & drop files here, or click to choose — label and tag them below once uploaded.'}
         </p>
         {!atLimit && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{limits.label}</p>}
@@ -900,7 +935,9 @@ function LibraryItemCard({
           }}
         />
       ) : (
-        <audio controls preload="none" src={api.designers.library.fileUrl(item.id)} style={{ width: '100%', height: 32, marginBottom: 6, display: 'block' }} />
+        <div style={{ width: '100%', height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6, background: 'var(--surface-2)', borderRadius: 6 }}>
+          <AudioPlayButton src={api.designers.library.fileUrl(item.id)} size={36} />
+        </div>
       )}
       <input
         value={label}

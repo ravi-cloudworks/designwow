@@ -224,6 +224,42 @@ requests.post('/:id/links', async (c) => {
 
 requests.post('/:id/submit', async (c) => {
   const id = c.req.param('id');
+
+  const request = await c.env.DB.prepare(
+    `SELECT designer_id, product_name, product_description, target_audience,
+            cta_style, story_direction, terms_confirmed_at, status
+     FROM requests WHERE id = ?`
+  ).bind(id).first<{
+    designer_id: string | null;
+    product_name: string;
+    product_description: string;
+    target_audience: string | null;
+    cta_style: string | null;
+    story_direction: string;
+    terms_confirmed_at: string | null;
+    status: string;
+  }>();
+  if (!request) return c.json({ error: 'not_found' }, 404);
+  if (request.status !== 'draft') return c.json({ error: 'not_a_draft' }, 409);
+
+  const { count: logoCount } = (await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM request_assets WHERE request_id = ? AND type = 'logo'"
+  ).bind(id).first<{ count: number }>()) ?? { count: 0 };
+
+  const missing: string[] = [];
+  if (!request.designer_id) missing.push('designer');
+  if (!request.product_name.trim()) missing.push('product name');
+  if (!request.product_description.trim()) missing.push('product description');
+  if (!logoCount) missing.push('logo');
+  if (!request.target_audience) missing.push('target audience');
+  if (!request.cta_style) missing.push('call-to-action style');
+  if (!request.story_direction.trim()) missing.push('story direction / dialogue');
+  if (!request.terms_confirmed_at) missing.push('approval & revision rules confirmation');
+
+  if (missing.length) {
+    return c.json({ error: 'incomplete_request', missing }, 400);
+  }
+
   try {
     await c.env.DB.prepare(
       `UPDATE requests

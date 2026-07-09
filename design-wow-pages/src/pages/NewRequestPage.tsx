@@ -5,8 +5,11 @@ import { validateFiles, maxCountMessage, UPLOAD_LIMITS, type AssetKind } from '.
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { captureVideoThumbnailFromUrl } from '../lib/videoThumbnail';
+import { Spinner } from '../components/Spinner';
 import { Avatar } from '../components/Avatar';
 import { ImageCropModal } from '../components/ImageCropModal';
+import { AudioPlayButton } from '../components/AudioPlayButton';
 import {
   INDUSTRIES,
   SCRIPT_STYLES,
@@ -20,11 +23,9 @@ import {
   APPROVAL_TERMS,
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
-import { CheckCircle2, Info } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts'];
-const PRIMARY_BACKUP_INFO =
-  "Your designer will use one of these two — confirmed with you before they start work — and deliver a single final video built from it, not both.";
 const LENGTHS = [15, 30, 60];
 const TONES = ['funny', 'emotional', 'energetic', 'professional'];
 
@@ -325,8 +326,13 @@ export function NewRequestPage() {
   }
 
   async function removeExisting(assetId: string) {
-    await api.assets.remove(assetId);
-    setExistingAssets((prev) => prev.filter((a) => a.id !== assetId));
+    try {
+      await api.assets.remove(assetId);
+      setExistingAssets((prev) => prev.filter((a) => a.id !== assetId));
+      showToast('File removed');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove file', 'error');
+    }
   }
 
   useEffect(() => {
@@ -537,15 +543,23 @@ export function NewRequestPage() {
   }
 
   async function handleSubmit() {
-    if (!form.storyDirection.trim()) {
-      setError('Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.');
-      showToast('Story direction is required', 'error');
-      return;
-    }
-    if (!termsConfirmed) {
-      setError('Please confirm the Approval & Revision Rules before submitting.');
-      showToast('Please confirm the Approval & Revision Rules', 'error');
-      return;
+    const hasLogo = existingAssets.some((a) => a.type === 'logo') || !!logoFile;
+    const checks: [boolean, string][] = [
+      [!form.designerId, 'Please choose a designer before submitting.'],
+      [!form.productName.trim(), 'Please add your product or brand name.'],
+      [!form.productDescription.trim(), 'Please add a product description.'],
+      [!hasLogo, 'Please upload a logo before submitting.'],
+      [!form.targetAudience, 'Please choose a target audience.'],
+      [!form.ctaStyle, 'Please choose a call-to-action style.'],
+      [!form.storyDirection.trim(), 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.'],
+      [!termsConfirmed, 'Please confirm the Approval & Revision Rules before submitting.'],
+    ];
+    for (const [failed, message] of checks) {
+      if (failed) {
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
     }
     setSaving(true);
     setError(null);
@@ -666,7 +680,7 @@ export function NewRequestPage() {
       </div>
 
       {/* Row 1: Brand Details */}
-      <Section number={1} title="Brand Details">
+      <Section number={1} title="Brand Details" description="Your product or brand name, description, logo, product photos, and brand colors — the basics your designer starts from.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <Field label="Product or brand name *">
@@ -684,7 +698,7 @@ export function NewRequestPage() {
             </Field>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Field label="Logo">
+            <Field label="Logo *">
               <FileGrid
                 existing={existingAssets.filter((a) => a.type === 'logo')}
                 pending={logoFile ? [logoFile] : []}
@@ -729,7 +743,7 @@ export function NewRequestPage() {
 
       {/* Row 2: Campaign Goal + Target Audience */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
-        <Section number={2} title="Campaign Goal">
+        <Section number={2} title="Campaign Goal" description="What this video needs to achieve.">
           <Field label="Goal *">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {GOALS.map((g) => {
@@ -762,7 +776,7 @@ export function NewRequestPage() {
           </Field>
         </Section>
 
-        <Section number={3} title="Target Audience">
+        <Section number={3} title="Target Audience" description="Who this video is speaking to.">
           <Field label="Audience *">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {TARGET_AUDIENCES.map((a) => {
@@ -798,7 +812,7 @@ export function NewRequestPage() {
       </div>
 
       {/* Row 3: Script Direction */}
-      <Section number={4} title="Script Direction">
+      <Section number={4} title="Script Direction" description="The story, tone, and specific dialogue or beats you want — the more detail here, the fewer revision rounds later.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           <Field label="Script style">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -832,7 +846,7 @@ export function NewRequestPage() {
       </Section>
 
       {/* Row 4: Video Settings */}
-      <Section number={5} title="Video Settings">
+      <Section number={5} title="Video Settings" description="Platform, length, and technical delivery preferences.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
           <Field label="Platform *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -896,12 +910,7 @@ export function NewRequestPage() {
         <Section
           number={6}
           title="Avatar Selection"
-          description={
-            <>
-              Primary + backup avatar preset from your designer's library, or upload your own.
-              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
-            </>
-          }
+          description="Primary + backup avatar preset from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={avatarMode} onChange={setAvatarMode} />}
         >
           <DualPickerField
@@ -925,12 +934,7 @@ export function NewRequestPage() {
         <Section
           number={7}
           title="Background Selection"
-          description={
-            <>
-              Primary + backup scene from your designer's library, or upload your own.
-              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
-            </>
-          }
+          description="Primary + backup scene from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={backgroundMode} onChange={setBackgroundMode} />}
         >
           <DualPickerField
@@ -954,7 +958,7 @@ export function NewRequestPage() {
 
       {/* Row 6: Visual Mood + Music Selection */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
-        <Section number={8} title="Visual Style / Mood">
+        <Section number={8} title="Visual Style / Mood" description="The overall look and feel of the video — pick a reference image, or upload your own.">
           <Field label="Mood">
             <LibraryPickerField
               designerId={form.designerId}
@@ -976,12 +980,7 @@ export function NewRequestPage() {
         <Section
           number={9}
           title="Music Selection"
-          description={
-            <>
-              Primary + backup track from your designer's library, or upload your own.
-              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
-            </>
-          }
+          description="Primary + backup track from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={musicPickMode} onChange={setMusicPickMode} />}
         >
           <Field label="Music">
@@ -1006,7 +1005,7 @@ export function NewRequestPage() {
       </div>
 
       {/* Row 7: Call-to-Action */}
-      <Section number={10} title="Call-to-Action">
+      <Section number={10} title="Call-to-Action" description="How the video should ask viewers to act.">
         <Field label="Call to action style *">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {CTA_STYLES.map((c) => (
@@ -1023,7 +1022,7 @@ export function NewRequestPage() {
       </Section>
 
       {/* Row 8: References & Notes */}
-      <Section number={11} title="References & Notes">
+      <Section number={11} title="References & Notes" description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts.">
         <Field label="Reference files">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'reference_file')}
@@ -1076,7 +1075,7 @@ export function NewRequestPage() {
       </Section>
 
       {/* Row 9: Approval & Revision Rules */}
-      <Section number={12} title="Approval & Revision Rules">
+      <Section number={12} title="Approval & Revision Rules" description="What to expect on delivery, revisions, and payment — please read before confirming.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {APPROVAL_TERMS.map((t, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
@@ -1108,7 +1107,22 @@ export function NewRequestPage() {
         </p>
       )}
       {progress && (
-        <p style={{ background: 'var(--teal-soft)', border: '1px solid var(--teal-line)', color: 'var(--teal)', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: 0 }}>
+        <p
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'var(--teal-soft)',
+            border: '1px solid var(--teal-line)',
+            color: 'var(--teal)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 13,
+            fontWeight: 700,
+            margin: 0,
+          }}
+        >
+          <Spinner />
           {progress}
         </p>
       )}
@@ -1122,14 +1136,6 @@ export function NewRequestPage() {
         </button>
       </div>
     </div>
-  );
-}
-
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <span title={text} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 5, cursor: 'help', color: 'var(--text-faint)' }}>
-      <Info size={13} />
-    </span>
   );
 }
 
@@ -1196,32 +1202,31 @@ function Section({
 }) {
   return (
     <section className="card">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0, flex: 1 }}>
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              background: 'var(--ink)',
-              color: 'var(--paper)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 13,
-              fontWeight: 700,
-              flexShrink: 0,
-              marginTop: 1,
-            }}
-          >
-            {number}
-          </span>
-          <div style={{ minWidth: 0 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: 'var(--ink)',
+                color: 'var(--paper)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {number}
+            </span>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h2>
-            {description && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>{description}</p>}
           </div>
+          {headerRight && <div style={{ flexShrink: 0 }}>{headerRight}</div>}
         </div>
-        {headerRight && <div style={{ flexShrink: 0 }}>{headerRight}</div>}
+        {description && <p style={{ margin: '6px 0 0 36px', fontSize: 12, color: 'var(--text-faint)' }}>{description}</p>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>{children}</div>
     </section>
@@ -1286,14 +1291,10 @@ function PickerTile({
   imageUrl?: string;
   onClick: () => void;
 }) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick();
-      }}
       style={{
         position: 'relative',
         width: TILE_SIZE,
@@ -1301,7 +1302,6 @@ function PickerTile({
         borderRadius: 8,
         padding: 6,
         background: selected ? 'var(--teal-soft)' : backupSelected ? 'var(--amber-soft)' : 'var(--surface)',
-        cursor: 'pointer',
       }}
     >
       <span
@@ -1364,16 +1364,50 @@ function PickerTile({
           Backup
         </span>
       )}
-      {kind === 'image' ? (
-        <img
-          src={imageUrl}
-          alt={label}
-          style={{ width: '100%', height: TILE_SIZE, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }}
-        />
-      ) : (
-        <div style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 4 }}>♪</div>
-      )}
-      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onClick();
+        }}
+        style={{ cursor: 'pointer' }}
+      >
+        {kind === 'image' ? (
+          <div style={{ position: 'relative', width: '100%', height: TILE_SIZE, marginBottom: 4 }}>
+            {!imageLoaded && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 6,
+                  background: 'var(--surface-2)',
+                  animation: 'pulse 1.4s ease-in-out infinite',
+                }}
+              />
+            )}
+            <img
+              src={imageUrl}
+              alt={label}
+              onLoad={() => setImageLoaded(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 6,
+                display: imageLoaded ? 'block' : 'none',
+                position: 'absolute',
+                inset: 0,
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+            {imageUrl && <AudioPlayButton src={imageUrl} />}
+          </div>
+        )}
+        <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
+      </div>
     </div>
   );
 }
@@ -1518,7 +1552,11 @@ function LibraryPickerField({
     return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Choose a designer first to see their presets.</p>;
   }
   if (loading) {
-    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Loading options…</p>;
+    return (
+    <p style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0, fontSize: 12, color: 'var(--teal)' }}>
+      <Spinner /> Loading options…
+    </p>
+  );
   }
 
   const uploadSelected = value?.source === 'upload';
@@ -1532,7 +1570,7 @@ function LibraryPickerField({
             index={i + 1}
             label={item.label}
             kind={kind}
-            imageUrl={kind === 'image' ? api.designers.library.fileUrl(item.id) : undefined}
+            imageUrl={api.designers.library.fileUrl(item.id)}
             selected={value?.source === 'library' && value.assetId === item.id}
             backupSelected={false}
             onClick={() => onChange({ source: 'library', assetId: item.id, label: item.label })}
@@ -1614,7 +1652,11 @@ function DualPickerField({
     return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Choose a designer first to see their presets.</p>;
   }
   if (loading) {
-    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Loading options…</p>;
+    return (
+    <p style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0, fontSize: 12, color: 'var(--teal)' }}>
+      <Spinner /> Loading options…
+    </p>
+  );
   }
 
   function choose(choice: AssetChoice | null) {
@@ -1635,7 +1677,7 @@ function DualPickerField({
             index={i + 1}
             label={item.label}
             kind={kind}
-            imageUrl={kind === 'image' ? api.designers.library.fileUrl(item.id) : undefined}
+            imageUrl={api.designers.library.fileUrl(item.id)}
             selected={primaryValue?.source === 'library' && primaryValue.assetId === item.id}
             backupSelected={backupValue?.source === 'library' && backupValue.assetId === item.id}
             onClick={() => choose({ source: 'library', assetId: item.id, label: item.label })}
@@ -1671,10 +1713,11 @@ function FileGrid({
 }: {
   existing: AssetRow[];
   pending: PendingFile[];
-  onRemoveExisting: (assetId: string) => void;
+  onRemoveExisting: (assetId: string) => Promise<void>;
   onRemovePending: (pending: PendingFile) => void;
 }) {
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   if (existing.length === 0 && pending.length === 0) return null;
 
@@ -1682,6 +1725,15 @@ function FileGrid({
     ...existing.map((a) => ({ name: a.file_name, mimeType: a.mime_type, url: api.assets.fileUrl(a.id) })),
     ...pending.map((p) => ({ name: p.file.name, mimeType: p.file.type, url: p.previewUrl })),
   ];
+
+  async function handleRemoveExisting(assetId: string) {
+    setRemovingId(assetId);
+    try {
+      await onRemoveExisting(assetId);
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   return (
     <>
@@ -1692,8 +1744,9 @@ function FileGrid({
             name={a.file_name}
             mimeType={a.mime_type}
             previewUrl={api.assets.fileUrl(a.id)}
+            removing={removingId === a.id}
             onOpen={() => setLightbox({ files: allFiles, index: i })}
-            onRemove={() => onRemoveExisting(a.id)}
+            onRemove={() => handleRemoveExisting(a.id)}
           />
         ))}
         {pending.map((p, i) => (
@@ -1725,6 +1778,7 @@ function FileChip({
   mimeType,
   previewUrl,
   uploading,
+  removing,
   onOpen,
   onRemove,
 }: {
@@ -1732,15 +1786,43 @@ function FileChip({
   mimeType: string;
   previewUrl: string;
   uploading?: boolean;
+  removing?: boolean;
   onOpen: () => void;
   onRemove: () => void;
 }) {
   const isImage = mimeType.startsWith('image/');
+  const isVideo = mimeType.startsWith('video/');
+  const [videoThumb, setVideoThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isVideo) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    captureVideoThumbnailFromUrl(previewUrl)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setVideoThumb(objectUrl);
+      })
+      .catch(() => {
+        // No thumbnail — falls back to the plain "Video" label below.
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewUrl, isVideo]);
+
   return (
-    <div style={{ position: 'relative', width: 84 }}>
-      <button onClick={onOpen} style={{ display: 'block', textDecoration: 'none', color: 'inherit', border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+    <div style={{ position: 'relative', width: 84, opacity: uploading ? 0.7 : 1 }}>
+      <button
+        onClick={onOpen}
+        aria-label={name}
+        style={{ display: 'block', textDecoration: 'none', color: 'inherit', border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+      >
         <div
           style={{
+            position: 'relative',
             width: 84,
             height: 84,
             borderRadius: 8,
@@ -1754,18 +1836,33 @@ function FileChip({
         >
           {isImage ? (
             <img src={previewUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : isVideo && videoThumb ? (
+            <img src={videoThumb} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
             <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase' }}>
-              {mimeType === 'application/pdf' ? 'PDF' : mimeType.startsWith('video/') ? 'Video' : 'File'}
+              {mimeType === 'application/pdf' ? 'PDF' : isVideo ? 'Video' : 'File'}
             </span>
           )}
+          {removing && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(10,11,14,0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#f0f6f4',
+              }}
+            >
+              <Spinner />
+            </div>
+          )}
         </div>
-        <p style={{ margin: '4px 0 0', fontSize: 10.5, color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {uploading ? `${name} (pending)` : name}
-        </p>
       </button>
       <button
         onClick={onRemove}
+        disabled={removing}
         aria-label={`Remove ${name}`}
         style={{
           position: 'absolute',
@@ -1779,7 +1876,8 @@ function FileChip({
           color: 'var(--crimson)',
           fontSize: 12,
           lineHeight: 1,
-          cursor: 'pointer',
+          cursor: removing ? 'default' : 'pointer',
+          opacity: removing ? 0.5 : 1,
         }}
       >
         ×

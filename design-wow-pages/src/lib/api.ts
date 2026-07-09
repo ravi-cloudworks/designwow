@@ -6,7 +6,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Surface the backend's JSON error detail when there is one (e.g. a
+    // list of missing required fields) instead of just the bare status —
+    // callers that only check `err.message.includes('409')` etc. still
+    // work fine since the status code stays at the front of the message.
+    let detail = '';
+    try {
+      const body = (await res.json()) as { error?: string; missing?: string[] };
+      if (body?.missing?.length) detail = `: missing ${body.missing.join(', ')}`;
+      else if (body?.error) detail = `: ${body.error}`;
+    } catch {
+      // Non-JSON error response — fall back to the plain status text below.
+    }
+    throw new Error(`${res.status} ${res.statusText}${detail}`);
+  }
   return res.json() as Promise<T>;
 }
 

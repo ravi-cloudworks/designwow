@@ -31,9 +31,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         style={{
           position: 'fixed',
           bottom: 20,
-          right: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
           display: 'flex',
           flexDirection: 'column-reverse',
+          alignItems: 'center',
           gap: 8,
           zIndex: 2000,
           maxWidth: 340,
