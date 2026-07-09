@@ -6,6 +6,7 @@ import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { Avatar } from '../components/Avatar';
+import { ImageCropModal } from '../components/ImageCropModal';
 import {
   INDUSTRIES,
   SCRIPT_STYLES,
@@ -19,9 +20,11 @@ import {
   APPROVAL_TERMS,
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Info } from 'lucide-react';
 
 const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts'];
+const PRIMARY_BACKUP_INFO =
+  "Your designer will use one of these two — confirmed with you before they start work — and deliver a single final video built from it, not both.";
 const LENGTHS = [15, 30, 60];
 const TONES = ['funny', 'emotional', 'energetic', 'professional'];
 
@@ -281,6 +284,11 @@ export function NewRequestPage() {
   const [backgroundBackupUpload, setBackgroundBackupUpload] = useState<PendingFile | null>(null);
   const [musicUpload, setMusicUpload] = useState<PendingFile | null>(null);
   const [musicBackupUpload, setMusicBackupUpload] = useState<PendingFile | null>(null);
+  const [imageCropQueue, setImageCropQueue] = useState<{ file: File; onCropped: (file: File) => void } | null>(null);
+
+  function requestImageCrop(file: File, onCropped: (file: File) => void) {
+    setImageCropQueue({ file, onCropped });
+  }
   const [termsConfirmed, setTermsConfirmed] = useState(false);
   const [noSubscription, setNoSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -529,6 +537,11 @@ export function NewRequestPage() {
   }
 
   async function handleSubmit() {
+    if (!form.storyDirection.trim()) {
+      setError('Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.');
+      showToast('Story direction is required', 'error');
+      return;
+    }
     if (!termsConfirmed) {
       setError('Please confirm the Approval & Revision Rules before submitting.');
       showToast('Please confirm the Approval & Revision Rules', 'error');
@@ -606,6 +619,7 @@ export function NewRequestPage() {
               </button>
             ))}
           </div>
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>Don't see your industry? Contact us to have it added.</p>
         </div>
 
         <div>
@@ -656,10 +670,17 @@ export function NewRequestPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <Field label="Product or brand name *">
-              <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
+              <input style={fieldStyle()} maxLength={100} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.productName.length}/100</p>
             </Field>
             <Field label="Product description *">
-              <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.productDescription} onChange={(e) => set('productDescription', e.target.value)} />
+              <textarea
+                style={{ ...fieldStyle(), minHeight: 84 }}
+                maxLength={1000}
+                value={form.productDescription}
+                onChange={(e) => set('productDescription', e.target.value)}
+              />
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.productDescription.length}/1000</p>
             </Field>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -798,7 +819,16 @@ export function NewRequestPage() {
             </div>
           </Field>
         </div>
-        <StoryDetailField value={form.storyDirection} onChange={(v) => set('storyDirection', v)} />
+        <Field label="Story direction / dialogue *">
+          <textarea
+            style={{ ...fieldStyle(), minHeight: 100 }}
+            maxLength={2000}
+            value={form.storyDirection}
+            onChange={(e) => set('storyDirection', e.target.value)}
+            placeholder="Specific dialogue, storyboard beats, or exact wording — the more detail here, the fewer rounds of back-and-forth."
+          />
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.storyDirection.length}/2000</p>
+        </Field>
       </Section>
 
       {/* Row 4: Video Settings */}
@@ -858,15 +888,6 @@ export function NewRequestPage() {
               ))}
             </select>
           </Field>
-          <Field label="Variants needed">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[1, 3].map((n) => (
-                <button key={n} style={pill(form.variantsCount === n)} onClick={() => set('variantsCount', n)}>
-                  {n} {n === 1 ? 'video' : 'hooks'}
-                </button>
-              ))}
-            </div>
-          </Field>
         </div>
       </Section>
 
@@ -875,7 +896,12 @@ export function NewRequestPage() {
         <Section
           number={6}
           title="Avatar Selection"
-          description="Primary + backup avatar preset from your designer's library, or upload your own."
+          description={
+            <>
+              Primary + backup avatar preset from your designer's library, or upload your own.
+              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
+            </>
+          }
           headerRight={<ModeToggle mode={avatarMode} onChange={setAvatarMode} />}
         >
           <DualPickerField
@@ -891,15 +917,20 @@ export function NewRequestPage() {
             onBackupChange={setAvatarBackupChoice}
             primaryUploadFile={avatarUpload}
             backupUploadFile={avatarBackupUpload}
-            onPickPrimaryUpload={(file) => setAvatarUpload({ file, previewUrl: URL.createObjectURL(file) })}
-            onPickBackupUpload={(file) => setAvatarBackupUpload({ file, previewUrl: URL.createObjectURL(file) })}
+            onPickPrimaryUpload={(file) => requestImageCrop(file, (cropped) => setAvatarUpload({ file: cropped, previewUrl: URL.createObjectURL(cropped) }))}
+            onPickBackupUpload={(file) => requestImageCrop(file, (cropped) => setAvatarBackupUpload({ file: cropped, previewUrl: URL.createObjectURL(cropped) }))}
           />
         </Section>
 
         <Section
           number={7}
           title="Background Selection"
-          description="Primary + backup scene from your designer's library, or upload your own."
+          description={
+            <>
+              Primary + backup scene from your designer's library, or upload your own.
+              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
+            </>
+          }
           headerRight={<ModeToggle mode={backgroundMode} onChange={setBackgroundMode} />}
         >
           <DualPickerField
@@ -915,8 +946,8 @@ export function NewRequestPage() {
             onBackupChange={setBackgroundBackupChoice}
             primaryUploadFile={backgroundUpload}
             backupUploadFile={backgroundBackupUpload}
-            onPickPrimaryUpload={(file) => setBackgroundUpload({ file, previewUrl: URL.createObjectURL(file) })}
-            onPickBackupUpload={(file) => setBackgroundBackupUpload({ file, previewUrl: URL.createObjectURL(file) })}
+            onPickPrimaryUpload={(file) => requestImageCrop(file, (cropped) => setBackgroundUpload({ file: cropped, previewUrl: URL.createObjectURL(cropped) }))}
+            onPickBackupUpload={(file) => requestImageCrop(file, (cropped) => setBackgroundBackupUpload({ file: cropped, previewUrl: URL.createObjectURL(cropped) }))}
           />
         </Section>
       </div>
@@ -935,8 +966,8 @@ export function NewRequestPage() {
               onChange={setMoodChoice}
               uploadFile={moodUpload}
               onPickUpload={(file) => {
-                setMoodUpload({ file, previewUrl: URL.createObjectURL(file) });
                 setMoodChoice({ source: 'upload', assetId: '', label: file.name });
+                requestImageCrop(file, (cropped) => setMoodUpload({ file: cropped, previewUrl: URL.createObjectURL(cropped) }));
               }}
             />
           </Field>
@@ -945,6 +976,12 @@ export function NewRequestPage() {
         <Section
           number={9}
           title="Music Selection"
+          description={
+            <>
+              Primary + backup track from your designer's library, or upload your own.
+              <InfoTooltip text={PRIMARY_BACKUP_INFO} />
+            </>
+          }
           headerRight={<ModeToggle mode={musicPickMode} onChange={setMusicPickMode} />}
         >
           <Field label="Music">
@@ -1019,9 +1056,16 @@ export function NewRequestPage() {
               onChange={(e) => setNewLinks((links) => links.map((l, idx) => (idx === i ? e.target.value : l)))}
             />
           ))}
-          <button className="btn" onClick={() => setNewLinks((links) => [...links, ''])}>
+          <button
+            className="btn"
+            disabled={existingLinks.length + newLinks.length >= 5}
+            onClick={() => setNewLinks((links) => [...links, ''])}
+          >
             + Add another link
           </button>
+          {existingLinks.length + newLinks.length >= 5 && (
+            <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>Max 5 links.</p>
+          )}
         </Field>
         <Field label="Do's and don'ts">
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.restrictions ?? ''} onChange={(e) => set('restrictions', e.target.value)} />
@@ -1047,6 +1091,17 @@ export function NewRequestPage() {
         </label>
       </Section>
 
+      {imageCropQueue && (
+        <ImageCropModal
+          files={[imageCropQueue.file]}
+          onCancel={() => setImageCropQueue(null)}
+          onDone={(finalFiles) => {
+            imageCropQueue.onCropped(finalFiles[0]);
+            setImageCropQueue(null);
+          }}
+        />
+      )}
+
       {error && (
         <p style={{ background: 'var(--crimson-soft)', border: '1px solid var(--crimson-line)', color: 'var(--crimson)', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: 0 }}>
           {error}
@@ -1067,6 +1122,14 @@ export function NewRequestPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span title={text} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 5, cursor: 'help', color: 'var(--text-faint)' }}>
+      <Info size={13} />
+    </span>
   );
 }
 
@@ -1127,7 +1190,7 @@ function Section({
 }: {
   number: number;
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -1170,32 +1233,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{label}</label>
       {children}
-    </div>
-  );
-}
-
-function StoryDetailField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(!!value);
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{ border: 'none', background: 'none', color: 'var(--teal)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
-      >
-        + Add specific dialogue or detail (optional)
-      </button>
-    );
-  }
-  return (
-    <div>
-      <textarea
-        style={{ ...fieldStyle(), minHeight: 70 }}
-        maxLength={300}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Optional — specific dialogue, exact wording, or extra detail"
-      />
-      <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{value.length}/300</p>
     </div>
   );
 }
@@ -1366,6 +1403,7 @@ function UploadOwnTile({
         if (e.key === 'Enter' || e.key === ' ') ref.current?.click();
       }}
       style={{
+        position: 'relative',
         width: TILE_SIZE,
         border: `1.5px dashed ${active ? 'var(--teal)' : 'var(--line)'}`,
         borderRadius: 8,
@@ -1374,6 +1412,27 @@ function UploadOwnTile({
         cursor: 'pointer',
       }}
     >
+      {active && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 1,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: 'var(--teal)',
+            color: '#f0f6f4',
+            fontSize: 11,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ✓
+        </span>
+      )}
       <input
         ref={ref}
         type="file"

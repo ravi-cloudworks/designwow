@@ -13,7 +13,6 @@ export const INDUSTRIES: { value: string; label: string }[] = [
   { value: 'textiles', label: 'Textiles & Garments' },
   { value: 'chemicals', label: 'Organic Chemicals' },
   { value: 'building_materials', label: 'Ceramic Tiles / Building Materials' },
-  { value: 'other', label: 'Other' },
 ];
 
 export const SCRIPT_STYLES: { value: string; label: string }[] = [
@@ -99,6 +98,7 @@ export const SUBTITLE_OPTIONS: { value: string; label: string }[] = [
 // Shown so the customer sees the standard delivery terms up front and
 // confirms understanding before submitting.
 export const APPROVAL_TERMS: string[] = [
+  'Where you picked a Primary + Backup (avatar, background, music), your designer will confirm which one they’re using before starting work — only one final video is produced from it',
   'Low-resolution preview delivered within your plan’s SLA window',
   '50% advance typically requested before final production begins',
   'The first round of feedback is treated as standard revision',
