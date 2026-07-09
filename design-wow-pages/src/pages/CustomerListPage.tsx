@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, type CustomerRosterRow } from '../lib/api';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 function formatInr(paise: number): string {
   return `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 export function CustomerListPage() {
+  useDocumentTitle('Customers — Design Wow');
   const [customers, setCustomers] = useState<CustomerRosterRow[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, type User } from '../lib/api';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export function LoginPage() {
+  useDocumentTitle('Log In — Design Wow');
   const [status, setStatus] = useState<'checking' | 'signed-in' | 'signed-out' | 'api-unreachable'>('checking');
   const [user, setUser] = useState<User | null>(null);
 

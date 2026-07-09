@@ -5,8 +5,10 @@ import { Avatar } from '../components/Avatar';
 import { ShowcaseThumbnail } from '../components/ShowcaseThumbnail';
 import { useToast } from '../components/ToastProvider';
 import { captureVideoThumbnailFromFile, captureVideoThumbnailFromUrl } from '../lib/videoThumbnail';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export function ProfilePage() {
+  useDocumentTitle('Profile — Design Wow');
   const { showToast } = useToast();
   const [designerId, setDesignerId] = useState('');
   const [name, setName] = useState('');

@@ -4,6 +4,7 @@ import { api, type AssetRow, type DesignerRow, type RequestInput } from '../lib/
 import { validateFiles, maxCountMessage, UPLOAD_LIMITS, type AssetKind } from '../lib/uploadLimits';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const GOALS = ['conversions', 'brand_awareness', 'ugc_testimonial', 'organic_social'];
 const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts', 'other'];
@@ -229,6 +230,7 @@ export function NewRequestPage() {
   const [params] = useSearchParams();
   const draftIdParam = params.get('draft');
   const navigate = useNavigate();
+  useDocumentTitle(draftIdParam ? 'Edit Draft — Design Wow' : 'New Request — Design Wow');
 
   const [draftId, setDraftId] = useState<string | null>(draftIdParam);
   const [form, setForm] = useState<RequestInput>(emptyForm);

@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type SubscriptionRow, type User } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 function formatInr(paise: number): string {
   return `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 export function AccountPage() {
+  useDocumentTitle('Account — Design Wow');
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);

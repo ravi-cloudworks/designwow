@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type RequestRow } from '../lib/api';
 import { deliveryStats, formatDuration, parseSqliteUtc } from '../lib/timer';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export function DesignerHistoryPage() {
+  useDocumentTitle('History — Design Wow');
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
 

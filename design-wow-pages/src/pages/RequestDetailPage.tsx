@@ -11,6 +11,7 @@ import { PaymentRequestForm } from '../components/PaymentRequestForm';
 import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -43,6 +44,7 @@ export function RequestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [request, setRequest] = useState<RequestRow | null>(null);
+  useDocumentTitle(request ? `${request.product_name} — Design Wow` : 'Request — Design Wow');
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [links, setLinks] = useState<{ url: string }[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);

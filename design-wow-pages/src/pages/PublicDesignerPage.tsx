@@ -4,6 +4,7 @@ import { api, type PublicDesignerProfile, type ShowcaseItem, type User } from '.
 import { Avatar } from '../components/Avatar';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { ShowcaseThumbnail } from '../components/ShowcaseThumbnail';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export function PublicDesignerPage() {
   const { id } = useParams();
@@ -13,6 +14,8 @@ export function PublicDesignerPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
+
+  useDocumentTitle(profile ? `${profile.name} — Design Wow` : 'Design Wow');
 
   useEffect(() => {
     if (!id) return;

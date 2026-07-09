@@ -10,6 +10,7 @@ import { QuickReplies, appendQuickReply } from '../components/QuickReplies';
 import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const STEPS = [
   { key: 'submitted', label: 'Submitted' },
@@ -68,6 +69,7 @@ export function CustomerRequestDetailPage() {
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState<RequestRow | null>(null);
+  useDocumentTitle(request ? `${request.product_name} — Design Wow` : 'Request — Design Wow');
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentAssets, setCommentAssets] = useState<CommentAssetLink[]>([]);
   const [assets, setAssets] = useState<AssetRow[]>([]);

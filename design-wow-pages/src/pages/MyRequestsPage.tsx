@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api, type RequestRow } from '../lib/api';
 import { parseSqliteUtc } from '../lib/timer';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const STATUS_META: Record<RequestRow['status'], { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'var(--text-faint)' },
@@ -27,6 +28,7 @@ const STATUS_ORDER: Record<RequestRow['status'], number> = {
 };
 
 export function MyRequestsPage() {
+  useDocumentTitle('My Requests — Design Wow');
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<RequestRow[]>([]);

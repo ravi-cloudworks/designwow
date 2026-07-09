@@ -4,6 +4,7 @@ import { api, type AssetRow, type RequestRow } from '../lib/api';
 import { formatDuration, timerState, urgencyColor } from '../lib/timer';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const OUTPUT_ACCEPT = ['video/mp4', 'video/quicktime', 'image/png', 'image/jpeg', 'application/pdf'];
 
@@ -14,6 +15,7 @@ export function DeliverPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [request, setRequest] = useState<RequestRow | null>(null);
+  useDocumentTitle(request ? `Deliver: ${request.product_name} — Design Wow` : 'Deliver — Design Wow');
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [loading, setLoading] = useState(true);

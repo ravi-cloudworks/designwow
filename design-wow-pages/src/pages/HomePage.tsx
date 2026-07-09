@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type DesignerRow, type User } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { useToast } from '../components/ToastProvider';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const STEPS = [
   { n: '1', title: 'Submit your brief', body: 'Product, goal, platform, references — once, not re-explained every time.' },
@@ -38,6 +39,8 @@ export function HomePage() {
   const [viewer, setViewer] = useState<User | null | 'unknown'>('unknown');
   const [designers, setDesigners] = useState<DesignerRow[]>([]);
   const [waitlistRole, setWaitlistRole] = useState<'customer' | 'designer' | null>(null);
+
+  useDocumentTitle('Design Wow — UGC Video Ads, Productized');
 
   useEffect(() => {
     api.me().then(({ user }) => setViewer(user)).catch(() => setViewer(null));

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type RequestRow, type RequestStatus } from '../lib/api';
 import { deliveryStats, formatDuration, timerState, urgencyColor } from '../lib/timer';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 const COLUMNS: { key: Extract<RequestStatus, 'queued' | 'in_progress' | 'needs_info' | 'delivered' | 'approved'>; label: string }[] = [
   { key: 'queued', label: 'Queued' },
@@ -24,6 +25,7 @@ function titleCase(value: string): string {
 }
 
 export function QueuePage() {
+  useDocumentTitle('Queue — Design Wow');
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
