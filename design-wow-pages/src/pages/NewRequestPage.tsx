@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, type AssetRow, type DesignerRow, type RequestInput } from '../lib/api';
+import { api, type AssetChoice, type AssetRow, type DesignerRow, type LibraryCategory, type LibraryItem, type RequestInput } from '../lib/api';
 import { validateFiles, maxCountMessage, UPLOAD_LIMITS, type AssetKind } from '../lib/uploadLimits';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { Avatar } from '../components/Avatar';
+import { INDUSTRIES, SCRIPT_STYLES, CTA_STYLES } from '../lib/industries';
 
 const GOALS = ['conversions', 'brand_awareness', 'ugc_testimonial', 'organic_social'];
 const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts', 'other'];
@@ -12,6 +14,17 @@ const LENGTHS = [15, 30, 60, 0];
 const TONES = ['funny', 'emotional', 'energetic', 'professional'];
 const CHARACTER_MODES = ['own_footage', 'ai_avatar', 'need_talent'];
 const MUSIC_MODES = ['pick_for_me', 'customer_provided', 'describe_style'];
+
+// How well a designer's free-text specialty tags match the chosen industry —
+// used only to sort the picker list, so a loose substring match is enough.
+function industryMatchScore(designer: DesignerRow, industryValue: string): number {
+  if (!industryValue) return 0;
+  const tags: string[] = designer.specialty_tags ? JSON.parse(designer.specialty_tags) : [];
+  if (tags.length === 0) return 0;
+  const meta = INDUSTRIES.find((i) => i.value === industryValue);
+  const needles = [industryValue, meta?.label ?? ''].map((s) => s.toLowerCase()).filter(Boolean);
+  return tags.some((t) => needles.some((n) => t.toLowerCase().includes(n) || n.includes(t.toLowerCase()))) ? 1 : 0;
+}
 
 type PendingFile = { file: File; previewUrl: string };
 
@@ -206,6 +219,9 @@ const emptyForm: RequestInput = {
   musicNote: '',
   restrictions: '',
   additionalNotes: '',
+  industry: '',
+  scriptStyle: '',
+  ctaStyle: '',
 };
 
 function fieldStyle() {
@@ -241,6 +257,9 @@ export function NewRequestPage() {
   const [logoFile, setLogoFile] = useState<PendingFile | null>(null);
   const [productFiles, setProductFiles] = useState<PendingFile[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<PendingFile[]>([]);
+  const [avatarChoice, setAvatarChoice] = useState<AssetChoice | null>(null);
+  const [moodChoice, setMoodChoice] = useState<AssetChoice | null>(null);
+  const [musicChoice, setMusicChoice] = useState<AssetChoice | null>(null);
   const [noSubscription, setNoSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -309,7 +328,13 @@ export function NewRequestPage() {
           musicNote: r.music_note ?? '',
           restrictions: r.restrictions ?? '',
           additionalNotes: r.additional_notes ?? '',
+          industry: r.industry ?? '',
+          scriptStyle: r.script_style ?? '',
+          ctaStyle: r.cta_style ?? '',
         });
+        setAvatarChoice(r.avatar_choice ? JSON.parse(r.avatar_choice) : null);
+        setMoodChoice(r.mood_choice ? JSON.parse(r.mood_choice) : null);
+        setMusicChoice(r.music_choice ? JSON.parse(r.music_choice) : null);
         setExistingAssets(detail.assets);
         setExistingLinks(detail.links.map((l) => l.url));
       } else {
@@ -353,8 +378,14 @@ export function NewRequestPage() {
 
   async function persist(): Promise<string> {
     setProgress('Saving details…');
-    const id = draftId ?? (await api.requests.create(form)).id;
-    if (draftId) await api.requests.update(draftId, form);
+    const payload: RequestInput = {
+      ...form,
+      avatarChoice: avatarChoice ? JSON.stringify(avatarChoice) : null,
+      moodChoice: moodChoice ? JSON.stringify(moodChoice) : null,
+      musicChoice: musicChoice ? JSON.stringify(musicChoice) : null,
+    };
+    const id = draftId ?? (await api.requests.create(payload)).id;
+    if (draftId) await api.requests.update(draftId, payload);
     if (!draftId) setDraftId(id);
 
     const uploaded: AssetRow[] = [];
@@ -438,6 +469,11 @@ export function NewRequestPage() {
     }
   }
 
+  const sortedDesigners = useMemo(
+    () => [...designers].sort((a, b) => industryMatchScore(b, form.industry ?? '') - industryMatchScore(a, form.industry ?? '')),
+    [designers, form.industry],
+  );
+
   if (loading) return <p style={{ color: 'var(--text-faint)' }}>Loading…</p>;
 
   if (noSubscription) {
@@ -452,7 +488,7 @@ export function NewRequestPage() {
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
       <div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 24, margin: '0 0 4px' }}>{draftId ? 'Edit Draft' : 'New Request'}</h1>
         <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Fields marked with an asterisk are required.</p>
@@ -474,6 +510,62 @@ export function NewRequestPage() {
         </div>
       )}
 
+      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+        <aside style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 20 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>Industry</label>
+            <p style={{ margin: '0 0 8px', fontSize: 11.5, color: 'var(--text-faint)' }}>Sorts designers by specialty and filters their preset library.</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {INDUSTRIES.map((ind) => (
+                <button key={ind.value} style={{ ...pill(form.industry === ind.value), padding: '6px 10px', fontSize: 12 }} onClick={() => set('industry', ind.value)}>
+                  {ind.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Choose Designer *</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto' }}>
+              {sortedDesigners.map((d) => {
+                const recommended = form.industry && industryMatchScore(d, form.industry) > 0;
+                const selected = form.designerId === d.id;
+                return (
+                  <label
+                    key={d.id}
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: 10,
+                      cursor: 'pointer',
+                      background: selected ? 'var(--teal-soft)' : 'transparent',
+                      borderColor: selected ? 'var(--teal)' : 'var(--line)',
+                    }}
+                  >
+                    <input type="radio" style={{ marginTop: 3 }} checked={selected} onChange={() => set('designerId', d.id)} />
+                    <Avatar name={d.name} avatarUrl={d.avatar_url} size={32} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <strong style={{ fontSize: 13.5 }}>{d.name}</strong>
+                        {recommended && (
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-soft)', borderRadius: 999, padding: '1px 6px', textTransform: 'uppercase' }}>
+                            Match
+                          </span>
+                        )}
+                      </div>
+                      {d.bio && <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--text-soft)' }}>{d.bio}</p>}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 32 }}>
       <Section title="The Basics">
         <Field label="Product or brand name *">
           <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
@@ -544,18 +636,43 @@ export function NewRequestPage() {
             ))}
           </div>
           {form.charactersMode === 'need_talent' && (
-            <textarea
-              style={{ ...fieldStyle(), minHeight: 70, marginTop: 10 }}
-              placeholder="Describe who you're picturing"
-              value={form.charactersDesc ?? ''}
-              onChange={(e) => set('charactersDesc', e.target.value)}
-            />
+            <div style={{ marginTop: 10 }}>
+              <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>Pick an avatar preset from your designer's library, or upload your own.</p>
+              <LibraryPickerField
+                designerId={form.designerId}
+                category="avatar"
+                industry={form.industry ?? ''}
+                kind="image"
+                value={avatarChoice}
+                onChange={setAvatarChoice}
+              />
+            </div>
           )}
+        </Field>
+        <Field label="Visual mood">
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>The overall look and feel of the video — pick a reference image, or upload your own.</p>
+          <LibraryPickerField
+            designerId={form.designerId}
+            category="mood"
+            industry={form.industry ?? ''}
+            kind="image"
+            value={moodChoice}
+            onChange={setMoodChoice}
+          />
         </Field>
         <Field label="Story / script direction *">
           <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.storyDirection} onChange={(e) => set('storyDirection', e.target.value)} />
         </Field>
-        <Field label="Tone & mood">
+        <Field label="Script style">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {SCRIPT_STYLES.map((s) => (
+              <button key={s.value} style={pill(form.scriptStyle === s.value)} onClick={() => set('scriptStyle', s.value)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Tone">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {TONES.map((t) => (
               <button key={t} style={pill(form.tone === t)} onClick={() => set('tone', t)}>
@@ -564,8 +681,18 @@ export function NewRequestPage() {
             ))}
           </div>
         </Field>
-        <Field label="Call to action *">
-          <input style={fieldStyle()} value={form.cta} onChange={(e) => set('cta', e.target.value)} />
+        <Field label="Call to action style *">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {CTA_STYLES.map((c) => (
+              <button
+                key={c.value}
+                style={pill(form.ctaStyle === c.value)}
+                onClick={() => setForm((f) => ({ ...f, ctaStyle: c.value, cta: c.label }))}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
         </Field>
       </Section>
 
@@ -627,6 +754,22 @@ export function NewRequestPage() {
               </button>
             ))}
           </div>
+          {form.musicMode === 'pick_for_me' && (
+            <>
+              <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>Pick a track from your designer's library, or upload your own.</p>
+              <LibraryPickerField
+                designerId={form.designerId}
+                category="music"
+                industry={form.industry ?? ''}
+                kind="audio"
+                value={musicChoice}
+                onChange={setMusicChoice}
+              />
+            </>
+          )}
+          {form.musicMode === 'customer_provided' && (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Attach your track in the Reference files section below.</p>
+          )}
           {form.musicMode === 'describe_style' && (
             <input
               style={fieldStyle()}
@@ -686,28 +829,8 @@ export function NewRequestPage() {
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.additionalNotes ?? ''} onChange={(e) => set('additionalNotes', e.target.value)} />
         </Field>
       </Section>
-
-      <Section title="Choose Designer">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {designers.map((d) => (
-            <label
-              key={d.id}
-              style={{
-                border: '1px solid var(--line)',
-                borderRadius: 10,
-                padding: 14,
-                cursor: 'pointer',
-                background: form.designerId === d.id ? 'var(--teal-soft)' : 'transparent',
-                borderColor: form.designerId === d.id ? 'var(--teal)' : 'var(--line)',
-              }}
-            >
-              <input type="radio" style={{ marginRight: 8 }} checked={form.designerId === d.id} onChange={() => set('designerId', d.id)} />
-              <strong style={{ fontSize: 14 }}>{d.name}</strong>
-              {d.bio && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-soft)' }}>{d.bio}</p>}
-            </label>
-          ))}
         </div>
-      </Section>
+      </div>
 
       {error && (
         <p style={{ background: 'var(--crimson-soft)', border: '1px solid var(--crimson-line)', color: 'var(--crimson)', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: 0 }}>
@@ -754,6 +877,134 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+function LibraryPickerField({
+  designerId,
+  category,
+  industry,
+  kind,
+  value,
+  onChange,
+}: {
+  designerId: string;
+  category: LibraryCategory;
+  industry: string;
+  kind: 'image' | 'audio';
+  value: AssetChoice | null;
+  onChange: (choice: AssetChoice | null) => void;
+}) {
+  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!designerId) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    api.designers.library
+      .fetchFor(designerId, category, industry || undefined)
+      .then(({ items }) => {
+        if (!cancelled) setItems(items);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [designerId, category, industry]);
+
+  if (!designerId) {
+    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Choose a designer first to see their presets.</p>;
+  }
+  if (loading) {
+    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Loading options…</p>;
+  }
+
+  const uploadSelected = value?.source === 'upload';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {items.map((item) => {
+          const selected = value?.source === 'library' && value.assetId === item.id;
+          const select = () => onChange({ source: 'library', assetId: item.id, label: item.label });
+          return (
+            <div
+              key={item.id}
+              style={{
+                width: 96,
+                border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
+                borderRadius: 8,
+                padding: 6,
+                background: selected ? 'var(--teal-soft)' : 'var(--surface)',
+              }}
+            >
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={select}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') select();
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {kind === 'image' ? (
+                  <img
+                    src={api.designers.library.fileUrl(item.id)}
+                    alt={item.label}
+                    style={{ width: '100%', height: 68, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, marginBottom: 4 }}>
+                    ♪
+                  </div>
+                )}
+                <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</p>
+              </div>
+              {kind === 'audio' && (
+                <audio
+                  controls
+                  preload="none"
+                  src={api.designers.library.fileUrl(item.id)}
+                  style={{ width: '100%', height: 28, marginTop: 4 }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+            </div>
+          );
+        })}
+        <button
+          onClick={() => onChange(uploadSelected ? null : { source: 'upload', assetId: '', label: 'Custom (attach in Reference files below)' })}
+          style={{
+            width: 96,
+            height: kind === 'image' ? 98 : 66,
+            border: `1.5px dashed ${uploadSelected ? 'var(--teal)' : 'var(--line)'}`,
+            borderRadius: 8,
+            padding: 6,
+            background: uploadSelected ? 'var(--teal-soft)' : 'var(--surface)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            textAlign: 'center',
+          }}
+        >
+          {uploadSelected ? '✓ Uploading my own' : '+ Upload my own'}
+        </button>
+      </div>
+      {items.length === 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+          No presets yet for this industry — pick "Upload my own" or ask your designer to add some.
+        </p>
+      )}
     </div>
   );
 }

@@ -15,10 +15,21 @@ import { useToast } from '../components/ToastProvider';
 import { captureVideoThumbnailFromFile, captureVideoThumbnailFromUrl } from '../lib/videoThumbnail';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { INDUSTRIES } from '../lib/industries';
+import { LIBRARY_LIMITS, validateLibraryFiles, libraryCountMessage } from '../lib/libraryLimits';
+import { ImageCropModal } from '../components/ImageCropModal';
+
+const TABS = [
+  { key: 'profile', label: 'Public profile' },
+  { key: 'library', label: 'Asset library' },
+  { key: 'payments', label: 'Payment accounts' },
+  { key: 'showcase', label: 'Public showcase' },
+] as const;
+type TabKey = (typeof TABS)[number]['key'];
 
 export function ProfilePage() {
   useDocumentTitle('Profile — Design Wow');
   const { showToast } = useToast();
+  const [activeTab, setActiveTab] = useState<TabKey>('profile');
   const [designerId, setDesignerId] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -62,13 +73,41 @@ export function ProfilePage() {
     setLibraryItems(items);
   }
 
-  async function handleLibraryUpload(category: LibraryCategory, file: File, label: string, industries: string[]) {
+  async function handleLibraryUpload(category: LibraryCategory, files: File[]) {
+    const existingCount = libraryItems.filter((i) => i.category === category).length;
+    const typeOrSizeError = validateLibraryFiles(category, files);
+    if (typeOrSizeError) {
+      showToast(typeOrSizeError, 'error');
+      return;
+    }
+    const countError = libraryCountMessage(category, existingCount + files.length);
+    if (countError) {
+      showToast(countError, 'error');
+      return;
+    }
+
+    let failures = 0;
+    for (const file of files) {
+      try {
+        await api.designers.library.upload(category, file);
+      } catch {
+        failures += 1;
+      }
+    }
+    await loadLibrary();
+    if (failures) {
+      showToast(failures === files.length ? 'Upload failed' : `${files.length - failures} of ${files.length} uploaded`, 'error');
+    } else {
+      showToast(files.length > 1 ? `Added ${files.length} files — tag them below` : 'Added to your library — tag it below');
+    }
+  }
+
+  async function handleLibraryUpdate(itemId: string, body: { label?: string; industries?: string[] }) {
     try {
-      await api.designers.library.upload(category, file, label, industries);
+      await api.designers.library.update(itemId, body);
       await loadLibrary();
-      showToast('Added to your asset library');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Upload failed', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to save', 'error');
     }
   }
 
@@ -299,6 +338,30 @@ export function ProfilePage() {
         })()}
       </div>
 
+      <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--line)' }}>
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            style={{
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              padding: '2px 0 10px',
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: activeTab === t.key ? 'var(--ink)' : 'var(--text-faint)',
+              borderBottom: `2px solid ${activeTab === t.key ? 'var(--ink)' : 'transparent'}`,
+              marginBottom: -1,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'profile' && (
+        <>
       <div className="card">
         <h2 style={cardTitle()}>Public profile</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
@@ -364,6 +427,20 @@ export function ProfilePage() {
       </div>
 
       <div className="card">
+        <h2 style={cardTitle()}>Account</h2>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-soft)' }}>Signed in with Google · {email}</p>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn btn-primary" disabled={saving} onClick={handleSave}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+        </>
+      )}
+
+      {activeTab === 'library' && (
+      <div className="card">
         <h2 style={cardTitle()}>Asset library</h2>
         <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--text-faint)' }}>
           Reusable presets customers pick from when building a brief — tag each with the industries it fits, or leave
@@ -375,7 +452,8 @@ export function ProfilePage() {
             title="Avatar / presenter styles"
             accept="image/png,image/jpeg"
             items={libraryItems.filter((i) => i.category === 'avatar')}
-            onUpload={handleLibraryUpload}
+            onFilesSelected={handleLibraryUpload}
+            onUpdate={handleLibraryUpdate}
             onRemove={handleLibraryRemove}
           />
           <AssetLibrarySection
@@ -383,7 +461,8 @@ export function ProfilePage() {
             title="Mood / visual style"
             accept="image/png,image/jpeg"
             items={libraryItems.filter((i) => i.category === 'mood')}
-            onUpload={handleLibraryUpload}
+            onFilesSelected={handleLibraryUpload}
+            onUpdate={handleLibraryUpdate}
             onRemove={handleLibraryRemove}
           />
           <AssetLibrarySection
@@ -391,12 +470,15 @@ export function ProfilePage() {
             title="Music styles"
             accept="audio/mpeg,audio/wav"
             items={libraryItems.filter((i) => i.category === 'music')}
-            onUpload={handleLibraryUpload}
+            onFilesSelected={handleLibraryUpload}
+            onUpdate={handleLibraryUpdate}
             onRemove={handleLibraryRemove}
           />
         </div>
       </div>
+      )}
 
+      {activeTab === 'showcase' && (
       <div className="card">
         <h2 style={cardTitle()}>Public showcase</h2>
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-faint)' }}>
@@ -502,7 +584,9 @@ export function ProfilePage() {
           </p>
         )}
       </div>
+      )}
 
+      {activeTab === 'payments' && (
       <div className="card">
         <h2 style={cardTitle()}>Payment accounts</h2>
         <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text-faint)' }}>
@@ -566,17 +650,7 @@ export function ProfilePage() {
           </button>
         </div>
       </div>
-
-      <div className="card">
-        <h2 style={cardTitle()}>Account</h2>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-soft)' }}>Signed in with Google · {email}</p>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" disabled={saving} onClick={handleSave}>
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -619,112 +693,229 @@ function AssetLibrarySection({
   title,
   accept,
   items,
-  onUpload,
+  onFilesSelected,
+  onUpdate,
   onRemove,
 }: {
   category: LibraryCategory;
   title: string;
   accept: string;
   items: LibraryAssetRow[];
-  onUpload: (category: LibraryCategory, file: File, label: string, industries: string[]) => Promise<void>;
+  onFilesSelected: (category: LibraryCategory, files: File[]) => Promise<void>;
+  onUpdate: (itemId: string, body: { label?: string; industries?: string[] }) => Promise<void>;
   onRemove: (itemId: string) => Promise<void>;
 }) {
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [label, setLabel] = useState('');
-  const [industries, setIndustries] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [cropQueue, setCropQueue] = useState<File[] | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const limits = LIBRARY_LIMITS[category];
+  const atLimit = items.length >= limits.maxCount;
+  const isImageCategory = category !== 'music';
 
-  function toggleIndustry(value: string) {
-    setIndustries((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
-  }
-
-  async function handleAdd() {
-    if (!pendingFile || !label.trim()) return;
+  async function upload(files: File[]) {
     setUploading(true);
     try {
-      await onUpload(category, pendingFile, label.trim(), industries);
-      setPendingFile(null);
-      setLabel('');
-      setIndustries([]);
-      if (fileInput.current) fileInput.current.value = '';
+      await onFilesSelected(category, files);
     } finally {
       setUploading(false);
     }
   }
 
+  function handleFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    if (!files.length || atLimit) return;
+    if (isImageCategory) {
+      // Drag-and-drop bypasses the input's accept filter, so re-check type
+      // here before handing files to the crop step (which assumes images).
+      const images = files.filter((f) => limits.accept.includes(f.type));
+      if (images.length) setCropQueue(images);
+    } else {
+      upload(files);
+    }
+  }
+
   return (
     <div>
-      <h3 style={{ margin: '0 0 10px', fontSize: 13.5, fontWeight: 700 }}>{title}</h3>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700 }}>{title}</h3>
+        <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+          {items.length} / {limits.maxCount}
+        </span>
+      </div>
 
       {items.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-          {items.map((item) => {
-            const tags: string[] = item.industry_tags ? JSON.parse(item.industry_tags) : [];
-            return (
-              <div key={item.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', width: 150 }}>
-                {item.mime_type.startsWith('image/') ? (
-                  <img
-                    src={api.designers.library.fileUrl(item.id)}
-                    alt={item.label}
-                    style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: '100%',
-                      height: 40,
-                      background: 'var(--surface-2)',
-                      borderRadius: 6,
-                      marginBottom: 6,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10.5,
-                      color: 'var(--text-faint)',
-                    }}
-                  >
-                    ♪ Audio
-                  </div>
-                )}
-                <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.label}
-                </p>
-                <p style={{ margin: '0 0 6px', fontSize: 10.5, color: 'var(--text-faint)' }}>
-                  {tags.length > 0 ? tags.join(', ') : 'Universal'}
-                </p>
-                <button
-                  onClick={() => onRemove(item.id)}
-                  style={{ border: 'none', background: 'none', color: 'var(--crimson)', fontSize: 11.5, cursor: 'pointer', padding: 0 }}
-                >
-                  Remove
-                </button>
-              </div>
-            );
-          })}
+          {items.map((item) => (
+            <LibraryItemCard key={item.id} item={item} onUpdate={onUpdate} onRemove={onRemove} />
+          ))}
         </div>
       )}
 
-      <div style={{ border: '1px dashed var(--line)', borderRadius: 8, padding: 12 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          <input
-            ref={fileInput}
-            type="file"
-            accept={accept}
-            onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
-            style={{ fontSize: 12.5, flex: '1 1 200px' }}
-          />
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Label (e.g. South Indian Woman, Friendly)"
-            style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5, flex: '1 1 220px' }}
-          />
-        </div>
-        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Industries (leave blank for Universal)
+      <div
+        onClick={() => !atLimit && fileInput.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!atLimit) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        style={{
+          border: `1.5px dashed ${dragOver ? 'var(--teal)' : 'var(--line)'}`,
+          background: dragOver ? 'var(--teal-soft)' : 'transparent',
+          borderRadius: 8,
+          padding: 18,
+          textAlign: 'center',
+          cursor: atLimit ? 'default' : 'pointer',
+          opacity: atLimit ? 0.6 : 1,
+        }}
+      >
+        <input
+          ref={fileInput}
+          type="file"
+          accept={accept}
+          multiple
+          disabled={atLimit}
+          onChange={(e) => {
+            handleFiles(e.target.files ?? []);
+            e.target.value = '';
+          }}
+          style={{ display: 'none' }}
+        />
+        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-faint)' }}>
+          {atLimit
+            ? `Library full (${limits.maxCount}/${limits.maxCount}) — remove one to add another.`
+            : uploading
+              ? 'Uploading…'
+              : 'Drag & drop files here, or click to choose — label and tag them below once uploaded.'}
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+        {!atLimit && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{limits.label}</p>}
+      </div>
+
+      {cropQueue && (
+        <ImageCropModal
+          files={cropQueue}
+          onCancel={() => setCropQueue(null)}
+          onDone={(finalFiles) => {
+            setCropQueue(null);
+            upload(finalFiles);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function LibraryItemCard({
+  item,
+  onUpdate,
+  onRemove,
+}: {
+  item: LibraryAssetRow;
+  onUpdate: (itemId: string, body: { label?: string; industries?: string[] }) => Promise<void>;
+  onRemove: (itemId: string) => Promise<void>;
+}) {
+  const [label, setLabel] = useState(item.label);
+  const [industries, setIndustries] = useState<string[]>(item.industry_tags ? JSON.parse(item.industry_tags) : []);
+  const [savingLabel, setSavingLabel] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLabel(item.label);
+    setIndustries(item.industry_tags ? JSON.parse(item.industry_tags) : []);
+  }, [item.id, item.label, item.industry_tags]);
+
+  useEffect(() => {
+    if (!tagsOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) setTagsOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [tagsOpen]);
+
+  async function saveLabel() {
+    const trimmed = label.trim();
+    if (!trimmed || trimmed === item.label) {
+      setLabel(item.label);
+      return;
+    }
+    setSavingLabel(true);
+    try {
+      await onUpdate(item.id, { label: trimmed });
+    } finally {
+      setSavingLabel(false);
+    }
+  }
+
+  async function toggleIndustry(value: string) {
+    const next = industries.includes(value) ? industries.filter((v) => v !== value) : [...industries, value];
+    setIndustries(next);
+    await onUpdate(item.id, { industries: next });
+  }
+
+  return (
+    <div ref={cardRef} style={{ position: 'relative', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', width: 172 }}>
+      {item.mime_type.startsWith('image/') ? (
+        <img
+          src={api.designers.library.fileUrl(item.id)}
+          alt={item.label}
+          style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', borderRadius: 6, marginBottom: 6, display: 'block' }}
+        />
+      ) : (
+        <audio controls preload="none" src={api.designers.library.fileUrl(item.id)} style={{ width: '100%', height: 32, marginBottom: 6, display: 'block' }} />
+      )}
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onBlur={saveLabel}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+        placeholder="Label"
+        style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 6px', fontSize: 11.5, fontWeight: 600, marginBottom: 6 }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setTagsOpen((v) => !v)}
+          style={{ border: '1px solid var(--line)', background: 'transparent', color: 'var(--text-soft)', borderRadius: 999, padding: '2px 8px', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}
+        >
+          + Tags
+        </button>
+        {industries.length === 0 ? (
+          <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>Universal</span>
+        ) : (
+          industries.map((v) => (
+            <span key={v} style={{ fontSize: 9.5, color: 'var(--teal)', background: 'var(--teal-soft)', borderRadius: 999, padding: '2px 7px' }}>
+              {INDUSTRIES.find((i) => i.value === v)?.label ?? v}
+            </span>
+          ))
+        )}
+      </div>
+      {tagsOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            zIndex: 10,
+            width: 220,
+            marginTop: 4,
+            background: 'var(--surface)',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            padding: 10,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+          }}
+        >
           {INDUSTRIES.map((ind) => (
             <button
               key={ind.value}
@@ -734,8 +925,8 @@ function AssetLibrarySection({
                 background: industries.includes(ind.value) ? 'var(--teal-soft)' : 'transparent',
                 color: industries.includes(ind.value) ? 'var(--teal)' : 'var(--text-soft)',
                 borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: 11.5,
+                padding: '3px 9px',
+                fontSize: 11,
                 cursor: 'pointer',
               }}
             >
@@ -743,10 +934,14 @@ function AssetLibrarySection({
             </button>
           ))}
         </div>
-        <button className="btn" disabled={uploading || !pendingFile || !label.trim()} onClick={handleAdd}>
-          {uploading ? 'Adding…' : '+ Add to library'}
-        </button>
-      </div>
+      )}
+      {savingLabel && <p style={{ margin: '0 0 6px', fontSize: 10, color: 'var(--text-faint)' }}>Saving…</p>}
+      <button
+        onClick={() => onRemove(item.id)}
+        style={{ border: 'none', background: 'none', color: 'var(--crimson)', fontSize: 11.5, cursor: 'pointer', padding: 0 }}
+      >
+        Remove
+      </button>
     </div>
   );
 }

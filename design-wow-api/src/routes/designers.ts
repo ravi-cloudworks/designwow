@@ -386,7 +386,12 @@ const LIBRARY_ACCEPT: Record<string, string[]> = {
   mood: ['image/png', 'image/jpeg'],
   music: ['audio/mpeg', 'audio/mp3', 'audio/wav'],
 };
-const LIBRARY_MAX_BYTES = 20 * 1024 * 1024;
+const LIBRARY_MAX_BYTES: Record<string, number> = {
+  avatar: 8 * 1024 * 1024,
+  mood: 8 * 1024 * 1024,
+  music: 20 * 1024 * 1024,
+};
+const LIBRARY_MAX_COUNT = 25;
 
 designers.get('/me/asset-library', async (c) => {
   const userId = currentUserId(c);
@@ -412,20 +417,30 @@ designers.put('/me/asset-library/:category/:filename', async (c) => {
     return c.json({ error: 'unsupported_type', allowed: LIBRARY_ACCEPT[category] }, 415);
   }
   const contentLength = Number(c.req.header('Content-Length') ?? 0);
-  if (!contentLength || contentLength > LIBRARY_MAX_BYTES) {
-    return c.json({ error: 'file_too_large', maxBytes: LIBRARY_MAX_BYTES }, 413);
+  if (!contentLength || contentLength > LIBRARY_MAX_BYTES[category]) {
+    return c.json({ error: 'file_too_large', maxBytes: LIBRARY_MAX_BYTES[category] }, 413);
+  }
+
+  const { count } = (await c.env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM designer_asset_library WHERE designer_id = ? AND category = ?'
+  ).bind(userId, category).first<{ count: number }>()) ?? { count: 0 };
+  if (count >= LIBRARY_MAX_COUNT) {
+    return c.json({ error: 'limit_reached', maxCount: LIBRARY_MAX_COUNT }, 400);
   }
 
   // Label + industry tags travel as query params since this is a raw file
-  // PUT, same pattern as filename-in-path elsewhere in this app.
-  const label = (c.req.query('label') ?? '').trim().slice(0, 100);
-  if (!label) return c.json({ error: 'missing_label' }, 400);
+  // PUT, same pattern as filename-in-path elsewhere in this app. Label is
+  // optional at upload time — customers can drop a batch of files first and
+  // tag each one afterwards via the PATCH route below, rather than typing a
+  // label per file before anything uploads.
+  const filename = c.req.param('filename');
+  const fallbackLabel = filename.replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 100) || 'Untitled';
+  const label = (c.req.query('label') ?? '').trim().slice(0, 100) || fallbackLabel;
   const industries = (c.req.query('industries') ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const filename = c.req.param('filename');
   const id = crypto.randomUUID();
   const key = `asset-library/${userId}/${id}-${filename}`;
   await c.env.ASSETS.put(key, c.req.raw.body, { httpMetadata: { contentType } });
@@ -436,6 +451,37 @@ designers.put('/me/asset-library/:category/:filename', async (c) => {
   ).bind(id, userId, category, label, key, filename, contentType, contentLength, industries.length ? JSON.stringify(industries) : null).run();
 
   return c.json({ id }, 201);
+});
+
+designers.patch('/me/asset-library/:itemId', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const itemId = c.req.param('itemId');
+
+  const body = await c.req.json<{ label?: string; industries?: string[] }>();
+  const updates: string[] = [];
+  const values: unknown[] = [];
+
+  if (typeof body.label === 'string') {
+    const label = body.label.trim().slice(0, 100);
+    if (!label) return c.json({ error: 'missing_label' }, 400);
+    updates.push('label = ?');
+    values.push(label);
+  }
+  if (Array.isArray(body.industries)) {
+    const industries = body.industries.filter((v): v is string => typeof v === 'string');
+    updates.push('industry_tags = ?');
+    values.push(industries.length ? JSON.stringify(industries) : null);
+  }
+  if (!updates.length) return c.json({ error: 'no_updates' }, 400);
+
+  values.push(itemId, userId);
+  const result = await c.env.DB.prepare(
+    `UPDATE designer_asset_library SET ${updates.join(', ')} WHERE id = ? AND designer_id = ?`
+  ).bind(...values).run();
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+
+  return c.json({ ok: true });
 });
 
 designers.delete('/me/asset-library/:itemId', async (c) => {

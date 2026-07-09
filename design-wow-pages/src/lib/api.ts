@@ -342,8 +342,8 @@ export const api = {
       request<{ profile: PublicDesignerProfile; items: ShowcaseItem[] }>(`/api/designers/${id}/public`),
     library: {
       list: () => request<{ items: LibraryAssetRow[] }>('/api/designers/me/asset-library'),
-      upload: async (category: LibraryCategory, file: File, label: string, industries: string[]): Promise<{ id: string }> => {
-        const params = new URLSearchParams({ label, industries: industries.join(',') });
+      upload: async (category: LibraryCategory, file: File, label?: string, industries?: string[]): Promise<{ id: string }> => {
+        const params = new URLSearchParams({ label: label ?? '', industries: (industries ?? []).join(',') });
         const res = await fetch(`${API_URL}/api/designers/me/asset-library/${category}/${encodeURIComponent(file.name)}?${params}`, {
           method: 'PUT',
           credentials: 'include',
@@ -353,6 +353,8 @@ export const api = {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
       },
+      update: (itemId: string, body: { label?: string; industries?: string[] }) =>
+        request<{ ok: boolean }>(`/api/designers/me/asset-library/${itemId}`, { method: 'PATCH', body: JSON.stringify(body) }),
       remove: (itemId: string) => request<{ ok: boolean }>(`/api/designers/me/asset-library/${itemId}`, { method: 'DELETE' }),
       fileUrl: (itemId: string) => `${API_URL}/api/designers/library-items/${itemId}/file`,
       fetchFor: (designerId: string, category: LibraryCategory, industry?: string) => {
