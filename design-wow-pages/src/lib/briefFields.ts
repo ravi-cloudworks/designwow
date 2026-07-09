@@ -11,11 +11,11 @@ import {
   SUBTITLE_OPTIONS,
 } from './industries';
 
-function titleCase(value: string): string {
+export function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
-function parseChoice(json: string | null): AssetChoice | null {
+export function parseChoice(json: string | null): AssetChoice | null {
   if (!json) return null;
   try {
     return JSON.parse(json);
@@ -24,7 +24,7 @@ function parseChoice(json: string | null): AssetChoice | null {
   }
 }
 
-function labelFor(list: { value: string; label: string }[], value: string | null): string | null {
+export function labelFor(list: { value: string; label: string }[], value: string | null): string | null {
   if (!value) return null;
   return list.find((i) => i.value === value)?.label ?? titleCase(value);
 }

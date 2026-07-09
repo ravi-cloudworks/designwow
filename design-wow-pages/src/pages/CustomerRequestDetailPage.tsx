@@ -11,7 +11,7 @@ import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
-import { getBriefFields } from '../lib/briefFields';
+import { BriefSummary } from '../components/BriefSummary';
 
 const STEPS = [
   { key: 'submitted', label: 'Submitted' },
@@ -294,17 +294,7 @@ export function CustomerRequestDetailPage() {
         </a>
       </div>
 
-      {tab === 'brief' && (
-        <div className="card">
-          <h2 style={{ ...cardTitleStyle, margin: '0 0 14px' }}>Request summary</h2>
-          <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 22px', margin: 0 }}>
-            {request.designer_name && <SummaryItem label="Designer" value={request.designer_name} />}
-            {getBriefFields(request).map((f) => (
-              <SummaryItem key={f.label} label={f.label} value={f.value} full={f.full} />
-            ))}
-          </dl>
-        </div>
-      )}
+      {tab === 'brief' && <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />}
 
       {tab === 'output' && (
         <>
@@ -502,15 +492,6 @@ export function CustomerRequestDetailPage() {
           onClose={() => setPaymentModal(null)}
         />
       )}
-    </div>
-  );
-}
-
-function SummaryItem({ label, value, full }: { label: string; value: string; full?: boolean }) {
-  return (
-    <div style={full ? { gridColumn: '1 / -1' } : undefined}>
-      <dt style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, marginBottom: 3 }}>{label}</dt>
-      <dd style={{ margin: 0, fontSize: 13.5, lineHeight: 1.4 }}>{value}</dd>
     </div>
   );
 }

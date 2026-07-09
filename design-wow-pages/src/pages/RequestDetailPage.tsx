@@ -12,8 +12,8 @@ import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
-import { getBriefFields } from '../lib/briefFields';
 import { UpdateFieldModal } from '../components/UpdateFieldModal';
+import { BriefSummary } from '../components/BriefSummary';
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -237,18 +237,13 @@ export function RequestDetailPage() {
           </div>
 
           {tab === 'brief' && (
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <h2 style={{ ...cardTitleStyle, margin: 0 }}>Brief</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setShowUpdateModal(true)}>
                   Update VIP
                 </button>
               </div>
-              <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 22px', margin: 0 }}>
-                {getBriefFields(request).map((f) => (
-                  <BriefItem key={f.label} label={f.label} value={f.value} full={f.full} />
-                ))}
-              </dl>
+              <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />
             </div>
           )}
 
@@ -405,15 +400,6 @@ export function RequestDetailPage() {
       {showUpdateModal && (
         <UpdateFieldModal request={request} onClose={() => setShowUpdateModal(false)} onUpdated={load} />
       )}
-    </div>
-  );
-}
-
-function BriefItem({ label, value, full }: { label: string; value: string; full?: boolean }) {
-  return (
-    <div style={full ? { gridColumn: '1 / -1' } : undefined}>
-      <dt style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, marginBottom: 3 }}>{label}</dt>
-      <dd style={{ margin: 0, fontSize: 13.5, lineHeight: 1.4 }}>{value}</dd>
     </div>
   );
 }

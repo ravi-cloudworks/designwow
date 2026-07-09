@@ -94,6 +94,10 @@ export const SUBTITLE_OPTIONS: { value: string; label: string }[] = [
   { value: 'no', label: 'No' },
 ];
 
+export const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts'];
+export const LENGTHS = [15, 30, 60];
+export const TONES = ['funny', 'emotional', 'energetic', 'professional'];
+
 // Static, informational-only — not tied to any enforcement in the app.
 // Shown so the customer sees the standard delivery terms up front and
 // confirms understanding before submitting.
