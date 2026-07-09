@@ -1,0 +1,279 @@
+<title>Customers — Designer</title>
+<style>
+  :root {
+    --ink: #14161b;
+    --paper: #eef1f2;
+    --surface: #ffffff;
+    --surface-2: #e6e9eb;
+    --text: #14161b;
+    --text-soft: #565b66;
+    --text-faint: #8b92a1;
+    --line: #dbdfe2;
+    --line-soft: #e8ebed;
+
+    --teal: #176b5e;
+    --teal-soft: #e3f1ee;
+    --teal-line: #bcded6;
+
+    --amber: #a05f10;
+    --amber-soft: #fbeedb;
+    --amber-line: #eccd9a;
+
+    --crimson: #b23a37;
+    --crimson-soft: #fbe6e5;
+
+    --moss: #2f7a4f;
+    --moss-soft: #e3f3e9;
+    --moss-line: #bfe0cc;
+
+    --display: "Avenir Next", "Century Gothic", "Segoe UI Semibold", ui-sans-serif, system-ui, sans-serif;
+    --body: -apple-system, "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    --mono: "SF Mono", "Roboto Mono", ui-monospace, "Consolas", monospace;
+
+    --radius: 10px;
+    --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 1px 1px rgba(20, 22, 27, 0.03);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+      --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+      --line: #2c313a; --line-soft: #23272f;
+      --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+      --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+      --crimson: #e2635f; --crimson-soft: #3a2220;
+      --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+    --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+    --line: #2c313a; --line-soft: #23272f;
+    --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+    --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+    --crimson: #e2635f; --crimson-soft: #3a2220;
+    --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+  }
+  :root[data-theme="light"] {
+    --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
+    --text: #14161b; --text-soft: #565b66; --text-faint: #8b92a1;
+    --line: #dbdfe2; --line-soft: #e8ebed;
+    --teal: #176b5e; --teal-soft: #e3f1ee; --teal-line: #bcded6;
+    --amber: #a05f10; --amber-soft: #fbeedb; --amber-line: #eccd9a;
+    --crimson: #b23a37; --crimson-soft: #fbe6e5;
+    --moss: #2f7a4f; --moss-soft: #e3f3e9; --moss-line: #bfe0cc;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--paper); color: var(--text); font-family: var(--body); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .app { display: flex; align-items: flex-start; min-height: 100vh; }
+
+  .sidebar {
+    width: 232px; flex: none; padding: 28px 20px; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 28px; position: sticky; top: 0; height: 100vh;
+  }
+  .identity { display: flex; align-items: center; gap: 12px; }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(160deg, var(--teal), #0e463d); color: #f0f6f4;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 700; font-size: 14px; flex: none;
+  }
+  .identity-text h2 { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 700; }
+  .identity-text span { font-size: 12px; color: var(--text-faint); }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav a { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 7px; font-size: 14px; color: var(--text-soft); }
+  .nav a:hover { background: var(--surface-2); }
+  .nav a.active { background: var(--teal-soft); color: var(--teal); font-weight: 600; }
+  .nav .count { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+  .nav a.active .count { color: var(--teal); }
+
+  .main { flex: 1; min-width: 0; padding: 28px 32px 40px; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-family: var(--display); font-size: 26px; font-weight: 700; text-wrap: balance; }
+  .page-head .sub { margin: 0; font-size: 13.5px; color: var(--text-faint); }
+
+  .search {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px;
+    width: 220px;
+  }
+  .search input { border: none; outline: none; background: transparent; font-size: 13px; width: 100%; }
+  .search svg { flex: none; color: var(--text-faint); }
+
+  .totals { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; min-width: 150px; }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); font-weight: 600; margin-bottom: 6px; }
+  .stat .value { font-family: var(--mono); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint);
+    font-weight: 600; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td { padding: 13px 16px; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); cursor: pointer; }
+
+  .cust-cell { display: flex; align-items: center; gap: 10px; }
+  .cust-cell .c-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 700; font-size: 11.5px; color: #f0f6f4;
+  }
+  .cust-cell .c-name { font-weight: 600; }
+  .cust-cell .c-since { font-size: 11.5px; color: var(--text-faint); }
+
+  .plan-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 5px; border: 1px solid transparent; }
+  .plan-tag.priority { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); }
+  .plan-tag.standard { background: var(--surface-2); color: var(--text-soft); }
+
+  .status-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .status-tag .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .status-tag.active .dot { background: var(--teal); }
+  .status-tag.idle .dot { background: var(--text-faint); }
+  .status-tag.paused .dot { background: var(--amber); }
+
+  td.amount { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  th:last-child, td:last-child { text-align: right; }
+</style>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="identity">
+      <div class="avatar">PR</div>
+      <div class="identity-text">
+        <h2>Priya Raman</h2>
+        <span>Designer</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#">Queue <span class="count">4</span></a>
+      <a href="#" class="active">Customers <span class="count">6</span></a>
+      <a href="#">History</a>
+      <a href="#">Profile</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Customers</h1>
+        <p class="sub">Everyone you've delivered for, and what they've paid</p>
+      </div>
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.6" stroke="currentColor" stroke-width="1.4"/><path d="m9.7 9.7 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search customers">
+      </div>
+    </div>
+
+    <div class="totals">
+      <div class="stat"><div class="label">Active customers</div><div class="value">4</div></div>
+      <div class="stat"><div class="label">Total collected</div><div class="value">&#8377;33,993</div></div>
+      <div class="stat"><div class="label">Requests completed</div><div class="value">22</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Requests</th>
+            <th>Since</th>
+            <th>Amount paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#2f7a4f,#1c4d31);">GS</div>
+                <div><div class="c-name">Glow Skincare</div><div class="c-since">glow@example.com</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag priority">Priority</span></td>
+            <td><span class="status-tag active"><span class="dot"></span>Active request</span></td>
+            <td>7</td>
+            <td>Feb 2026</td>
+            <td class="amount">&#8377;34,995</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#565b66,#33363d);">NC</div>
+                <div><div class="c-name">Nomad Coffee Co.</div><div class="c-since">hi@nomadcoffee.example</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag standard">Standard</span></td>
+            <td><span class="status-tag active"><span class="dot"></span>Active request</span></td>
+            <td>5</td>
+            <td>Mar 2026</td>
+            <td class="amount">&#8377;11,996</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#a05f10,#6b3f0a);">FB</div>
+                <div><div class="c-name">Fitbyte App</div><div class="c-since">team@fitbyte.example</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag priority">Priority</span></td>
+            <td><span class="status-tag active"><span class="dot"></span>Active request</span></td>
+            <td>4</td>
+            <td>Apr 2026</td>
+            <td class="amount">&#8377;20,997</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#176b5e,#0e463d);">LE</div>
+                <div><div class="c-name">Lumen Eyewear</div><div class="c-since">hello@lumeneyewear.example</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag standard">Standard</span></td>
+            <td><span class="status-tag active"><span class="dot"></span>Needs info</span></td>
+            <td>2</td>
+            <td>Jun 2026</td>
+            <td class="amount">&#8377;5,998</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#b23a37,#7a2624);">AC</div>
+                <div><div class="c-name">Aura Candles</div><div class="c-since">orders@auracandles.example</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag standard">Standard</span></td>
+            <td><span class="status-tag idle"><span class="dot"></span>No active request</span></td>
+            <td>3</td>
+            <td>Jan 2026</td>
+            <td class="amount">&#8377;8,997</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="cust-cell">
+                <div class="c-avatar" style="background:linear-gradient(160deg,#8b92a1,#565b66);">VP</div>
+                <div><div class="c-name">Verve Protein</div><div class="c-since">brand@verveprotein.example</div></div>
+              </div>
+            </td>
+            <td><span class="plan-tag priority">Priority</span></td>
+            <td><span class="status-tag paused"><span class="dot"></span>Subscription paused</span></td>
+            <td>1</td>
+            <td>May 2026</td>
+            <td class="amount">&#8377;6,999</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>

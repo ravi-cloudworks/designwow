@@ -1,0 +1,25 @@
+name = "design-wow-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ugc-queue-db"
+database_id = "f06e3781-9576-4685-bafe-512a8eaebe3b"
+
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "ugc-queue-assets"
+
+[vars]
+GOOGLE_CLIENT_ID = "1090261704938-0oains3voanh0hjduj03v1pdcn1d3ld9.apps.googleusercontent.com"
+FRONTEND_ORIGIN = "https://designwow.pages.dev"
+# Fixed rather than derived from the incoming request URL, since requests now
+# arrive via the Pages Function proxy at designwow.pages.dev/api/*, not
+# directly at this Worker's own domain.
+GOOGLE_REDIRECT_URI = "https://designwow.pages.dev/api/auth/google/callback"
+
+# Secrets (set via `wrangler secret put`, not stored here):
+#   GOOGLE_CLIENT_SECRET
+#   SESSION_SECRET

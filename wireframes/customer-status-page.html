@@ -1,0 +1,354 @@
+<title>Your Request — Customer</title>
+<style>
+  :root {
+    --ink: #14161b;
+    --paper: #eef1f2;
+    --surface: #ffffff;
+    --surface-2: #e6e9eb;
+    --text: #14161b;
+    --text-soft: #565b66;
+    --text-faint: #8b92a1;
+    --line: #dbdfe2;
+    --line-soft: #e8ebed;
+
+    --teal: #176b5e;
+    --teal-soft: #e3f1ee;
+    --teal-line: #bcded6;
+
+    --amber: #a05f10;
+    --amber-soft: #fbeedb;
+    --amber-line: #eccd9a;
+
+    --crimson: #b23a37;
+    --crimson-soft: #fbe6e5;
+
+    --moss: #2f7a4f;
+    --moss-soft: #e3f3e9;
+    --moss-line: #bfe0cc;
+
+    --display: "Avenir Next", "Century Gothic", "Segoe UI Semibold", ui-sans-serif, system-ui, sans-serif;
+    --body: -apple-system, "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    --mono: "SF Mono", "Roboto Mono", ui-monospace, "Consolas", monospace;
+
+    --radius: 10px;
+    --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 1px 1px rgba(20, 22, 27, 0.03);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+      --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+      --line: #2c313a; --line-soft: #23272f;
+      --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+      --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+      --crimson: #e2635f; --crimson-soft: #3a2220;
+      --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+    --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+    --line: #2c313a; --line-soft: #23272f;
+    --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+    --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+    --crimson: #e2635f; --crimson-soft: #3a2220;
+    --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+  }
+
+  :root[data-theme="light"] {
+    --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
+    --text: #14161b; --text-soft: #565b66; --text-faint: #8b92a1;
+    --line: #dbdfe2; --line-soft: #e8ebed;
+    --teal: #176b5e; --teal-soft: #e3f1ee; --teal-line: #bcded6;
+    --amber: #a05f10; --amber-soft: #fbeedb; --amber-line: #eccd9a;
+    --crimson: #b23a37; --crimson-soft: #fbe6e5;
+    --moss: #2f7a4f; --moss-soft: #e3f3e9; --moss-line: #bfe0cc;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--text);
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .back-link { font-size: 13px; color: var(--text-soft); display: flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--text); }
+  .plan-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--amber-soft); border: 1px solid var(--amber-line); color: var(--amber);
+    padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  }
+  .plan-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 36px 32px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .request-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .request-head .eyebrow {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint); font-weight: 600; margin: 0 0 4px;
+  }
+  .request-head h1 { font-family: var(--display); font-size: 24px; margin: 0 0 6px; font-weight: 700; text-wrap: balance; }
+  .request-head .meta { font-size: 13px; color: var(--text-faint); }
+
+  .designer-mini {
+    display: flex; align-items: center; gap: 9px;
+    border: 1px solid var(--line); background: var(--surface);
+    padding: 7px 12px 7px 7px; border-radius: 999px;
+  }
+  .designer-mini .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(160deg, var(--teal), #0e463d);
+    color: #f0f6f4; display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 700; font-size: 11px; flex: none;
+  }
+  .designer-mini div span { display: block; }
+  .designer-mini .d-name { font-size: 12.5px; font-weight: 600; }
+  .designer-mini .d-role { font-size: 11px; color: var(--text-faint); }
+
+  /* ---- stepper ---- */
+  .stepper { position: relative; padding: 6px 6px 0; }
+  .stepper-track {
+    position: absolute; top: 20px; left: 34px; right: 34px; height: 2px;
+    background: var(--line);
+  }
+  .stepper-track-fill {
+    position: absolute; top: 20px; left: 34px; height: 2px;
+    background: var(--moss); width: 62%;
+  }
+  .stepper-nodes { position: relative; display: flex; justify-content: space-between; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 90px; }
+  .step .node {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--line); background: var(--surface); flex: none;
+  }
+  .step.done .node { background: var(--moss); border-color: var(--moss); color: #f0f6f4; }
+  .step.current .node { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 0 4px var(--teal-soft); }
+  .step .label { font-size: 12px; font-weight: 600; color: var(--text-faint); text-align: center; }
+  .step.done .label, .step.current .label { color: var(--text); }
+  .step .sub { font-size: 10.5px; color: var(--text-faint); text-align: center; }
+
+  /* ---- card base ---- */
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow-card);
+    padding: 20px;
+  }
+  .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .card-title-row h2 { font-family: var(--display); font-size: 15.5px; font-weight: 700; margin: 0; }
+  .link-btn { font-size: 12.5px; font-weight: 600; color: var(--teal); }
+
+  /* ---- delivery card ---- */
+  .delivery-body { display: flex; gap: 18px; }
+  .video-preview {
+    width: 148px; height: 264px; flex: none; border-radius: 8px;
+    background: linear-gradient(160deg, #23272f, #14161b);
+    position: relative; overflow: hidden;
+  }
+  .video-preview .play {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.92);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .video-preview .duration {
+    position: absolute; bottom: 8px; right: 8px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-family: var(--mono); font-size: 11px; padding: 2px 6px; border-radius: 4px;
+  }
+  .delivery-info { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .delivery-stat {
+    display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+    background: var(--moss-soft); border: 1px solid var(--moss-line); color: var(--moss);
+    padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .delivery-file { font-size: 13.5px; font-weight: 600; }
+  .delivery-file span { display: block; font-size: 12px; font-weight: 400; color: var(--text-faint); margin-top: 2px; }
+  .delivery-actions { display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap; }
+  .btn { border-radius: 8px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface); }
+  .btn:hover { border-color: var(--text-faint); }
+  .btn-primary { background: var(--teal); border-color: var(--teal); color: #f0f6f4; }
+  .btn-primary:hover { opacity: 0.92; }
+  .btn-secondary { color: var(--crimson); }
+  .btn-secondary:hover { border-color: var(--crimson); }
+  .revision-note { font-size: 11.5px; color: var(--text-faint); }
+
+  /* ---- clarification card ---- */
+  .resolved-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line);
+    padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .thread { display: flex; flex-direction: column; gap: 10px; }
+  .bubble { max-width: 88%; padding: 10px 13px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+  .bubble.designer { background: var(--amber-soft); border: 1px solid var(--amber-line); align-self: flex-start; border-bottom-left-radius: 3px; }
+  .bubble.customer { background: var(--surface-2); align-self: flex-end; border-bottom-right-radius: 3px; }
+  .bubble .who { font-size: 11px; font-weight: 700; margin-bottom: 3px; display: block; }
+  .bubble.designer .who { color: var(--amber); }
+  .bubble time { display: block; font-size: 10.5px; color: var(--text-faint); margin-top: 5px; }
+  .pause-note { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+
+  /* ---- summary card ---- */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .summary-item dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 3px; font-weight: 600; }
+  .summary-item dd { margin: 0; font-size: 13.5px; }
+
+  /* ---- drafts note ---- */
+  .drafts-note {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px 18px;
+    flex-wrap: wrap;
+  }
+  .drafts-note p { margin: 0; font-size: 13px; color: var(--text-soft); }
+  .drafts-note .chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .drafts-note .chip { font-size: 11.5px; background: var(--surface-2); padding: 4px 9px; border-radius: 999px; color: var(--text-soft); }
+</style>
+
+<header class="topbar">
+  <a href="#" class="back-link">&larr; My requests</a>
+  <span class="plan-badge"><span class="dot"></span>Priority plan &middot; 48h turnaround</span>
+</header>
+
+<div class="wrap">
+
+  <div class="request-head">
+    <div>
+      <p class="eyebrow">Your active request</p>
+      <h1>Hydration Serum — Hero Video</h1>
+      <p class="meta">Submitted Jul 5, 10:14 AM &middot; Glow Skincare</p>
+    </div>
+    <div class="designer-mini">
+      <div class="avatar">PR</div>
+      <div><span class="d-name">Priya Raman</span><span class="d-role">Your designer</span></div>
+    </div>
+  </div>
+
+  <div class="stepper">
+    <div class="stepper-track"></div>
+    <div class="stepper-track-fill"></div>
+    <div class="stepper-nodes">
+      <div class="step done">
+        <div class="node">
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.8 5.3 9.5 10.5 3.8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="label">Submitted</span>
+      </div>
+      <div class="step done">
+        <div class="node">
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.8 5.3 9.5 10.5 3.8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="label">In Progress</span>
+        <span class="sub">paused 6h for Q&amp;A</span>
+      </div>
+      <div class="step current">
+        <div class="node"></div>
+        <span class="label">Delivered</span>
+        <span class="sub">awaiting your review</span>
+      </div>
+      <div class="step">
+        <div class="node"></div>
+        <span class="label">Approved</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row"><h2>Delivered video</h2></div>
+    <div class="delivery-body">
+      <div class="video-preview">
+        <div class="play"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 2.2v9.6l8-4.8-8-4.8Z" fill="#14161b"/></svg></div>
+        <span class="duration">0:30</span>
+      </div>
+      <div class="delivery-info">
+        <span class="delivery-stat">
+          <svg width="11" height="11" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.8 5.3 9.5 10.5 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Delivered in 44h 12m &middot; on time
+        </span>
+        <p class="delivery-file">hydration-serum-hero-v1.mp4<span>28.4 MB &middot; delivered Jul 7, 6:26 AM</span></p>
+        <div class="delivery-actions">
+          <button class="btn btn-primary">Approve</button>
+          <button class="btn">Request revision</button>
+          <button class="btn" style="border-color: transparent;">Download</button>
+        </div>
+        <p class="revision-note">One revision included &middot; requesting one restarts your 48h timer</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <h2>Clarification</h2>
+      <span class="resolved-tag">Resolved</span>
+    </div>
+    <div class="thread">
+      <div class="bubble designer">
+        <span class="who">Priya Raman</span>
+        Quick one before I start editing — should the serum bottle be shown label-forward in the final shot, or is the flat-lay packaging photo enough?
+        <time>Jul 5, 4:02 PM</time>
+      </div>
+      <div class="bubble customer">
+        <span class="who">You</span>
+        Label-forward please — that's what converts best on our other ads.
+        <time>Jul 5, 10:11 PM</time>
+      </div>
+    </div>
+    <p class="pause-note">Timer was paused for 6h 9m while waiting on your reply.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title-row">
+      <h2>Request summary</h2>
+      <a href="#" class="link-btn">View full brief &rarr;</a>
+    </div>
+    <dl class="summary-grid">
+      <div class="summary-item"><dt>Goal</dt><dd>Conversions</dd></div>
+      <div class="summary-item"><dt>Platform</dt><dd>TikTok</dd></div>
+      <div class="summary-item"><dt>Length</dt><dd>30 seconds</dd></div>
+      <div class="summary-item"><dt>Variants</dt><dd>1 video</dd></div>
+      <div class="summary-item"><dt>Tone</dt><dd>Emotional</dd></div>
+      <div class="summary-item"><dt>Designer</dt><dd>Priya Raman</dd></div>
+    </dl>
+  </div>
+
+  <div class="drafts-note">
+    <div>
+      <p>You have 2 saved drafts — submit your next request once this one is approved.</p>
+      <div class="chips">
+        <span class="chip">Cold Brew Can — Fall Launch</span>
+        <span class="chip">Referral Program Teaser</span>
+      </div>
+    </div>
+    <a href="#" class="link-btn">View drafts &rarr;</a>
+  </div>
+
+</div>

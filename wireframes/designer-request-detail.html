@@ -1,0 +1,268 @@
+<title>Request Detail — Designer</title>
+<style>
+  :root {
+    --ink: #14161b;
+    --paper: #eef1f2;
+    --surface: #ffffff;
+    --surface-2: #e6e9eb;
+    --text: #14161b;
+    --text-soft: #565b66;
+    --text-faint: #8b92a1;
+    --line: #dbdfe2;
+    --line-soft: #e8ebed;
+
+    --teal: #176b5e;
+    --teal-soft: #e3f1ee;
+    --teal-line: #bcded6;
+
+    --amber: #a05f10;
+    --amber-soft: #fbeedb;
+    --amber-line: #eccd9a;
+
+    --crimson: #b23a37;
+    --crimson-soft: #fbe6e5;
+    --crimson-line: #edc0be;
+
+    --moss: #2f7a4f;
+    --moss-soft: #e3f3e9;
+    --moss-line: #bfe0cc;
+
+    --display: "Avenir Next", "Century Gothic", "Segoe UI Semibold", ui-sans-serif, system-ui, sans-serif;
+    --body: -apple-system, "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    --mono: "SF Mono", "Roboto Mono", ui-monospace, "Consolas", monospace;
+
+    --radius: 10px;
+    --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 1px 1px rgba(20, 22, 27, 0.03);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+      --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+      --line: #2c313a; --line-soft: #23272f;
+      --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+      --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+      --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
+      --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+    --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+    --line: #2c313a; --line-soft: #23272f;
+    --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+    --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+    --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
+    --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+  }
+  :root[data-theme="light"] {
+    --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
+    --text: #14161b; --text-soft: #565b66; --text-faint: #8b92a1;
+    --line: #dbdfe2; --line-soft: #e8ebed;
+    --teal: #176b5e; --teal-soft: #e3f1ee; --teal-line: #bcded6;
+    --amber: #a05f10; --amber-soft: #fbeedb; --amber-line: #eccd9a;
+    --crimson: #b23a37; --crimson-soft: #fbe6e5; --crimson-line: #edc0be;
+    --moss: #2f7a4f; --moss-soft: #e3f3e9; --moss-line: #bfe0cc;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper); color: var(--text); font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+  textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 12px;
+  }
+  .back-link { font-size: 13px; color: var(--text-soft); display: flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--text); }
+
+  .timer-pill {
+    display: flex; align-items: center; gap: 8px;
+    border-radius: 999px; padding: 7px 14px;
+    font-family: var(--mono); font-size: 13.5px; font-weight: 700;
+  }
+  .timer-pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .timer-pill.warning { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line); }
+  .timer-pill.warning .dot { background: var(--amber); }
+  .timer-pill span.cap { font-family: var(--body); font-weight: 400; font-size: 11.5px; color: inherit; opacity: 0.75; margin-left: 2px; }
+
+  .layout {
+    display: grid; grid-template-columns: 1fr 320px;
+    max-width: 1120px; margin: 0 auto; padding: 28px 32px 60px; gap: 28px;
+    align-items: start;
+  }
+
+  .main-col { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .side-col { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 28px; }
+
+  .request-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .request-head .eyebrow { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; }
+  .badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 8px; border-radius: 5px; border: 1px solid transparent; }
+  .badge.priority { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); }
+  .badge.revision { background: var(--crimson-soft); color: var(--crimson); border-color: var(--crimson-line); }
+  .request-head h1 { font-family: var(--display); font-size: 22px; margin: 0 0 6px; font-weight: 700; text-wrap: balance; }
+  .request-head .meta { font-size: 13px; color: var(--text-faint); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 18px 20px;
+  }
+  .card h2 {
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft);
+    margin: 0 0 14px;
+  }
+
+  .brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; margin-bottom: 4px; }
+  .brief-item dt { font-size: 11px; color: var(--text-faint); font-weight: 600; margin-bottom: 3px; }
+  .brief-item dd { margin: 0; font-size: 13.5px; line-height: 1.4; }
+  .brief-item.full { grid-column: 1 / -1; }
+
+  .swatches { display: flex; gap: 7px; margin-top: 6px; }
+  .swatch { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); }
+
+  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .asset {
+    aspect-ratio: 1; border-radius: 8px; background: var(--surface-2);
+    display: flex; align-items: flex-end; padding: 6px; position: relative; overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .asset .fname {
+    font-size: 10px; background: rgba(20,22,27,0.65); color: #fff;
+    padding: 2px 5px; border-radius: 4px; width: 100%;
+  }
+  .asset.logo { background: linear-gradient(160deg, #d8ddd2, #c3cbb8); }
+  .asset.video::before {
+    content: ''; position: absolute; top: 8px; right: 8px; width: 18px; height: 18px;
+    border-radius: 50%; background: rgba(255,255,255,0.85);
+  }
+
+  .ref-links { display: flex; flex-direction: column; gap: 6px; }
+  .ref-links a { font-size: 12.5px; color: var(--teal); word-break: break-all; }
+  .ref-links a:hover { text-decoration: underline; }
+
+  /* action card */
+  .action-card { display: flex; flex-direction: column; gap: 12px; }
+  .action-card .timer-big {
+    font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--amber);
+  }
+  .action-card .timer-caption { font-size: 12px; color: var(--text-faint); margin-top: -8px; }
+  .btn { border-radius: 8px; padding: 11px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface); width: 100%; }
+  .btn:hover { border-color: var(--text-faint); }
+  .btn-primary { background: var(--teal); border-color: var(--teal); color: #f0f6f4; }
+  .btn-primary:hover { opacity: 0.92; }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--text-soft); }
+  .btn-ghost:hover { background: var(--surface-2); }
+
+  .customer-mini { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 12.5px; color: #f0f6f4; }
+  .customer-mini .c-name { font-size: 13.5px; font-weight: 600; }
+  .customer-mini .c-plan { font-size: 11.5px; color: var(--text-faint); }
+
+  .clarify-box textarea {
+    width: 100%; min-height: 74px; border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; resize: vertical; background: var(--surface);
+  }
+  .clarify-box textarea:focus { border-color: var(--amber); }
+  .clarify-box label { font-size: 12.5px; font-weight: 600; margin-bottom: 6px; display: block; }
+</style>
+
+<header class="topbar">
+  <a href="#" class="back-link">&larr; Queue</a>
+  <span class="timer-pill warning"><span class="dot"></span>9h 48m left<span class="cap">of 78h &middot; Standard plan</span></span>
+</header>
+
+<div class="layout">
+  <div class="main-col">
+
+    <div class="request-head">
+      <div>
+        <p class="eyebrow"><span class="badge priority" style="background:var(--surface-2);color:var(--text-soft);border-color:transparent;">Standard</span></p>
+        <h1>Cold Brew Can — Launch Film</h1>
+        <p class="meta">Nomad Coffee Co. &middot; submitted Jul 5, 8:02 AM &middot; In Progress</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Brief</h2>
+      <dl class="brief-grid">
+        <div class="brief-item"><dt>Goal</dt><dd>Brand awareness</dd></div>
+        <div class="brief-item"><dt>Platform</dt><dd>Instagram Reels</dd></div>
+        <div class="brief-item"><dt>Length</dt><dd>30 seconds</dd></div>
+        <div class="brief-item"><dt>Variants</dt><dd>1 video</dd></div>
+        <div class="brief-item"><dt>Tone</dt><dd>Energetic</dd></div>
+        <div class="brief-item"><dt>Call to action</dt><dd>"Find us at Whole Foods — link in bio for locations"</dd></div>
+        <div class="brief-item full"><dt>Product description</dt><dd>Ready-to-drink cold brew in a slim can, launching a new Vanilla Oat flavor. Selling point is "barista-quality, zero prep."</dd></div>
+        <div class="brief-item full"><dt>Characters</dt><dd>Use my own footage — we have a founder on camera, casual and upbeat, filmed at our roastery.</dd></div>
+        <div class="brief-item full"><dt>Story / script direction</dt><dd>Open on founder cracking open the can, quick cuts of pour + ice, close on "new flavor, same 3am energy" line to camera. Fast-paced editing, punchy captions on screen.</dd></div>
+        <div class="brief-item"><dt>Color preferences</dt>
+          <dd>Warm cream, espresso brown, oat tan
+            <div class="swatches">
+              <span class="swatch" style="background:#F3EEE3"></span>
+              <span class="swatch" style="background:#4A3527"></span>
+              <span class="swatch" style="background:#D8C39B"></span>
+            </div>
+          </dd>
+        </div>
+        <div class="brief-item"><dt>Music</dt><dd>Describe a style — "upbeat lo-fi, no lyrics"</dd></div>
+        <div class="brief-item full"><dt>Do's and don'ts</dt><dd>Don't show competitor canned coffee brands. Founder prefers not to show the back-of-house equipment in shot.</dd></div>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Assets</h2>
+      <div class="asset-grid">
+        <div class="asset logo"><span class="fname">logo.svg</span></div>
+        <div class="asset video"><span class="fname">founder-clip-1.mp4</span></div>
+        <div class="asset video"><span class="fname">founder-clip-2.mp4</span></div>
+        <div class="asset"><span class="fname">can-flatlay.jpg</span></div>
+        <div class="asset"><span class="fname">roastery-wide.jpg</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Reference links</h2>
+      <div class="ref-links">
+        <a href="#">https://instagram.com/reel/nomad-example-1</a>
+        <a href="#">https://tiktok.com/@competitorstyle/video/998877</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-col">
+
+    <div class="card">
+      <h2 style="margin-bottom:12px;">Customer</h2>
+      <div class="customer-mini">
+        <div class="avatar" style="background:linear-gradient(160deg,#565b66,#33363d);">NC</div>
+        <div>
+          <div class="c-name">Nomad Coffee Co.</div>
+          <div class="c-plan">Standard plan &middot; since Mar 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card action-card">
+      <h2>Actions</h2>
+      <div>
+        <div class="timer-big">9h 48m</div>
+        <p class="timer-caption">left of 78h &middot; started Jul 5, 9:15 AM</p>
+      </div>
+      <button class="btn btn-primary">Mark as delivered</button>
+      <div class="clarify-box">
+        <label>Ask a clarifying question</label>
+        <textarea placeholder="This pauses the timer until the customer replies"></textarea>
+        <button class="btn" style="margin-top:8px;">Send &amp; pause timer</button>
+      </div>
+      <button class="btn btn-ghost">View customer's other requests</button>
+    </div>
+  </div>
+</div>
