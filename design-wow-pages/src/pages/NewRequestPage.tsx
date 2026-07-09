@@ -18,6 +18,172 @@ function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
+// Onboarding/demo shortcuts — quickly fills a realistic brief so customers
+// and designers can see a full example without typing one by hand. Each
+// maps a real export-testimonial scenario onto the actual form fields.
+const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
+  {
+    label: 'Generic Pharmaceuticals',
+    data: {
+      productName: 'Indian Pharmaceutical Exports',
+      productDescription: 'Generic pharmaceutical manufacturing for international healthcare markets, meeting global quality and compliance standards.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'A pharmacist in Germany explains why they trust medicines manufactured in India.',
+      storyDirection:
+        "Most people don't realize this, but many of the medicines we dispense every day are manufactured in India. The quality standards are incredibly high, and that's why hospitals and pharmacies across Europe continue to rely on Indian pharmaceutical manufacturers. If you're sourcing pharmaceutical products internationally, India should definitely be on your shortlist.",
+      tone: 'professional',
+      cta: 'Contact us to source pharmaceutical products from India',
+    },
+  },
+  {
+    label: 'Engineering Goods',
+    data: {
+      productName: 'Indian Engineering Goods',
+      productDescription: 'Precision-machined engineering components — castings, valves, pumps — for industrial buyers worldwide.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Factory owner in Europe showing industrial machines.',
+      storyDirection:
+        "We've been importing engineering components from India for the last few years. The machining quality is excellent, delivery is consistent, and the pricing makes sense. Whether it's castings, valves, pumps, or precision components, India has become one of our preferred sourcing destinations.",
+      tone: 'professional',
+      cta: 'Get in touch to source engineering components from India',
+    },
+  },
+  {
+    label: 'Electrical Equipment',
+    data: {
+      productName: 'Indian Electrical Equipment',
+      productDescription: 'Certified electrical components for commercial and industrial construction projects.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Electrical contractor walking through a construction site.',
+      storyDirection:
+        "For our commercial projects, we've started sourcing more electrical components from India. The build quality is solid, certifications are available, and lead times have been surprisingly good. Definitely worth considering if you're sourcing internationally.",
+      tone: 'professional',
+      cta: 'Reach out to source electrical equipment from India',
+    },
+  },
+  {
+    label: 'Rice (Basmati)',
+    data: {
+      productName: 'Indian Basmati Rice',
+      productDescription: 'Authentic long-grain basmati rice, aromatic and export-grade, sourced from India.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Home cook preparing biryani.',
+      storyDirection:
+        "Whenever I cook biryani, there's only one rice I look for—Indian basmati. The aroma, the long grains, and the texture after cooking are completely different. Once you've tried authentic Indian basmati, it's difficult to switch back.",
+      tone: 'emotional',
+      cta: 'Try authentic Indian basmati rice today',
+    },
+  },
+  {
+    label: 'Seafood',
+    data: {
+      productName: 'Indian Seafood Exports',
+      productDescription: 'Fresh, export-grade shrimp and seafood sourced from India for restaurants and retailers.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Restaurant chef opening fresh shrimp.',
+      storyDirection:
+        'We serve seafood every single day, so consistency matters. Indian shrimp has become one of our favorite imports because the quality is reliable and customers love the taste. It makes a real difference in our dishes.',
+      tone: 'professional',
+      cta: 'Source premium seafood from India',
+    },
+  },
+  {
+    label: 'Jewelry',
+    data: {
+      productName: 'Indian Gold & Diamond Jewelry',
+      productDescription: 'Handcrafted gold and diamond jewelry collections, made in India.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Jewelry store owner showing gold necklaces.',
+      storyDirection:
+        'A lot of our customers ask where these pieces come from. Many of our gold and diamond collections are crafted in India. The craftsmanship is exceptional, and the finishing quality speaks for itself.',
+      tone: 'emotional',
+      cta: 'Explore jewelry crafted in India',
+    },
+  },
+  {
+    label: 'Textiles & Garments',
+    data: {
+      productName: 'Indian Textiles & Garments',
+      productDescription: 'Quality apparel manufacturing — cotton fabrics, stitching, and unique designs — made in India.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Fashion creator showing clothing haul.',
+      storyDirection:
+        "I've recently discovered clothing manufactured in India, and honestly the fabric quality surprised me. Soft cotton, beautiful stitching, and unique designs. If you're looking for reliable apparel manufacturers, India has some incredible options.",
+      tone: 'energetic',
+      cta: 'Discover apparel manufactured in India',
+    },
+  },
+  {
+    label: 'Organic Chemicals',
+    data: {
+      productName: 'Indian Organic Chemicals',
+      productDescription: 'High-quality organic chemical manufacturing with technical documentation for industrial buyers.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Manufacturing procurement manager speaking in laboratory.',
+      storyDirection:
+        'Our production depends on high-quality chemical suppliers. India has become one of our trusted sourcing partners because they offer consistent quality, technical documentation, and competitive pricing. That\'s why many manufacturers work with Indian suppliers.',
+      tone: 'professional',
+      cta: 'Partner with Indian chemical suppliers',
+    },
+  },
+  {
+    label: 'Spices',
+    data: {
+      productName: 'Indian Spices',
+      productDescription: 'Fresh, aromatic spices — turmeric, cumin, cardamom, chili — sourced directly from India.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Food influencer cooking.',
+      storyDirection:
+        "The secret behind amazing Indian food isn't just the recipe—it's the spices. Fresh turmeric, cumin, cardamom, and chili from India completely change the flavor. You can literally smell the difference the moment you open the package.",
+      tone: 'energetic',
+      cta: 'Taste the difference with Indian spices',
+    },
+  },
+  {
+    label: 'Ceramic Tiles / Building Materials',
+    data: {
+      productName: 'Indian Ceramic Tiles',
+      productDescription: 'Modern, durable ceramic tiles and building materials for premium residential and commercial projects.',
+      goal: 'ugc_testimonial',
+      platform: 'instagram_reels',
+      videoLengthSec: 30,
+      charactersMode: 'need_talent',
+      charactersDesc: 'Interior designer showing modern home.',
+      storyDirection:
+        "Everyone keeps asking where we sourced these tiles. They're actually manufactured in India. The finish, durability, and modern designs are fantastic, especially for premium residential projects.",
+      tone: 'professional',
+      cta: 'Source premium tiles manufactured in India',
+    },
+  },
+];
+
 const emptyForm: RequestInput = {
   designerId: '',
   subscriptionId: '',
@@ -289,6 +455,22 @@ export function NewRequestPage() {
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 24, margin: '0 0 4px' }}>{draftId ? 'Edit Draft' : 'New Request'}</h1>
         <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Fields marked with an asterisk are required.</p>
       </div>
+
+      {!draftId && (
+        <div className="card" style={{ background: 'var(--surface-2)' }}>
+          <h2 style={{ margin: '0 0 4px', fontFamily: 'var(--display)', fontSize: 14, fontWeight: 700 }}>Quick demo sample</h2>
+          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-faint)' }}>
+            For onboarding/training — pick a use case to instantly fill the form below with a realistic example.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {SAMPLE_USE_CASES.map((sample) => (
+              <button key={sample.label} style={pill(false)} onClick={() => setForm((f) => ({ ...f, ...sample.data }))}>
+                {sample.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Section title="The Basics">
         <Field label="Product or brand name *">
