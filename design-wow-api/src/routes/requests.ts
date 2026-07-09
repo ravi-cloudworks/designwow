@@ -248,7 +248,9 @@ requests.post('/:id/submit', async (c) => {
 
   const request = await c.env.DB.prepare(
     `SELECT designer_id, product_name, product_description, target_audience,
-            cta_style, story_direction, terms_confirmed_at, status
+            cta_style, story_direction, terms_confirmed_at, status,
+            avatar_choice, background_choice, mood_choice, music_choice,
+            restrictions, additional_notes
      FROM requests WHERE id = ?`
   ).bind(id).first<{
     designer_id: string | null;
@@ -259,6 +261,12 @@ requests.post('/:id/submit', async (c) => {
     story_direction: string;
     terms_confirmed_at: string | null;
     status: string;
+    avatar_choice: string | null;
+    background_choice: string | null;
+    mood_choice: string | null;
+    music_choice: string | null;
+    restrictions: string | null;
+    additional_notes: string | null;
   }>();
   if (!request) return c.json({ error: 'not_found' }, 404);
   if (request.status !== 'draft') return c.json({ error: 'not_a_draft' }, 409);
@@ -266,15 +274,44 @@ requests.post('/:id/submit', async (c) => {
   const { count: logoCount } = (await c.env.DB.prepare(
     "SELECT COUNT(*) AS count FROM request_assets WHERE request_id = ? AND type = 'logo'"
   ).bind(id).first<{ count: number }>()) ?? { count: 0 };
+  const { count: productFileCount } = (await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM request_assets WHERE request_id = ? AND type = 'product_file'"
+  ).bind(id).first<{ count: number }>()) ?? { count: 0 };
+  const { count: referenceFileCount } = (await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM request_assets WHERE request_id = ? AND type = 'reference_file'"
+  ).bind(id).first<{ count: number }>()) ?? { count: 0 };
+  const { count: linkCount } = (await c.env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM request_links WHERE request_id = ?'
+  ).bind(id).first<{ count: number }>()) ?? { count: 0 };
+
+  // A picker choice with an empty assetId is an unresolved "upload my own"
+  // placeholder — treat it the same as unset rather than counting it as chosen.
+  function hasChoice(json: string | null): boolean {
+    if (!json) return false;
+    try {
+      return !!JSON.parse(json)?.assetId;
+    } catch {
+      return false;
+    }
+  }
+
+  const hasReferencesOrNotes =
+    !!referenceFileCount || !!linkCount || !!request.restrictions?.trim() || !!request.additional_notes?.trim();
 
   const missing: string[] = [];
   if (!request.designer_id) missing.push('designer');
   if (!request.product_name.trim()) missing.push('product name');
   if (!request.product_description.trim()) missing.push('product description');
   if (!logoCount) missing.push('logo');
+  if (!productFileCount) missing.push('product photos / footage');
   if (!request.target_audience) missing.push('target audience');
+  if (!hasChoice(request.avatar_choice)) missing.push('avatar selection');
+  if (!hasChoice(request.background_choice)) missing.push('background selection');
+  if (!hasChoice(request.mood_choice)) missing.push('visual mood selection');
+  if (!hasChoice(request.music_choice)) missing.push('music selection');
   if (!request.cta_style) missing.push('call-to-action style');
   if (!request.story_direction.trim()) missing.push('story direction / dialogue');
+  if (!hasReferencesOrNotes) missing.push("reference file, reference link, do's/don'ts, or additional note");
   if (!request.terms_confirmed_at) missing.push('approval & revision rules confirmation');
 
   if (missing.length) {

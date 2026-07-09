@@ -21,13 +21,12 @@ import {
   VOICE_TYPES,
   SUBTITLE_OPTIONS,
   APPROVAL_TERMS,
+  PLATFORMS,
+  LENGTHS,
+  TONES,
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
 import { CheckCircle2 } from 'lucide-react';
-
-const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts'];
-const LENGTHS = [15, 30, 60];
-const TONES = ['funny', 'emotional', 'energetic', 'professional'];
 
 // How well a designer's free-text specialty tags match the chosen industry —
 // used only to sort the picker list, so a loose substring match is enough.
@@ -544,14 +543,24 @@ export function NewRequestPage() {
 
   async function handleSubmit() {
     const hasLogo = existingAssets.some((a) => a.type === 'logo') || !!logoFile;
+    const hasProductFile = existingAssets.some((a) => a.type === 'product_file') || productFiles.length > 0;
+    const hasReferenceFile = existingAssets.some((a) => a.type === 'reference_file') || referenceFiles.length > 0;
+    const hasReferenceLink = existingLinks.length > 0 || newLinks.some((u) => u.trim());
+    const hasReferencesOrNotes = hasReferenceFile || hasReferenceLink || !!form.restrictions?.trim() || !!form.additionalNotes?.trim();
     const checks: [boolean, string][] = [
       [!form.designerId, 'Please choose a designer before submitting.'],
       [!form.productName.trim(), 'Please add your product or brand name.'],
       [!form.productDescription.trim(), 'Please add a product description.'],
       [!hasLogo, 'Please upload a logo before submitting.'],
+      [!hasProductFile, 'Please upload at least one product photo or footage before submitting.'],
       [!form.targetAudience, 'Please choose a target audience.'],
+      [!avatarChoice, 'Please choose an avatar (or upload your own) before submitting.'],
+      [!backgroundChoice, 'Please choose a background (or upload your own) before submitting.'],
+      [!moodChoice, 'Please choose a visual mood (or upload your own) before submitting.'],
+      [!musicChoice, 'Please choose music (or upload your own) before submitting.'],
       [!form.ctaStyle, 'Please choose a call-to-action style.'],
       [!form.storyDirection.trim(), 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.'],
+      [!hasReferencesOrNotes, 'Please add at least one reference file, reference link, do\'s/don\'ts, or additional note.'],
       [!termsConfirmed, 'Please confirm the Approval & Revision Rules before submitting.'],
     ];
     for (const [failed, message] of checks) {
@@ -722,7 +731,7 @@ export function NewRequestPage() {
             </Field>
           </div>
         </div>
-        <Field label="Product photos / footage">
+        <Field label="Product photos / footage *">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'product_file')}
             pending={productFiles}
@@ -909,7 +918,7 @@ export function NewRequestPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
         <Section
           number={6}
-          title="Avatar Selection"
+          title="Avatar Selection *"
           description="Primary + backup avatar preset from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={avatarMode} onChange={setAvatarMode} />}
         >
@@ -933,7 +942,7 @@ export function NewRequestPage() {
 
         <Section
           number={7}
-          title="Background Selection"
+          title="Background Selection *"
           description="Primary + backup scene from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={backgroundMode} onChange={setBackgroundMode} />}
         >
@@ -958,7 +967,7 @@ export function NewRequestPage() {
 
       {/* Row 6: Visual Mood + Music Selection */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
-        <Section number={8} title="Visual Style / Mood" description="The overall look and feel of the video — pick a reference image, or upload your own.">
+        <Section number={8} title="Visual Style / Mood *" description="The overall look and feel of the video — pick a reference image, or upload your own.">
           <Field label="Mood">
             <LibraryPickerField
               designerId={form.designerId}
@@ -979,7 +988,7 @@ export function NewRequestPage() {
 
         <Section
           number={9}
-          title="Music Selection"
+          title="Music Selection *"
           description="Primary + backup track from your designer's library, or upload your own."
           headerRight={<ModeToggle mode={musicPickMode} onChange={setMusicPickMode} />}
         >
@@ -1022,7 +1031,11 @@ export function NewRequestPage() {
       </Section>
 
       {/* Row 8: References & Notes */}
-      <Section number={11} title="References & Notes" description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts.">
+      <Section
+        number={11}
+        title="References & Notes *"
+        description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts. At least one of the four below is required."
+      >
         <Field label="Reference files">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'reference_file')}
