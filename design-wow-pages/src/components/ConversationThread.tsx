@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { AssetRow, CommentAssetLink, CommentRow } from '../lib/api';
 import { CommentAttachments } from './CommentAttachments';
 import { parseSqliteUtc } from '../lib/timer';
+import { linkifyText } from '../lib/linkify';
 import type { LightboxFile } from './FileLightbox';
 
 const cardTitleStyle: React.CSSProperties = {
@@ -104,7 +105,7 @@ export function ConversationThread({
           }}
         >
           <strong style={{ color: 'var(--text-soft)' }}>{latest.author_name}: </strong>
-          {latest.message}
+          {linkifyText(latest.message)}
           {' · '}
           {formatMessageTime(latest.created_at)}
         </p>
@@ -148,7 +149,7 @@ export function ConversationThread({
                   {c.author_name}
                   <span style={{ fontWeight: 400, opacity: 0.75, fontSize: 10.5 }}>{formatMessageTime(c.created_at)}</span>
                 </span>
-                {c.message}
+                {linkifyText(c.message)}
                 {c.payment_amount_paise != null && c.payment_upi_id && (
                   <button
                     onClick={() => onPay(c)}
