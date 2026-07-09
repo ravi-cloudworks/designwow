@@ -12,16 +12,12 @@ import waitlist from './routes/waitlist';
 const app = new Hono<{ Bindings: Bindings }>();
 
 // Allows the production Pages domain, its preview-deployment subdomains
-// (random-hash.designwow.pages.dev), local dev, and the old
-// design-wow-pages.pages.dev domain (retired from active deploys but left
-// reachable rather than broken outright for anyone still holding that link).
+// (random-hash.designwow.pages.dev), and local dev.
 function isAllowedOrigin(origin: string): boolean {
   return (
     origin === 'http://localhost:5173' ||
     origin === 'https://designwow.pages.dev' ||
-    /^https:\/\/[a-z0-9-]+\.designwow\.pages\.dev$/.test(origin) ||
-    origin === 'https://design-wow-pages.pages.dev' ||
-    /^https:\/\/[a-z0-9-]+\.design-wow-pages\.pages\.dev$/.test(origin)
+    /^https:\/\/[a-z0-9-]+\.designwow\.pages\.dev$/.test(origin)
   );
 }
 

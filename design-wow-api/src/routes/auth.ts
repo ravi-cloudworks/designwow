@@ -66,7 +66,7 @@ auth.get('/google/callback', async (c) => {
   // TODO: replace this plain cookie with a signed session (JWT via SESSION_SECRET,
   // or an opaque token backed by a sessions table) before shipping past scaffold.
   // SameSite=Lax is safe here because the browser only ever talks to
-  // design-wow-pages.pages.dev (the Pages Function proxies /api/* to this
+  // designwow.pages.dev (the Pages Function proxies /api/* to this
   // Worker server-side) — the cookie is first-party, not cross-site.
   c.header('Set-Cookie', `session=${user!.id}; HttpOnly; Secure; SameSite=Lax; Path=/`);
 
