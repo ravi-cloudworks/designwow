@@ -399,9 +399,13 @@ export function BriefSummary({
         <FieldBlock label="Call to action style">
           <PillRow options={CTA_STYLES} value={request.cta_style} />
         </FieldBlock>
-        <FieldBlock label="Call to action text">
-          <PlainText>{request.cta}</PlainText>
-        </FieldBlock>
+        {/* Picking a style auto-fills this with the same label — only worth a
+            second field once it's been customized (e.g. via a VIP update). */}
+        {request.cta && request.cta !== labelFor(CTA_STYLES, request.cta_style) && (
+          <FieldBlock label="Call to action text">
+            <PlainText>{request.cta}</PlainText>
+          </FieldBlock>
+        )}
       </SectionCard>
 
       <SectionCard number={11} title="References & Notes" description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts.">
