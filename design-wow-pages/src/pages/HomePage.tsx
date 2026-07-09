@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api, type DesignerRow } from '../lib/api';
+import { api, type DesignerRow, type User } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { useToast } from '../components/ToastProvider';
 
@@ -31,31 +30,24 @@ const FAQS = [
 ];
 
 export function HomePage() {
-  const navigate = useNavigate();
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  // Deliberately doesn't force-navigate a logged-in visitor away from here —
+  // clicking the "Design Wow" brand mark (from anywhere, e.g. a designer's
+  // public showcase page) should always land on the real home page, not
+  // bounce you into the app. Instead, the CTAs just adapt to point you back
+  // into the app if you're already signed in.
+  const [viewer, setViewer] = useState<User | null | 'unknown'>('unknown');
   const [designers, setDesigners] = useState<DesignerRow[]>([]);
   const [waitlistRole, setWaitlistRole] = useState<'customer' | 'designer' | null>(null);
 
   useEffect(() => {
-    api
-      .me()
-      .then(({ user }) => {
-        if (user?.role === 'customer') {
-          navigate('/dashboard', { replace: true });
-          return;
-        }
-        if (user?.role === 'designer') {
-          navigate('/designer', { replace: true });
-          return;
-        }
-        setCheckingAuth(false);
-      })
-      .catch(() => setCheckingAuth(false));
-
+    api.me().then(({ user }) => setViewer(user)).catch(() => setViewer(null));
     api.designers.list().then(({ designers }) => setDesigners(designers)).catch(() => {});
-  }, [navigate]);
+  }, []);
 
-  if (checkingAuth) return null;
+  if (viewer === 'unknown') return null;
+
+  const appHref = viewer?.role === 'designer' ? '/designer' : '/dashboard';
+  const appLabel = viewer?.role === 'designer' ? 'Go to Queue' : 'Go to Dashboard';
 
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 24px' }}>
@@ -66,12 +58,20 @@ export function HomePage() {
           <span style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>Design Wow</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <a href="/login" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-soft)', textDecoration: 'none' }}>
-            Log in
-          </a>
-          <button className="btn btn-primary" onClick={() => setWaitlistRole('customer')}>
-            Join Waitlist
-          </button>
+          {viewer ? (
+            <a href={appHref} className="btn btn-primary" style={{ textDecoration: 'none' }}>
+              {appLabel}
+            </a>
+          ) : (
+            <>
+              <a href="/login" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-soft)', textDecoration: 'none' }}>
+                Log in
+              </a>
+              <button className="btn btn-primary" onClick={() => setWaitlistRole('customer')}>
+                Join Waitlist
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -87,14 +87,20 @@ export function HomePage() {
           Submit a brief, get matched with a dedicated video editor, and track everything in one place — no chasing
           freelancers, no re-explaining your brand every time.
         </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" style={{ fontSize: 14.5, padding: '11px 22px' }} onClick={() => setWaitlistRole('customer')}>
-            Join customer waitlist
-          </button>
-          <button className="btn" style={{ fontSize: 14.5, padding: '11px 22px' }} onClick={() => setWaitlistRole('designer')}>
-            Join designer waitlist
-          </button>
-        </div>
+        {viewer ? (
+          <a href={appHref} className="btn btn-primary" style={{ fontSize: 14.5, padding: '11px 22px', textDecoration: 'none' }}>
+            {appLabel}
+          </a>
+        ) : (
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" style={{ fontSize: 14.5, padding: '11px 22px' }} onClick={() => setWaitlistRole('customer')}>
+              Join customer waitlist
+            </button>
+            <button className="btn" style={{ fontSize: 14.5, padding: '11px 22px' }} onClick={() => setWaitlistRole('designer')}>
+              Join designer waitlist
+            </button>
+          </div>
+        )}
       </section>
 
       {/* How it works */}
