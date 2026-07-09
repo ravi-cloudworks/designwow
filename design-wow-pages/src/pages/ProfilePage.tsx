@@ -35,6 +35,7 @@ export function ProfilePage() {
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarCropQueue, setAvatarCropQueue] = useState<File[] | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
   const [bio, setBio] = useState('');
@@ -140,7 +141,7 @@ export function ProfilePage() {
     loadLibrary();
   }, []);
 
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -153,6 +154,10 @@ export function ProfilePage() {
       return;
     }
     setAvatarError(null);
+    setAvatarCropQueue([file]);
+  }
+
+  async function uploadAvatarFile(file: File) {
     setUploadingAvatar(true);
     try {
       const { avatarUrl } = await api.users.uploadAvatar(file);
@@ -660,6 +665,17 @@ export function ProfilePage() {
         </div>
       </div>
       )}
+
+      {avatarCropQueue && (
+        <ImageCropModal
+          files={avatarCropQueue}
+          onCancel={() => setAvatarCropQueue(null)}
+          onDone={(finalFiles) => {
+            setAvatarCropQueue(null);
+            uploadAvatarFile(finalFiles[0]);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -721,7 +737,6 @@ function AssetLibrarySection({
   const limits = LIBRARY_LIMITS[category];
   const atLimit = items.length >= limits.maxCount;
   const isImageCategory = category !== 'music';
-  const cropAspect = category === 'background' ? 16 / 9 : 3 / 4;
 
   async function upload(files: File[]) {
     setUploading(true);
@@ -809,7 +824,6 @@ function AssetLibrarySection({
       {cropQueue && (
         <ImageCropModal
           files={cropQueue}
-          aspect={cropAspect}
           onCancel={() => setCropQueue(null)}
           onDone={(finalFiles) => {
             setCropQueue(null);
@@ -878,7 +892,7 @@ function LibraryItemCard({
           alt={item.label}
           style={{
             width: '100%',
-            aspectRatio: item.category === 'background' ? '16 / 9' : '3 / 4',
+            aspectRatio: '1 / 1',
             objectFit: 'cover',
             borderRadius: 6,
             marginBottom: 6,

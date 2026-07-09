@@ -34,8 +34,10 @@ export const CTA_STYLES: { value: string; label: string }[] = [
   { value: 'limited_time_offer', label: 'Limited Time Offer' },
 ];
 
-// Expanded goal set (8 options, icon-tile style) — kept industry-agnostic
-// since one designer's library and one industry tag serve many verticals.
+// Expanded goal set (10 options, icon-tile style, matching Target Audience's
+// count/grid so the two paired cards land at the same height) — kept
+// industry-agnostic since one designer's library and one industry tag serve
+// many verticals.
 export const GOALS: { value: string; label: string }[] = [
   { value: 'increase_sales', label: 'Increase Sales' },
   { value: 'brand_awareness', label: 'Brand Awareness' },
@@ -45,6 +47,8 @@ export const GOALS: { value: string; label: string }[] = [
   { value: 'more_followers', label: 'More Followers' },
   { value: 'announce_offer', label: 'Announce Offer' },
   { value: 'build_trust', label: 'Build Trust' },
+  { value: 'increase_engagement', label: 'Increase Engagement' },
+  { value: 'educate_customers', label: 'Educate Customers' },
 ];
 
 // Buyer-persona categories — same structure as the reference layout, kept

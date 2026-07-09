@@ -16,6 +16,8 @@ import {
   MapPin,
   Plane,
   Globe2,
+  ThumbsUp,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -28,6 +30,8 @@ export const GOAL_ICONS: Record<string, LucideIcon> = {
   more_followers: Users,
   announce_offer: Tag,
   build_trust: ShieldCheck,
+  increase_engagement: ThumbsUp,
+  educate_customers: BookOpen,
 };
 
 export const TARGET_AUDIENCE_ICONS: Record<string, LucideIcon> = {

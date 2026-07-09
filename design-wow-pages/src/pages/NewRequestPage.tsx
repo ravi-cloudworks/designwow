@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, type AssetChoice, type AssetRow, type DesignerRow, type LibraryCategory, type LibraryItem, type RequestInput } from '../lib/api';
 import { validateFiles, maxCountMessage, UPLOAD_LIMITS, type AssetKind } from '../lib/uploadLimits';
@@ -21,10 +21,9 @@ import {
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
 import { CheckCircle2 } from 'lucide-react';
 
-const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts', 'other'];
-const LENGTHS = [15, 30, 60, 0];
+const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts'];
+const LENGTHS = [15, 30, 60];
 const TONES = ['funny', 'emotional', 'energetic', 'professional'];
-const MUSIC_MODES = ['pick_for_me', 'customer_provided', 'describe_style'];
 
 // How well a designer's free-text specialty tags match the chosen industry —
 // used only to sort the picker list, so a loose substring match is enough.
@@ -216,7 +215,7 @@ const emptyForm: RequestInput = {
   tone: '',
   cta: '',
   colorPreferences: '',
-  musicMode: MUSIC_MODES[0],
+  musicMode: 'pick_for_me',
   musicNote: '',
   restrictions: '',
   additionalNotes: '',
@@ -272,6 +271,16 @@ export function NewRequestPage() {
   const [backgroundBackupChoice, setBackgroundBackupChoice] = useState<AssetChoice | null>(null);
   const [musicChoice, setMusicChoice] = useState<AssetChoice | null>(null);
   const [musicBackupChoice, setMusicBackupChoice] = useState<AssetChoice | null>(null);
+  const [avatarMode, setAvatarMode] = useState<'primary' | 'backup'>('primary');
+  const [backgroundMode, setBackgroundMode] = useState<'primary' | 'backup'>('primary');
+  const [musicPickMode, setMusicPickMode] = useState<'primary' | 'backup'>('primary');
+  const [avatarUpload, setAvatarUpload] = useState<PendingFile | null>(null);
+  const [avatarBackupUpload, setAvatarBackupUpload] = useState<PendingFile | null>(null);
+  const [moodUpload, setMoodUpload] = useState<PendingFile | null>(null);
+  const [backgroundUpload, setBackgroundUpload] = useState<PendingFile | null>(null);
+  const [backgroundBackupUpload, setBackgroundBackupUpload] = useState<PendingFile | null>(null);
+  const [musicUpload, setMusicUpload] = useState<PendingFile | null>(null);
+  const [musicBackupUpload, setMusicBackupUpload] = useState<PendingFile | null>(null);
   const [termsConfirmed, setTermsConfirmed] = useState(false);
   const [noSubscription, setNoSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -444,7 +453,49 @@ export function NewRequestPage() {
     }
     setReferenceFiles([]);
 
+    // Resolve any "upload my own" picks into real assets now that we have a
+    // request id — the choice payload sent above used a placeholder (empty
+    // assetId), so once these upload we send a corrected follow-up update.
+    const choiceSlots: { choice: AssetChoice | null; pending: PendingFile | null; setChoice: (c: AssetChoice) => void; clearPending: () => void }[] = [
+      { choice: avatarChoice, pending: avatarUpload, setChoice: setAvatarChoice, clearPending: () => setAvatarUpload(null) },
+      { choice: avatarBackupChoice, pending: avatarBackupUpload, setChoice: setAvatarBackupChoice, clearPending: () => setAvatarBackupUpload(null) },
+      { choice: moodChoice, pending: moodUpload, setChoice: setMoodChoice, clearPending: () => setMoodUpload(null) },
+      { choice: backgroundChoice, pending: backgroundUpload, setChoice: setBackgroundChoice, clearPending: () => setBackgroundUpload(null) },
+      { choice: backgroundBackupChoice, pending: backgroundBackupUpload, setChoice: setBackgroundBackupChoice, clearPending: () => setBackgroundBackupUpload(null) },
+      { choice: musicChoice, pending: musicUpload, setChoice: setMusicChoice, clearPending: () => setMusicUpload(null) },
+      { choice: musicBackupChoice, pending: musicBackupUpload, setChoice: setMusicBackupChoice, clearPending: () => setMusicBackupUpload(null) },
+    ];
+
+    let anyResolved = false;
+    for (const slot of choiceSlots) {
+      if (slot.choice?.source === 'upload' && !slot.choice.assetId && slot.pending) {
+        setProgress(`Uploading ${slot.pending.file.name}…`);
+        const { id: assetId } = await api.assets.upload(id, 'reference_file', slot.pending.file);
+        const resolved: AssetChoice = { source: 'upload', assetId, label: slot.pending.file.name };
+        slot.setChoice(resolved);
+        slot.choice = resolved;
+        uploaded.push(assetRowFor(assetId, id, 'reference_file', slot.pending.file));
+        URL.revokeObjectURL(slot.pending.previewUrl);
+        slot.clearPending();
+        anyResolved = true;
+      }
+    }
+
     if (uploaded.length) setExistingAssets((prev) => [...prev, ...uploaded]);
+
+    if (anyResolved) {
+      setProgress('Finalizing selections…');
+      await api.requests.update(id, {
+        ...payload,
+        avatarChoice: choiceSlots[0].choice ? JSON.stringify(choiceSlots[0].choice) : null,
+        avatarBackupChoice: choiceSlots[1].choice ? JSON.stringify(choiceSlots[1].choice) : null,
+        moodChoice: choiceSlots[2].choice ? JSON.stringify(choiceSlots[2].choice) : null,
+        backgroundChoice: choiceSlots[3].choice ? JSON.stringify(choiceSlots[3].choice) : null,
+        backgroundBackupChoice: choiceSlots[4].choice ? JSON.stringify(choiceSlots[4].choice) : null,
+        musicChoice: choiceSlots[5].choice ? JSON.stringify(choiceSlots[5].choice) : null,
+        musicBackupChoice: choiceSlots[6].choice ? JSON.stringify(choiceSlots[6].choice) : null,
+      });
+    }
 
     const links = newLinks.filter((u) => u.trim());
     for (const [i, url] of links.entries()) {
@@ -600,67 +651,66 @@ export function NewRequestPage() {
         </div>
       </div>
 
-      {/* Row 1: Brand Details + Campaign Goal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
-        <Section number={1} title="Brand Details">
-          <Field label="Product or brand name *">
-            <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
-          </Field>
-          <Field label="Product description *">
-            <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.productDescription} onChange={(e) => set('productDescription', e.target.value)} />
-          </Field>
-          <Field label="Logo">
-            <FileGrid
-              existing={existingAssets.filter((a) => a.type === 'logo')}
-              pending={logoFile ? [logoFile] : []}
-              onRemoveExisting={removeExisting}
-              onRemovePending={(p) => {
-                removePending(p);
-                setLogoFile(null);
-              }}
-            />
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml"
-              onChange={(e) => {
-                pickSingle('logo', Array.from(e.target.files ?? []), logoFile, setLogoFile);
-                e.target.value = '';
-              }}
-            />
-            <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
-          </Field>
-          <Field label="Product photos / footage">
-            <FileGrid
-              existing={existingAssets.filter((a) => a.type === 'product_file')}
-              pending={productFiles}
-              onRemoveExisting={removeExisting}
-              onRemovePending={(p) => {
-                removePending(p);
-                setProductFiles((prev) => prev.filter((x) => x !== p));
-              }}
-            />
-            <input
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,video/mp4"
-              onChange={(e) => {
-                pickMultiple('product_file', Array.from(e.target.files ?? []), productFiles, setProductFiles);
-                e.target.value = '';
-              }}
-            />
-            <FieldHint text={UPLOAD_LIMITS.product_file.label} error={fileErrors.product_file} />
-          </Field>
-          <Field label="Brand colors">
-            <div style={{ display: 'flex', gap: 16 }}>
-              <ColorSwatchPicker label="Primary" value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
-              <ColorSwatchPicker label="Secondary" value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
-            </div>
-          </Field>
-        </Section>
+      {/* Row 1: Brand Details */}
+      <Section number={1} title="Brand Details">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <Field label="Product or brand name *">
+              <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
+            </Field>
+            <Field label="Product description *">
+              <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.productDescription} onChange={(e) => set('productDescription', e.target.value)} />
+            </Field>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <Field label="Logo">
+              <FileGrid
+                existing={existingAssets.filter((a) => a.type === 'logo')}
+                pending={logoFile ? [logoFile] : []}
+                onRemoveExisting={removeExisting}
+                onRemovePending={(p) => {
+                  removePending(p);
+                  setLogoFile(null);
+                }}
+              />
+              <ChooseFileLink
+                accept="image/png,image/jpeg,image/svg+xml"
+                onPick={(files) => pickSingle('logo', files, logoFile, setLogoFile)}
+              />
+              <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
+            </Field>
+            <Field label="Brand colors">
+              <div style={{ display: 'flex', gap: 16 }}>
+                <ColorSwatchPicker label="Primary" value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
+                <ColorSwatchPicker label="Secondary" value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
+              </div>
+            </Field>
+          </div>
+        </div>
+        <Field label="Product photos / footage">
+          <FileGrid
+            existing={existingAssets.filter((a) => a.type === 'product_file')}
+            pending={productFiles}
+            onRemoveExisting={removeExisting}
+            onRemovePending={(p) => {
+              removePending(p);
+              setProductFiles((prev) => prev.filter((x) => x !== p));
+            }}
+          />
+          <ChooseFileLink
+            accept="image/png,image/jpeg,video/mp4"
+            multiple
+            onPick={(files) => pickMultiple('product_file', files, productFiles, setProductFiles)}
+          />
+          <FieldHint text={UPLOAD_LIMITS.product_file.label} error={fileErrors.product_file} />
+        </Field>
+      </Section>
 
+      {/* Row 2: Campaign Goal + Target Audience */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
         <Section number={2} title="Campaign Goal">
           <Field label="Goal *">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {GOALS.map((g) => {
                 const Icon = GOAL_ICONS[g.value];
                 const selected = form.goal === g.value;
@@ -676,22 +726,21 @@ export function NewRequestPage() {
                       border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
                       background: selected ? 'var(--teal-soft)' : 'var(--surface)',
                       borderRadius: 8,
-                      padding: '12px 6px',
+                      padding: '10px 6px',
+                      fontSize: 11.5,
+                      fontWeight: 600,
                       cursor: 'pointer',
                     }}
                   >
-                    <Icon size={20} color={selected ? 'var(--teal)' : 'var(--text-soft)'} />
-                    <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: 'center', color: selected ? 'var(--teal)' : 'var(--text-soft)' }}>{g.label}</span>
+                    <Icon size={18} color={selected ? 'var(--teal)' : 'var(--text-soft)'} />
+                    <span style={{ textAlign: 'center', color: selected ? 'var(--teal)' : 'var(--text-soft)' }}>{g.label}</span>
                   </button>
                 );
               })}
             </div>
           </Field>
         </Section>
-      </div>
 
-      {/* Row 2: Target Audience + Video Settings */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14, alignItems: 'stretch' }}>
         <Section number={3} title="Target Audience">
           <Field label="Audience *">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -725,8 +774,36 @@ export function NewRequestPage() {
             </div>
           </Field>
         </Section>
+      </div>
 
-        <Section number={4} title="Video Settings">
+      {/* Row 3: Script Direction */}
+      <Section number={4} title="Script Direction">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <Field label="Script style">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SCRIPT_STYLES.map((s) => (
+                <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Tone">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TONES.map((t) => (
+                <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
+                  {titleCase(t)}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+        <StoryDetailField value={form.storyDirection} onChange={(v) => set('storyDirection', v)} />
+      </Section>
+
+      {/* Row 4: Video Settings */}
+      <Section number={5} title="Video Settings">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
           <Field label="Platform *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PLATFORMS.map((p) => (
@@ -740,7 +817,7 @@ export function NewRequestPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {LENGTHS.map((len) => (
                 <button key={len} style={pill(form.videoLengthSec === len)} onClick={() => set('videoLengthSec', len)}>
-                  {len === 0 ? 'Custom' : `${len}s`}
+                  {len}s
                 </button>
               ))}
             </div>
@@ -790,154 +867,126 @@ export function NewRequestPage() {
               ))}
             </div>
           </Field>
+        </div>
+      </Section>
+
+      {/* Row 5: Avatar Selection + Background Selection */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
+        <Section
+          number={6}
+          title="Avatar Selection"
+          description="Primary + backup avatar preset from your designer's library, or upload your own."
+          headerRight={<ModeToggle mode={avatarMode} onChange={setAvatarMode} />}
+        >
+          <DualPickerField
+            designerId={form.designerId}
+            category="avatar"
+            industry={form.industry ?? ''}
+            kind="image"
+            accept="image/png,image/jpeg"
+            mode={avatarMode}
+            primaryValue={avatarChoice}
+            backupValue={avatarBackupChoice}
+            onPrimaryChange={setAvatarChoice}
+            onBackupChange={setAvatarBackupChoice}
+            primaryUploadFile={avatarUpload}
+            backupUploadFile={avatarBackupUpload}
+            onPickPrimaryUpload={(file) => setAvatarUpload({ file, previewUrl: URL.createObjectURL(file) })}
+            onPickBackupUpload={(file) => setAvatarBackupUpload({ file, previewUrl: URL.createObjectURL(file) })}
+          />
+        </Section>
+
+        <Section
+          number={7}
+          title="Background Selection"
+          description="Primary + backup scene from your designer's library, or upload your own."
+          headerRight={<ModeToggle mode={backgroundMode} onChange={setBackgroundMode} />}
+        >
+          <DualPickerField
+            designerId={form.designerId}
+            category="background"
+            industry={form.industry ?? ''}
+            kind="image"
+            accept="image/png,image/jpeg"
+            mode={backgroundMode}
+            primaryValue={backgroundChoice}
+            backupValue={backgroundBackupChoice}
+            onPrimaryChange={setBackgroundChoice}
+            onBackupChange={setBackgroundBackupChoice}
+            primaryUploadFile={backgroundUpload}
+            backupUploadFile={backgroundBackupUpload}
+            onPickPrimaryUpload={(file) => setBackgroundUpload({ file, previewUrl: URL.createObjectURL(file) })}
+            onPickBackupUpload={(file) => setBackgroundBackupUpload({ file, previewUrl: URL.createObjectURL(file) })}
+          />
         </Section>
       </div>
 
-      {/* Row 3: Avatar Selection */}
-      <Section number={5} title="Avatar Selection">
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
-          Pick a primary and backup avatar preset from your designer's library, or upload your own.
-        </p>
-        <DualPickerField
-          designerId={form.designerId}
-          category="avatar"
-          industry={form.industry ?? ''}
-          kind="image"
-          primaryValue={avatarChoice}
-          backupValue={avatarBackupChoice}
-          onPrimaryChange={setAvatarChoice}
-          onBackupChange={setAvatarBackupChoice}
-        />
-      </Section>
-
-      {/* Row 4: Background Selection */}
-      <Section number={6} title="Background Selection">
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
-          Pick a primary and backup scene from your designer's library, or upload your own.
-        </p>
-        <DualPickerField
-          designerId={form.designerId}
-          category="background"
-          industry={form.industry ?? ''}
-          kind="image"
-          primaryValue={backgroundChoice}
-          backupValue={backgroundBackupChoice}
-          onPrimaryChange={setBackgroundChoice}
-          onBackupChange={setBackgroundBackupChoice}
-        />
-      </Section>
-
-      {/* Row 5: Visual Mood + Music + Script Direction */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, alignItems: 'stretch' }}>
-        <Section number={7} title="Visual Style / Mood">
+      {/* Row 6: Visual Mood + Music Selection */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
+        <Section number={8} title="Visual Style / Mood">
           <Field label="Mood">
             <LibraryPickerField
               designerId={form.designerId}
               category="mood"
               industry={form.industry ?? ''}
               kind="image"
+              accept="image/png,image/jpeg"
               value={moodChoice}
               onChange={setMoodChoice}
+              uploadFile={moodUpload}
+              onPickUpload={(file) => {
+                setMoodUpload({ file, previewUrl: URL.createObjectURL(file) });
+                setMoodChoice({ source: 'upload', assetId: '', label: file.name });
+              }}
             />
           </Field>
         </Section>
 
-        <Section number={8} title="Music Selection">
-          <Field label="Music / voiceover">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-              {MUSIC_MODES.map((m) => (
-                <button key={m} style={{ ...pill(form.musicMode === m), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('musicMode', m)}>
-                  {titleCase(m)}
-                </button>
-              ))}
-            </div>
-            {form.musicMode === 'pick_for_me' && (
-              <DualPickerField
-                designerId={form.designerId}
-                category="music"
-                industry={form.industry ?? ''}
-                kind="audio"
-                primaryValue={musicChoice}
-                backupValue={musicBackupChoice}
-                onPrimaryChange={setMusicChoice}
-                onBackupChange={setMusicBackupChoice}
-              />
-            )}
-            {form.musicMode === 'customer_provided' && (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Attach your track in the Reference files section below.</p>
-            )}
-            {form.musicMode === 'describe_style' && (
-              <input
-                style={fieldStyle()}
-                placeholder="e.g. soft acoustic, no lyrics"
-                value={form.musicNote ?? ''}
-                onChange={(e) => set('musicNote', e.target.value)}
-              />
-            )}
-          </Field>
-        </Section>
-
-        <Section number={9} title="Script Direction">
-          <Field label="Script style">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {SCRIPT_STYLES.map((s) => (
-                <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <StoryDetailField value={form.storyDirection} onChange={(v) => set('storyDirection', v)} />
-            </div>
-          </Field>
-          <Field label="Tone">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {TONES.map((t) => (
-                <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
-                  {titleCase(t)}
-                </button>
-              ))}
-            </div>
+        <Section
+          number={9}
+          title="Music Selection"
+          headerRight={<ModeToggle mode={musicPickMode} onChange={setMusicPickMode} />}
+        >
+          <Field label="Music">
+            <DualPickerField
+              designerId={form.designerId}
+              category="music"
+              industry={form.industry ?? ''}
+              kind="audio"
+              accept="audio/mpeg,audio/mp3,audio/wav"
+              mode={musicPickMode}
+              primaryValue={musicChoice}
+              backupValue={musicBackupChoice}
+              onPrimaryChange={setMusicChoice}
+              onBackupChange={setMusicBackupChoice}
+              primaryUploadFile={musicUpload}
+              backupUploadFile={musicBackupUpload}
+              onPickPrimaryUpload={(file) => setMusicUpload({ file, previewUrl: URL.createObjectURL(file) })}
+              onPickBackupUpload={(file) => setMusicBackupUpload({ file, previewUrl: URL.createObjectURL(file) })}
+            />
           </Field>
         </Section>
       </div>
 
-      {/* Row 6: Call-to-Action + Approval & Revision Rules */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 14, alignItems: 'stretch' }}>
-        <Section number={10} title="Call-to-Action">
-          <Field label="Call to action style *">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {CTA_STYLES.map((c) => (
-                <button
-                  key={c.value}
-                  style={pill(form.ctaStyle === c.value)}
-                  onClick={() => setForm((f) => ({ ...f, ctaStyle: c.value, cta: c.label }))}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </Section>
-
-        <Section number={11} title="Approval & Revision Rules">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {APPROVAL_TERMS.map((t, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
-                <CheckCircle2 size={15} style={{ color: 'var(--moss)', flexShrink: 0, marginTop: 2 }} />
-                <span>{t}</span>
-              </div>
+      {/* Row 7: Call-to-Action */}
+      <Section number={10} title="Call-to-Action">
+        <Field label="Call to action style *">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {CTA_STYLES.map((c) => (
+              <button
+                key={c.value}
+                style={pill(form.ctaStyle === c.value)}
+                onClick={() => setForm((f) => ({ ...f, ctaStyle: c.value, cta: c.label }))}
+              >
+                {c.label}
+              </button>
             ))}
           </div>
-          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 14, cursor: 'pointer' }}>
-            <input type="checkbox" checked={termsConfirmed} onChange={(e) => setTermsConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>I understand and confirm these terms *</span>
-          </label>
-        </Section>
-      </div>
+        </Field>
+      </Section>
 
-      {/* Row 7: References & Notes */}
-      <Section number={12} title="References & Notes">
+      {/* Row 8: References & Notes */}
+      <Section number={11} title="References & Notes">
         <Field label="Reference files">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'reference_file')}
@@ -948,14 +997,10 @@ export function NewRequestPage() {
               setReferenceFiles((prev) => prev.filter((x) => x !== p));
             }}
           />
-          <input
-            type="file"
-            multiple
+          <ChooseFileLink
             accept="image/png,image/jpeg,video/mp4,application/pdf"
-            onChange={(e) => {
-              pickMultiple('reference_file', Array.from(e.target.files ?? []), referenceFiles, setReferenceFiles);
-              e.target.value = '';
-            }}
+            multiple
+            onPick={(files) => pickMultiple('reference_file', files, referenceFiles, setReferenceFiles)}
           />
           <FieldHint text={UPLOAD_LIMITS.reference_file.label} error={fileErrors.reference_file} />
         </Field>
@@ -986,6 +1031,22 @@ export function NewRequestPage() {
         </Field>
       </Section>
 
+      {/* Row 9: Approval & Revision Rules */}
+      <Section number={12} title="Approval & Revision Rules">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {APPROVAL_TERMS.map((t, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
+              <CheckCircle2 size={15} style={{ color: 'var(--moss)', flexShrink: 0, marginTop: 2 }} />
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+          <input type="checkbox" checked={termsConfirmed} onChange={(e) => setTermsConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+          <span style={{ fontSize: 13, fontWeight: 600 }}>I understand and confirm these terms *</span>
+        </label>
+      </Section>
+
       {error && (
         <p style={{ background: 'var(--crimson-soft)', border: '1px solid var(--crimson-line)', color: 'var(--crimson)', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: 0 }}>
           {error}
@@ -1009,6 +1070,46 @@ export function NewRequestPage() {
   );
 }
 
+function ModeToggle({ mode, onChange }: { mode: 'primary' | 'backup'; onChange: (mode: 'primary' | 'backup') => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 12 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <input type="radio" checked={mode === 'primary'} onChange={() => onChange('primary')} />
+        Primary
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <input type="radio" checked={mode === 'backup'} onChange={() => onChange('backup')} />
+        Backup
+      </label>
+    </div>
+  );
+}
+
+function ChooseFileLink({ accept, multiple, onPick }: { accept: string; multiple?: boolean; onPick: (files: File[]) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        onClick={() => ref.current?.click()}
+        style={{ border: 'none', background: 'none', color: 'var(--teal)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+      >
+        + Choose
+      </button>
+      <input
+        ref={ref}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          onPick(Array.from(e.target.files ?? []));
+          e.target.value = '';
+        }}
+      />
+    </>
+  );
+}
+
 function FieldHint({ text, error }: { text: string; error?: string }) {
   return (
     <p style={{ margin: '6px 0 0', fontSize: 11.5, color: error ? 'var(--crimson)' : 'var(--text-faint)' }}>
@@ -1017,28 +1118,47 @@ function FieldHint({ text, error }: { text: string; error?: string }) {
   );
 }
 
-function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
+function Section({
+  number,
+  title,
+  description,
+  headerRight,
+  children,
+}: {
+  number: number;
+  title: string;
+  description?: string;
+  headerRight?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <span
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: '50%',
-            background: 'var(--ink)',
-            color: 'var(--paper)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 13,
-            fontWeight: 700,
-            flexShrink: 0,
-          }}
-        >
-          {number}
-        </span>
-        <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h2>
+    <section className="card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0, flex: 1 }}>
+          <span
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              background: 'var(--ink)',
+              color: 'var(--paper)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 13,
+              fontWeight: 700,
+              flexShrink: 0,
+              marginTop: 1,
+            }}
+          >
+            {number}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h2>
+            {description && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>{description}</p>}
+          </div>
+        </div>
+        {headerRight && <div style={{ flexShrink: 0 }}>{headerRight}</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>{children}</div>
     </section>
@@ -1110,6 +1230,8 @@ function ColorSwatchPicker({ label, value, onChange }: { label: string; value: s
   );
 }
 
+const TILE_SIZE = 100;
+
 function PickerTile({
   index,
   label,
@@ -1137,7 +1259,7 @@ function PickerTile({
       }}
       style={{
         position: 'relative',
-        width: 108,
+        width: TILE_SIZE,
         border: `1.5px solid ${selected ? 'var(--teal)' : backupSelected ? 'var(--amber)' : 'var(--line)'}`,
         borderRadius: 8,
         padding: 6,
@@ -1206,11 +1328,85 @@ function PickerTile({
         </span>
       )}
       {kind === 'image' ? (
-        <img src={imageUrl} alt={label} style={{ width: '100%', height: 78, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }} />
+        <img
+          src={imageUrl}
+          alt={label}
+          style={{ width: '100%', height: TILE_SIZE, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }}
+        />
       ) : (
         <div style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 4 }}>♪</div>
       )}
       <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
+    </div>
+  );
+}
+
+function UploadOwnTile({
+  kind,
+  active,
+  fileName,
+  previewUrl,
+  accept,
+  onPick,
+}: {
+  kind: 'image' | 'audio';
+  active: boolean;
+  fileName?: string;
+  previewUrl?: string;
+  accept: string;
+  onPick: (file: File) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => ref.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') ref.current?.click();
+      }}
+      style={{
+        width: TILE_SIZE,
+        border: `1.5px dashed ${active ? 'var(--teal)' : 'var(--line)'}`,
+        borderRadius: 8,
+        padding: 6,
+        background: active ? 'var(--teal-soft)' : 'var(--surface)',
+        cursor: 'pointer',
+      }}
+    >
+      <input
+        ref={ref}
+        type="file"
+        accept={accept}
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPick(file);
+          e.target.value = '';
+        }}
+      />
+      {active && kind === 'image' && previewUrl ? (
+        <img src={previewUrl} alt={fileName} style={{ width: '100%', height: TILE_SIZE, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }} />
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            height: kind === 'image' ? TILE_SIZE : 46,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: active ? 20 : 11,
+            textAlign: 'center',
+            color: 'var(--text-soft)',
+            marginBottom: 4,
+          }}
+        >
+          {active ? '♪' : '+ Upload my own'}
+        </div>
+      )}
+      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {active ? fileName : ''}
+      </p>
     </div>
   );
 }
@@ -1220,15 +1416,21 @@ function LibraryPickerField({
   category,
   industry,
   kind,
+  accept,
   value,
   onChange,
+  uploadFile,
+  onPickUpload,
 }: {
   designerId: string;
   category: LibraryCategory;
   industry: string;
   kind: 'image' | 'audio';
+  accept: string;
   value: AssetChoice | null;
   onChange: (choice: AssetChoice | null) => void;
+  uploadFile: PendingFile | null;
+  onPickUpload: (file: File) => void;
 }) {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1277,26 +1479,14 @@ function LibraryPickerField({
             onClick={() => onChange({ source: 'library', assetId: item.id, label: item.label })}
           />
         ))}
-        <button
-          onClick={() => onChange(uploadSelected ? null : { source: 'upload', assetId: '', label: 'Custom (attach in Reference files below)' })}
-          style={{
-            width: 108,
-            height: kind === 'image' ? 110 : 78,
-            border: `1.5px dashed ${uploadSelected ? 'var(--teal)' : 'var(--line)'}`,
-            borderRadius: 8,
-            padding: 6,
-            background: uploadSelected ? 'var(--teal-soft)' : 'var(--surface)',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 11,
-            textAlign: 'center',
-          }}
-        >
-          {uploadSelected ? '✓ Uploading my own' : '+ Upload my own'}
-        </button>
+        <UploadOwnTile
+          kind={kind}
+          accept={accept}
+          active={uploadSelected}
+          fileName={uploadFile?.file.name}
+          previewUrl={uploadFile?.previewUrl}
+          onPick={onPickUpload}
+        />
       </div>
       {items.length === 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
@@ -1312,23 +1502,34 @@ function DualPickerField({
   category,
   industry,
   kind,
+  accept,
+  mode,
   primaryValue,
   backupValue,
   onPrimaryChange,
   onBackupChange,
+  primaryUploadFile,
+  backupUploadFile,
+  onPickPrimaryUpload,
+  onPickBackupUpload,
 }: {
   designerId: string;
   category: LibraryCategory;
   industry: string;
   kind: 'image' | 'audio';
+  accept: string;
+  mode: 'primary' | 'backup';
   primaryValue: AssetChoice | null;
   backupValue: AssetChoice | null;
   onPrimaryChange: (choice: AssetChoice | null) => void;
   onBackupChange: (choice: AssetChoice | null) => void;
+  primaryUploadFile: PendingFile | null;
+  backupUploadFile: PendingFile | null;
+  onPickPrimaryUpload: (file: File) => void;
+  onPickBackupUpload: (file: File) => void;
 }) {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'primary' | 'backup'>('primary');
 
   useEffect(() => {
     if (!designerId) {
@@ -1362,21 +1563,12 @@ function DualPickerField({
     else onBackupChange(choice);
   }
 
-  const uploadActiveSelected = mode === 'primary' ? primaryValue?.source === 'upload' : backupValue?.source === 'upload';
+  const activeValue = mode === 'primary' ? primaryValue : backupValue;
+  const activeUploadFile = mode === 'primary' ? primaryUploadFile : backupUploadFile;
+  const uploadActiveSelected = activeValue?.source === 'upload';
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginBottom: 10 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
-          <input type="radio" checked={mode === 'primary'} onChange={() => setMode('primary')} />
-          Primary
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
-          <input type="radio" checked={mode === 'backup'} onChange={() => setMode('backup')} />
-          Backup
-        </label>
-      </div>
-
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
         {items.map((item, i) => (
           <PickerTile
@@ -1390,28 +1582,18 @@ function DualPickerField({
             onClick={() => choose({ source: 'library', assetId: item.id, label: item.label })}
           />
         ))}
-        <button
-          onClick={() =>
-            choose(uploadActiveSelected ? null : { source: 'upload', assetId: '', label: 'Custom (attach in Reference files below)' })
-          }
-          style={{
-            width: 108,
-            height: kind === 'image' ? 110 : 78,
-            border: `1.5px dashed ${uploadActiveSelected ? 'var(--teal)' : 'var(--line)'}`,
-            borderRadius: 8,
-            padding: 6,
-            background: uploadActiveSelected ? 'var(--teal-soft)' : 'var(--surface)',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 11,
-            textAlign: 'center',
+        <UploadOwnTile
+          kind={kind}
+          accept={accept}
+          active={uploadActiveSelected}
+          fileName={activeUploadFile?.file.name ?? activeValue?.label}
+          previewUrl={activeUploadFile?.previewUrl}
+          onPick={(file) => {
+            choose({ source: 'upload', assetId: '', label: file.name });
+            if (mode === 'primary') onPickPrimaryUpload(file);
+            else onPickBackupUpload(file);
           }}
-        >
-          {uploadActiveSelected ? `✓ Uploading my own (${mode})` : `+ Upload my own (${mode})`}
-        </button>
+        />
       </div>
       {items.length === 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { cropImageToFile } from '../lib/cropImage';
 
-// Lets a designer step through a batch of just-picked images, crop each to
-// the portrait frame the picker expects, or skip ones that are already
-// framed correctly — so they don't have to pre-crop random internet photos
-// in another tool first.
+// Lets a designer step through a batch of just-picked images and crop each
+// to the frame the picker expects, panning/zooming to the region of
+// interest — so they don't have to pre-crop random internet photos in
+// another tool first. Cropping is mandatory: only the cropped output is
+// ever uploaded, never the original file.
 export function ImageCropModal({
   files,
-  aspect = 3 / 4,
+  aspect = 1,
   onDone,
   onCancel,
 }: {
@@ -60,10 +61,6 @@ export function ImageCropModal({
     }
   }
 
-  function handleSkip() {
-    advance(decisions);
-  }
-
   return (
     <div
       style={{
@@ -113,26 +110,18 @@ export function ImageCropModal({
           <button className="btn" disabled={index === 0} onClick={() => setIndex(index - 1)} style={{ fontSize: 12.5 }}>
             ← Prev
           </button>
-          <button className="btn" disabled={index + 1 >= files.length} onClick={() => setIndex(index + 1)} style={{ fontSize: 12.5 }}>
+          <button
+            className="btn"
+            disabled={index + 1 >= files.length || !decisions[index]}
+            onClick={() => setIndex(index + 1)}
+            style={{ fontSize: 12.5 }}
+          >
             Next →
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" style={{ flex: 1 }} onClick={handleSkip} disabled={processing}>
-            Skip (use as-is)
-          </button>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleUseCrop} disabled={processing || !croppedAreaPixels}>
-            {processing ? 'Cropping…' : 'Use this crop'}
-          </button>
-        </div>
-
-        <button
-          onClick={() => finish(decisions)}
-          disabled={processing}
-          style={{ display: 'block', margin: '14px auto 0', border: 'none', background: 'none', color: 'var(--text-faint)', fontSize: 12, cursor: 'pointer' }}
-        >
-          Done — add all {files.length} images as-is from here
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleUseCrop} disabled={processing || !croppedAreaPixels}>
+          {processing ? 'Cropping…' : index + 1 >= files.length ? 'Crop & finish' : 'Use this crop & continue'}
         </button>
       </div>
     </div>
