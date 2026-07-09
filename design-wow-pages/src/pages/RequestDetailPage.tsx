@@ -54,7 +54,7 @@ export function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
-  const [tab, setTab] = useState<'brief' | 'output'>('brief');
+  const [tab, setTab] = useState<'brief' | 'notes' | 'storage'>('brief');
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<CommentRow | null>(null);
@@ -204,7 +204,8 @@ export function RequestDetailPage() {
               {(
                 [
                   { key: 'brief', label: 'Brief' },
-                  { key: 'output', label: 'Output' },
+                  { key: 'notes', label: 'Notes' },
+                  { key: 'storage', label: 'Storage' },
                 ] as const
               ).map((t) => (
                 <button
@@ -236,19 +237,10 @@ export function RequestDetailPage() {
             </a>
           </div>
 
-          {tab === 'brief' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setShowUpdateModal(true)}>
-                  Update VIP
-                </button>
-              </div>
-              <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />
-            </div>
-          )}
+          {tab === 'brief' && <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />}
 
-          {tab === 'output' && (
-            <>
+          {tab === 'notes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <ConversationThread
                 viewerRole="designer"
                 comments={comments}
@@ -291,8 +283,20 @@ export function RequestDetailPage() {
                 }
               />
 
-              <StorageSection assets={assets} comments={comments} commentAssets={commentAssets} links={links} onOpenLightbox={setLightbox} />
-            </>
+              <div style={cardStyle}>
+                <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>Update the brief</label>
+                <button className="btn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setShowUpdateModal(true)}>
+                  Update VIP
+                </button>
+                <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+                  Posts a note here automatically so the customer sees exactly what changed.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {tab === 'storage' && (
+            <StorageSection assets={assets} comments={comments} commentAssets={commentAssets} links={links} onOpenLightbox={setLightbox} />
           )}
         </div>
 
