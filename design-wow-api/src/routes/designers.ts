@@ -384,11 +384,13 @@ designers.get('/showcase-items/:itemId/thumbnail', async (c) => {
 const LIBRARY_ACCEPT: Record<string, string[]> = {
   avatar: ['image/png', 'image/jpeg'],
   mood: ['image/png', 'image/jpeg'],
+  background: ['image/png', 'image/jpeg'],
   music: ['audio/mpeg', 'audio/mp3', 'audio/wav'],
 };
 const LIBRARY_MAX_BYTES: Record<string, number> = {
   avatar: 8 * 1024 * 1024,
   mood: 8 * 1024 * 1024,
+  background: 8 * 1024 * 1024,
   music: 20 * 1024 * 1024,
 };
 const LIBRARY_MAX_COUNT = 25;

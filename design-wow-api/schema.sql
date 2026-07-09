@@ -85,7 +85,7 @@ CREATE INDEX idx_showcase_designer ON designer_showcase_items(designer_id, creat
 CREATE TABLE designer_asset_library (
   id            TEXT PRIMARY KEY,
   designer_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  category      TEXT NOT NULL CHECK (category IN ('avatar','mood','music')),
+  category      TEXT NOT NULL CHECK (category IN ('avatar','mood','music','background')),
   label         TEXT NOT NULL CHECK (length(label) <= 100),
   r2_key        TEXT NOT NULL,
   file_name     TEXT NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE requests (
   -- brief: the basics
   product_name          TEXT NOT NULL CHECK (length(product_name) <= 100),
   product_description   TEXT NOT NULL CHECK (length(product_description) <= 1000),
-  goal                  TEXT NOT NULL CHECK (goal IN ('conversions','brand_awareness','ugc_testimonial','organic_social')),
+  goal                  TEXT NOT NULL CHECK (length(goal) <= 50),   -- free-form enum; UI offers a fixed list but not DB-enforced, since it's expected to grow
   platform              TEXT NOT NULL CHECK (platform IN ('tiktok','instagram_reels','youtube_shorts','other')),
   video_length_sec      INTEGER NOT NULL CHECK (video_length_sec IN (15,30,60,0)),  -- 0 = custom
   video_length_note     TEXT CHECK (length(video_length_note) <= 100),             -- used when custom
@@ -174,12 +174,28 @@ CREATE TABLE requests (
   -- each designer's library, not a fixed enum. industry drives both which
   -- designers get recommended and which of a chosen designer's assets show.
   -- Each *_choice is a JSON blob: {source:'library'|'upload', assetId, label}.
-  industry              TEXT,
-  avatar_choice         TEXT,
-  mood_choice           TEXT,
-  music_choice          TEXT,
-  script_style          TEXT,
-  cta_style             TEXT,
+  industry                  TEXT,
+  avatar_choice             TEXT,
+  avatar_backup_choice      TEXT,
+  mood_choice               TEXT,
+  music_choice              TEXT,
+  music_backup_choice       TEXT,
+  background_choice         TEXT,
+  background_backup_choice  TEXT,
+  script_style              TEXT,
+  cta_style                 TEXT,
+
+  -- brief: structured picker phase 2 — full mockup parity fields
+  target_audience       TEXT,
+  aspect_ratio          TEXT,
+  language              TEXT,
+  voice_type            TEXT,
+  subtitles             TEXT,
+  brand_color_primary   TEXT,
+  brand_color_secondary TEXT,
+  -- Set when the customer confirms the (informational-only, not enforced)
+  -- Approval & Revision Rules terms shown on the request form.
+  terms_confirmed_at    TEXT,
 
   -- timer
   sla_hours             INTEGER NOT NULL,          -- copied from subscription at submit time

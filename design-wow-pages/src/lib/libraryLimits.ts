@@ -13,6 +13,12 @@ export const LIBRARY_LIMITS: Record<LibraryCategory, { maxBytes: number; maxCoun
     accept: ['image/png', 'image/jpeg'],
     label: 'Portrait photos, ideally 1080×1440 (3:4) or taller — PNG/JPG up to 8MB, max 25',
   },
+  background: {
+    maxBytes: 8 * 1024 * 1024,
+    maxCount: 25,
+    accept: ['image/png', 'image/jpeg'],
+    label: 'Landscape scene photos — PNG/JPG up to 8MB, max 25',
+  },
   music: {
     maxBytes: 20 * 1024 * 1024,
     maxCount: 25,

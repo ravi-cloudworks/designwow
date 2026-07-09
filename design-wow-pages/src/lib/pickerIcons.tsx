@@ -1,0 +1,44 @@
+import {
+  ShoppingCart,
+  Megaphone,
+  Gift,
+  MessageCircle,
+  Globe,
+  Users,
+  Tag,
+  ShieldCheck,
+  Home,
+  BadgeCheck,
+  HeartPulse,
+  Store,
+  Briefcase,
+  Gem,
+  MapPin,
+  Plane,
+  Globe2,
+  type LucideIcon,
+} from 'lucide-react';
+
+export const GOAL_ICONS: Record<string, LucideIcon> = {
+  increase_sales: ShoppingCart,
+  brand_awareness: Megaphone,
+  promote_new_product: Gift,
+  drive_inquiries: MessageCircle,
+  website_visits: Globe,
+  more_followers: Users,
+  announce_offer: Tag,
+  build_trust: ShieldCheck,
+};
+
+export const TARGET_AUDIENCE_ICONS: Record<string, LucideIcon> = {
+  families: Users,
+  personal_use: Home,
+  quality_conscious: BadgeCheck,
+  health_conscious: HeartPulse,
+  business_retail: Store,
+  young_professionals: Briefcase,
+  luxury_buyers: Gem,
+  domestic_market: MapPin,
+  export_buyers: Plane,
+  general_audience: Globe2,
+};

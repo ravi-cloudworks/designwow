@@ -33,3 +33,72 @@ export const CTA_STYLES: { value: string; label: string }[] = [
   { value: 'dm_to_order', label: 'DM to Order' },
   { value: 'limited_time_offer', label: 'Limited Time Offer' },
 ];
+
+// Expanded goal set (8 options, icon-tile style) — kept industry-agnostic
+// since one designer's library and one industry tag serve many verticals.
+export const GOALS: { value: string; label: string }[] = [
+  { value: 'increase_sales', label: 'Increase Sales' },
+  { value: 'brand_awareness', label: 'Brand Awareness' },
+  { value: 'promote_new_product', label: 'Promote New Product' },
+  { value: 'drive_inquiries', label: 'Drive Inquiries' },
+  { value: 'website_visits', label: 'Website Visits' },
+  { value: 'more_followers', label: 'More Followers' },
+  { value: 'announce_offer', label: 'Announce Offer' },
+  { value: 'build_trust', label: 'Build Trust' },
+];
+
+// Buyer-persona categories — same structure as the reference layout, kept
+// generic rather than seafood-specific since designers serve many industries.
+export const TARGET_AUDIENCES: { value: string; label: string }[] = [
+  { value: 'families', label: 'Families' },
+  { value: 'personal_use', label: 'Home / Personal Use' },
+  { value: 'quality_conscious', label: 'Quality-Conscious Buyers' },
+  { value: 'health_conscious', label: 'Health Conscious' },
+  { value: 'business_retail', label: 'Business & Retail Buyers' },
+  { value: 'young_professionals', label: 'Young Professionals' },
+  { value: 'luxury_buyers', label: 'Luxury Buyers' },
+  { value: 'domestic_market', label: 'Domestic Market' },
+  { value: 'export_buyers', label: 'Export / International Buyers' },
+  { value: 'general_audience', label: 'General Audience' },
+];
+
+export const ASPECT_RATIOS: { value: string; label: string }[] = [
+  { value: '9:16', label: '9:16 (Vertical)' },
+  { value: '1:1', label: '1:1 (Square)' },
+  { value: '4:5', label: '4:5 (Portrait)' },
+  { value: '16:9', label: '16:9 (Horizontal)' },
+];
+
+export const LANGUAGES: { value: string; label: string }[] = [
+  { value: 'english', label: 'English' },
+  { value: 'hindi', label: 'Hindi' },
+  { value: 'tamil', label: 'Tamil' },
+  { value: 'telugu', label: 'Telugu' },
+  { value: 'kannada', label: 'Kannada' },
+  { value: 'malayalam', label: 'Malayalam' },
+  { value: 'bengali', label: 'Bengali' },
+  { value: 'other', label: 'Other' },
+];
+
+export const VOICE_TYPES: { value: string; label: string }[] = [
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'no_preference', label: 'No Preference' },
+];
+
+export const SUBTITLE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
+
+// Static, informational-only — not tied to any enforcement in the app.
+// Shown so the customer sees the standard delivery terms up front and
+// confirms understanding before submitting.
+export const APPROVAL_TERMS: string[] = [
+  'Low-resolution preview delivered within your plan’s SLA window',
+  '50% advance typically requested before final production begins',
+  'The first round of feedback is treated as standard revision',
+  'Larger changes after that may need extra time or cost — your designer will flag this before proceeding',
+  'Final HD video delivered after you approve the revision',
+  'Remaining balance is settled directly with your designer via UPI',
+];

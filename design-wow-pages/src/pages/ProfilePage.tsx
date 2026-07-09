@@ -466,6 +466,15 @@ export function ProfilePage() {
             onRemove={handleLibraryRemove}
           />
           <AssetLibrarySection
+            category="background"
+            title="Background scenes"
+            accept="image/png,image/jpeg"
+            items={libraryItems.filter((i) => i.category === 'background')}
+            onFilesSelected={handleLibraryUpload}
+            onUpdate={handleLibraryUpdate}
+            onRemove={handleLibraryRemove}
+          />
+          <AssetLibrarySection
             category="music"
             title="Music styles"
             accept="audio/mpeg,audio/wav"
@@ -712,6 +721,7 @@ function AssetLibrarySection({
   const limits = LIBRARY_LIMITS[category];
   const atLimit = items.length >= limits.maxCount;
   const isImageCategory = category !== 'music';
+  const cropAspect = category === 'background' ? 16 / 9 : 3 / 4;
 
   async function upload(files: File[]) {
     setUploading(true);
@@ -799,6 +809,7 @@ function AssetLibrarySection({
       {cropQueue && (
         <ImageCropModal
           files={cropQueue}
+          aspect={cropAspect}
           onCancel={() => setCropQueue(null)}
           onDone={(finalFiles) => {
             setCropQueue(null);
@@ -865,7 +876,14 @@ function LibraryItemCard({
         <img
           src={api.designers.library.fileUrl(item.id)}
           alt={item.label}
-          style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', borderRadius: 6, marginBottom: 6, display: 'block' }}
+          style={{
+            width: '100%',
+            aspectRatio: item.category === 'background' ? '16 / 9' : '3 / 4',
+            objectFit: 'cover',
+            borderRadius: 6,
+            marginBottom: 6,
+            display: 'block',
+          }}
         />
       ) : (
         <audio controls preload="none" src={api.designers.library.fileUrl(item.id)} style={{ width: '100%', height: 32, marginBottom: 6, display: 'block' }} />

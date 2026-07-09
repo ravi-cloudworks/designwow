@@ -93,10 +93,22 @@ type RequestBody = {
   additionalNotes?: string | null;
   industry?: string | null;
   avatarChoice?: string | null;
+  avatarBackupChoice?: string | null;
   moodChoice?: string | null;
   musicChoice?: string | null;
+  musicBackupChoice?: string | null;
+  backgroundChoice?: string | null;
+  backgroundBackupChoice?: string | null;
   scriptStyle?: string | null;
   ctaStyle?: string | null;
+  targetAudience?: string | null;
+  aspectRatio?: string | null;
+  language?: string | null;
+  voiceType?: string | null;
+  subtitles?: string | null;
+  brandColorPrimary?: string | null;
+  brandColorSecondary?: string | null;
+  termsConfirmed?: boolean;
 };
 
 requests.post('/', async (c) => {
@@ -114,9 +126,13 @@ requests.post('/', async (c) => {
        video_length_sec, video_length_note, variants_count,
        characters_mode, characters_desc, story_direction, tone, cta,
        color_preferences, music_mode, music_note, restrictions, additional_notes,
-       industry, avatar_choice, mood_choice, music_choice, script_style, cta_style,
+       industry, avatar_choice, avatar_backup_choice, mood_choice,
+       music_choice, music_backup_choice, background_choice, background_backup_choice,
+       script_style, cta_style,
+       target_audience, aspect_ratio, language, voice_type, subtitles,
+       brand_color_primary, brand_color_secondary, terms_confirmed_at,
        sla_hours
-     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') ELSE NULL END, ?)`
   ).bind(
     id, userId, body.designerId, body.subscriptionId,
     body.productName, body.productDescription, body.goal, body.platform,
@@ -124,8 +140,12 @@ requests.post('/', async (c) => {
     body.charactersMode, body.charactersDesc ?? null, body.storyDirection, body.tone ?? null, body.cta,
     body.colorPreferences ?? null, body.musicMode ?? 'pick_for_me', body.musicNote ?? null,
     body.restrictions ?? null, body.additionalNotes ?? null,
-    body.industry ?? null, body.avatarChoice ?? null, body.moodChoice ?? null, body.musicChoice ?? null,
+    body.industry ?? null, body.avatarChoice ?? null, body.avatarBackupChoice ?? null, body.moodChoice ?? null,
+    body.musicChoice ?? null, body.musicBackupChoice ?? null, body.backgroundChoice ?? null, body.backgroundBackupChoice ?? null,
     body.scriptStyle ?? null, body.ctaStyle ?? null,
+    body.targetAudience ?? null, body.aspectRatio ?? null, body.language ?? null, body.voiceType ?? null, body.subtitles ?? null,
+    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null,
+    body.termsConfirmed ? 1 : 0,
     body.slaHours
   ).run();
 
@@ -145,7 +165,12 @@ requests.patch('/:id', async (c) => {
        video_length_sec = ?, video_length_note = ?, variants_count = ?,
        characters_mode = ?, characters_desc = ?, story_direction = ?, tone = ?, cta = ?,
        color_preferences = ?, music_mode = ?, music_note = ?, restrictions = ?, additional_notes = ?,
-       industry = ?, avatar_choice = ?, mood_choice = ?, music_choice = ?, script_style = ?, cta_style = ?,
+       industry = ?, avatar_choice = ?, avatar_backup_choice = ?, mood_choice = ?,
+       music_choice = ?, music_backup_choice = ?, background_choice = ?, background_backup_choice = ?,
+       script_style = ?, cta_style = ?,
+       target_audience = ?, aspect_ratio = ?, language = ?, voice_type = ?, subtitles = ?,
+       brand_color_primary = ?, brand_color_secondary = ?,
+       terms_confirmed_at = CASE WHEN ? THEN COALESCE(terms_confirmed_at, datetime('now')) ELSE terms_confirmed_at END,
        updated_at = datetime('now')
      WHERE id = ? AND status = 'draft'`
   ).bind(
@@ -155,8 +180,12 @@ requests.patch('/:id', async (c) => {
     body.charactersMode, body.charactersDesc ?? null, body.storyDirection, body.tone ?? null, body.cta,
     body.colorPreferences ?? null, body.musicMode ?? 'pick_for_me', body.musicNote ?? null,
     body.restrictions ?? null, body.additionalNotes ?? null,
-    body.industry ?? null, body.avatarChoice ?? null, body.moodChoice ?? null, body.musicChoice ?? null,
+    body.industry ?? null, body.avatarChoice ?? null, body.avatarBackupChoice ?? null, body.moodChoice ?? null,
+    body.musicChoice ?? null, body.musicBackupChoice ?? null, body.backgroundChoice ?? null, body.backgroundBackupChoice ?? null,
     body.scriptStyle ?? null, body.ctaStyle ?? null,
+    body.targetAudience ?? null, body.aspectRatio ?? null, body.language ?? null, body.voiceType ?? null, body.subtitles ?? null,
+    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null,
+    body.termsConfirmed ? 1 : 0,
     id
   ).run();
 

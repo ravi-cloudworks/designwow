@@ -12,6 +12,7 @@ import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { getBriefFields } from '../lib/briefFields';
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -52,6 +53,7 @@ export function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
+  const [tab, setTab] = useState<'brief' | 'output'>('brief');
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<CommentRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -195,75 +197,91 @@ export function RequestDetailPage() {
             </p>
           </div>
 
-          <div style={cardStyle}>
-            <h2 style={cardTitleStyle}>Brief</h2>
-            <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 22px', margin: 0 }}>
-              <BriefItem label="Goal" value={titleCase(request.goal)} />
-              <BriefItem label="Platform" value={titleCase(request.platform)} />
-              <BriefItem label="Length" value={`${request.video_length_sec || request.video_length_note || 'Custom'}s`} />
-              <BriefItem label="Variants" value={String(request.variants_count)} />
-              {request.tone && <BriefItem label="Tone" value={titleCase(request.tone)} />}
-              <BriefItem label="Call to action" value={request.cta} />
-              <BriefItem full label="Product description" value={request.product_description} />
-              <BriefItem
-                full
-                label="Characters"
-                value={`${titleCase(request.characters_mode)}${request.characters_desc ? ' — ' + request.characters_desc : ''}`}
-              />
-              <BriefItem full label="Story / script direction" value={request.story_direction} />
-              {request.color_preferences && <BriefItem label="Color preferences" value={request.color_preferences} />}
-              <BriefItem
-                label="Music"
-                value={`${titleCase(request.music_mode)}${request.music_note ? ' — ' + request.music_note : ''}`}
-              />
-              {request.restrictions && <BriefItem full label="Do's and don'ts" value={request.restrictions} />}
-              {request.additional_notes && <BriefItem full label="Additional notes" value={request.additional_notes} />}
-            </dl>
+          <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid var(--line)' }}>
+            {(
+              [
+                { key: 'brief', label: 'Brief' },
+                { key: 'output', label: 'Output' },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  padding: '2px 0 10px',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
+                  borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
+                  marginBottom: -1,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          <ConversationThread
-            viewerRole="designer"
-            comments={comments}
-            assets={assets}
-            commentAssets={commentAssets}
-            onOpenLightbox={setLightbox}
-            onPay={setPaymentModal}
-            composeSlot={
-              canAsk ? (
-                <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>
-                    Ask a clarifying question
-                  </label>
-                  <QuickReplies role="designer" onPick={(phrase) => setQuestion((q) => appendQuickReply(q, phrase))} />
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="This pauses the timer until the customer replies"
-                    style={{
-                      width: '100%',
-                      minHeight: 74,
-                      border: '1px solid var(--line)',
-                      borderRadius: 8,
-                      padding: '9px 11px',
-                      fontSize: 13,
-                      resize: 'vertical',
-                    }}
-                  />
-                  <AttachmentPicker ref={attachRef} existingAssets={inputAssets} disabled={busy} />
-                  <button className="btn btn-amber" style={{ marginTop: 8 }} disabled={busy || !question.trim()} onClick={handleAsk}>
-                    {busy ? 'Sending…' : 'Send & pause timer'}
-                  </button>
-                  {progress && (
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--teal)', margin: '6px 0 0' }}>
-                      <Spinner /> {progress}
-                    </p>
-                  )}
-                </div>
-              ) : undefined
-            }
-          />
+          {tab === 'brief' && (
+            <div style={cardStyle}>
+              <h2 style={cardTitleStyle}>Brief</h2>
+              <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 22px', margin: 0 }}>
+                {getBriefFields(request).map((f) => (
+                  <BriefItem key={f.label} label={f.label} value={f.value} full={f.full} />
+                ))}
+              </dl>
+            </div>
+          )}
 
-          <StorageSection assets={assets} comments={comments} commentAssets={commentAssets} links={links} onOpenLightbox={setLightbox} />
+          {tab === 'output' && (
+            <>
+              <ConversationThread
+                viewerRole="designer"
+                comments={comments}
+                assets={assets}
+                commentAssets={commentAssets}
+                onOpenLightbox={setLightbox}
+                onPay={setPaymentModal}
+                composeSlot={
+                  canAsk ? (
+                    <div>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>
+                        Ask a clarifying question
+                      </label>
+                      <QuickReplies role="designer" onPick={(phrase) => setQuestion((q) => appendQuickReply(q, phrase))} />
+                      <textarea
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        placeholder="This pauses the timer until the customer replies"
+                        style={{
+                          width: '100%',
+                          minHeight: 74,
+                          border: '1px solid var(--line)',
+                          borderRadius: 8,
+                          padding: '9px 11px',
+                          fontSize: 13,
+                          resize: 'vertical',
+                        }}
+                      />
+                      <AttachmentPicker ref={attachRef} existingAssets={inputAssets} disabled={busy} />
+                      <button className="btn btn-amber" style={{ marginTop: 8 }} disabled={busy || !question.trim()} onClick={handleAsk}>
+                        {busy ? 'Sending…' : 'Send & pause timer'}
+                      </button>
+                      {progress && (
+                        <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--teal)', margin: '6px 0 0' }}>
+                          <Spinner /> {progress}
+                        </p>
+                      )}
+                    </div>
+                  ) : undefined
+                }
+              />
+
+              <StorageSection assets={assets} comments={comments} commentAssets={commentAssets} links={links} onOpenLightbox={setLightbox} />
+            </>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, position: 'sticky', top: 28 }}>

@@ -6,13 +6,24 @@ import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { Avatar } from '../components/Avatar';
-import { INDUSTRIES, SCRIPT_STYLES, CTA_STYLES } from '../lib/industries';
+import {
+  INDUSTRIES,
+  SCRIPT_STYLES,
+  CTA_STYLES,
+  GOALS,
+  TARGET_AUDIENCES,
+  ASPECT_RATIOS,
+  LANGUAGES,
+  VOICE_TYPES,
+  SUBTITLE_OPTIONS,
+  APPROVAL_TERMS,
+} from '../lib/industries';
+import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
+import { CheckCircle2 } from 'lucide-react';
 
-const GOALS = ['conversions', 'brand_awareness', 'ugc_testimonial', 'organic_social'];
 const PLATFORMS = ['tiktok', 'instagram_reels', 'youtube_shorts', 'other'];
 const LENGTHS = [15, 30, 60, 0];
 const TONES = ['funny', 'emotional', 'energetic', 'professional'];
-const CHARACTER_MODES = ['own_footage', 'ai_avatar', 'need_talent'];
 const MUSIC_MODES = ['pick_for_me', 'customer_provided', 'describe_style'];
 
 // How well a designer's free-text specialty tags match the chosen industry —
@@ -41,13 +52,12 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Pharmaceutical Exports',
       productDescription: 'Generic pharmaceutical manufacturing for international healthcare markets, meeting global quality and compliance standards.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'A pharmacist in Germany explains why they trust medicines manufactured in India.',
       storyDirection:
-        "Most people don't realize this, but many of the medicines we dispense every day are manufactured in India. The quality standards are incredibly high, and that's why hospitals and pharmacies across Europe continue to rely on Indian pharmaceutical manufacturers. If you're sourcing pharmaceutical products internationally, India should definitely be on your shortlist.",
+        "Most people don't realize many of the medicines we dispense every day are manufactured in India. Quality standards are incredibly high, which is why hospitals and pharmacies across Europe rely on Indian manufacturers.",
       tone: 'professional',
       cta: 'Contact us to source pharmaceutical products from India',
     },
@@ -57,11 +67,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Engineering Goods',
       productDescription: 'Precision-machined engineering components — castings, valves, pumps — for industrial buyers worldwide.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Factory owner in Europe showing industrial machines.',
       storyDirection:
         "We've been importing engineering components from India for the last few years. The machining quality is excellent, delivery is consistent, and the pricing makes sense. Whether it's castings, valves, pumps, or precision components, India has become one of our preferred sourcing destinations.",
       tone: 'professional',
@@ -73,11 +82,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Electrical Equipment',
       productDescription: 'Certified electrical components for commercial and industrial construction projects.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Electrical contractor walking through a construction site.',
       storyDirection:
         "For our commercial projects, we've started sourcing more electrical components from India. The build quality is solid, certifications are available, and lead times have been surprisingly good. Definitely worth considering if you're sourcing internationally.",
       tone: 'professional',
@@ -89,11 +97,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Basmati Rice',
       productDescription: 'Authentic long-grain basmati rice, aromatic and export-grade, sourced from India.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Home cook preparing biryani.',
       storyDirection:
         "Whenever I cook biryani, there's only one rice I look for—Indian basmati. The aroma, the long grains, and the texture after cooking are completely different. Once you've tried authentic Indian basmati, it's difficult to switch back.",
       tone: 'emotional',
@@ -105,11 +112,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Seafood Exports',
       productDescription: 'Fresh, export-grade shrimp and seafood sourced from India for restaurants and retailers.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Restaurant chef opening fresh shrimp.',
       storyDirection:
         'We serve seafood every single day, so consistency matters. Indian shrimp has become one of our favorite imports because the quality is reliable and customers love the taste. It makes a real difference in our dishes.',
       tone: 'professional',
@@ -121,11 +127,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Gold & Diamond Jewelry',
       productDescription: 'Handcrafted gold and diamond jewelry collections, made in India.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Jewelry store owner showing gold necklaces.',
       storyDirection:
         'A lot of our customers ask where these pieces come from. Many of our gold and diamond collections are crafted in India. The craftsmanship is exceptional, and the finishing quality speaks for itself.',
       tone: 'emotional',
@@ -137,11 +142,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Textiles & Garments',
       productDescription: 'Quality apparel manufacturing — cotton fabrics, stitching, and unique designs — made in India.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Fashion creator showing clothing haul.',
       storyDirection:
         "I've recently discovered clothing manufactured in India, and honestly the fabric quality surprised me. Soft cotton, beautiful stitching, and unique designs. If you're looking for reliable apparel manufacturers, India has some incredible options.",
       tone: 'energetic',
@@ -153,11 +157,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Organic Chemicals',
       productDescription: 'High-quality organic chemical manufacturing with technical documentation for industrial buyers.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Manufacturing procurement manager speaking in laboratory.',
       storyDirection:
         'Our production depends on high-quality chemical suppliers. India has become one of our trusted sourcing partners because they offer consistent quality, technical documentation, and competitive pricing. That\'s why many manufacturers work with Indian suppliers.',
       tone: 'professional',
@@ -169,11 +172,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Spices',
       productDescription: 'Fresh, aromatic spices — turmeric, cumin, cardamom, chili — sourced directly from India.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Food influencer cooking.',
       storyDirection:
         "The secret behind amazing Indian food isn't just the recipe—it's the spices. Fresh turmeric, cumin, cardamom, and chili from India completely change the flavor. You can literally smell the difference the moment you open the package.",
       tone: 'energetic',
@@ -185,11 +187,10 @@ const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
     data: {
       productName: 'Indian Ceramic Tiles',
       productDescription: 'Modern, durable ceramic tiles and building materials for premium residential and commercial projects.',
-      goal: 'ugc_testimonial',
+      goal: 'increase_sales',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      charactersDesc: 'Interior designer showing modern home.',
       storyDirection:
         "Everyone keeps asking where we sourced these tiles. They're actually manufactured in India. The finish, durability, and modern designs are fantastic, especially for premium residential projects.",
       tone: 'professional',
@@ -204,12 +205,12 @@ const emptyForm: RequestInput = {
   slaHours: 78,
   productName: '',
   productDescription: '',
-  goal: GOALS[0],
+  goal: GOALS[0].value,
   platform: PLATFORMS[0],
   videoLengthSec: 30,
   videoLengthNote: '',
   variantsCount: 1,
-  charactersMode: CHARACTER_MODES[0],
+  charactersMode: 'need_talent',
   charactersDesc: '',
   storyDirection: '',
   tone: '',
@@ -222,6 +223,13 @@ const emptyForm: RequestInput = {
   industry: '',
   scriptStyle: '',
   ctaStyle: '',
+  targetAudience: '',
+  aspectRatio: ASPECT_RATIOS[0].value,
+  language: LANGUAGES[0].value,
+  voiceType: VOICE_TYPES[2].value,
+  subtitles: SUBTITLE_OPTIONS[0].value,
+  brandColorPrimary: '',
+  brandColorSecondary: '',
 };
 
 function fieldStyle() {
@@ -258,8 +266,13 @@ export function NewRequestPage() {
   const [productFiles, setProductFiles] = useState<PendingFile[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<PendingFile[]>([]);
   const [avatarChoice, setAvatarChoice] = useState<AssetChoice | null>(null);
+  const [avatarBackupChoice, setAvatarBackupChoice] = useState<AssetChoice | null>(null);
   const [moodChoice, setMoodChoice] = useState<AssetChoice | null>(null);
+  const [backgroundChoice, setBackgroundChoice] = useState<AssetChoice | null>(null);
+  const [backgroundBackupChoice, setBackgroundBackupChoice] = useState<AssetChoice | null>(null);
   const [musicChoice, setMusicChoice] = useState<AssetChoice | null>(null);
+  const [musicBackupChoice, setMusicBackupChoice] = useState<AssetChoice | null>(null);
+  const [termsConfirmed, setTermsConfirmed] = useState(false);
   const [noSubscription, setNoSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -331,10 +344,22 @@ export function NewRequestPage() {
           industry: r.industry ?? '',
           scriptStyle: r.script_style ?? '',
           ctaStyle: r.cta_style ?? '',
+          targetAudience: r.target_audience ?? '',
+          aspectRatio: r.aspect_ratio ?? ASPECT_RATIOS[0].value,
+          language: r.language ?? LANGUAGES[0].value,
+          voiceType: r.voice_type ?? VOICE_TYPES[2].value,
+          subtitles: r.subtitles ?? SUBTITLE_OPTIONS[0].value,
+          brandColorPrimary: r.brand_color_primary ?? '',
+          brandColorSecondary: r.brand_color_secondary ?? '',
         });
         setAvatarChoice(r.avatar_choice ? JSON.parse(r.avatar_choice) : null);
+        setAvatarBackupChoice(r.avatar_backup_choice ? JSON.parse(r.avatar_backup_choice) : null);
         setMoodChoice(r.mood_choice ? JSON.parse(r.mood_choice) : null);
+        setBackgroundChoice(r.background_choice ? JSON.parse(r.background_choice) : null);
+        setBackgroundBackupChoice(r.background_backup_choice ? JSON.parse(r.background_backup_choice) : null);
         setMusicChoice(r.music_choice ? JSON.parse(r.music_choice) : null);
+        setMusicBackupChoice(r.music_backup_choice ? JSON.parse(r.music_backup_choice) : null);
+        setTermsConfirmed(!!r.terms_confirmed_at);
         setExistingAssets(detail.assets);
         setExistingLinks(detail.links.map((l) => l.url));
       } else {
@@ -381,8 +406,13 @@ export function NewRequestPage() {
     const payload: RequestInput = {
       ...form,
       avatarChoice: avatarChoice ? JSON.stringify(avatarChoice) : null,
+      avatarBackupChoice: avatarBackupChoice ? JSON.stringify(avatarBackupChoice) : null,
       moodChoice: moodChoice ? JSON.stringify(moodChoice) : null,
+      backgroundChoice: backgroundChoice ? JSON.stringify(backgroundChoice) : null,
+      backgroundBackupChoice: backgroundBackupChoice ? JSON.stringify(backgroundBackupChoice) : null,
       musicChoice: musicChoice ? JSON.stringify(musicChoice) : null,
+      musicBackupChoice: musicBackupChoice ? JSON.stringify(musicBackupChoice) : null,
+      termsConfirmed,
     };
     const id = draftId ?? (await api.requests.create(payload)).id;
     if (draftId) await api.requests.update(draftId, payload);
@@ -448,6 +478,11 @@ export function NewRequestPage() {
   }
 
   async function handleSubmit() {
+    if (!termsConfirmed) {
+      setError('Please confirm the Approval & Revision Rules before submitting.');
+      showToast('Please confirm the Approval & Revision Rules', 'error');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -488,7 +523,7 @@ export function NewRequestPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <div style={{ maxWidth: 1040, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 24, margin: '0 0 4px' }}>{draftId ? 'Edit Draft' : 'New Request'}</h1>
         <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Fields marked with an asterisk are required.</p>
@@ -510,89 +545,198 @@ export function NewRequestPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-        <aside style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 20 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>Industry</label>
-            <p style={{ margin: '0 0 8px', fontSize: 11.5, color: 'var(--text-faint)' }}>Sorts designers by specialty and filters their preset library.</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {INDUSTRIES.map((ind) => (
-                <button key={ind.value} style={{ ...pill(form.industry === ind.value), padding: '6px 10px', fontSize: 12 }} onClick={() => set('industry', ind.value)}>
-                  {ind.label}
-                </button>
-              ))}
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 20px', background: 'var(--surface-2)', borderRadius: 10 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Industry</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {INDUSTRIES.map((ind) => (
+              <button key={ind.value} style={{ ...pill(form.industry === ind.value), padding: '6px 10px', fontSize: 12 }} onClick={() => set('industry', ind.value)}>
+                {ind.label}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Choose Designer *</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto' }}>
-              {sortedDesigners.map((d) => {
-                const recommended = form.industry && industryMatchScore(d, form.industry) > 0;
-                const selected = form.designerId === d.id;
+        <div>
+          <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Choose Designer *</label>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+            {sortedDesigners.map((d) => {
+              const recommended = form.industry && industryMatchScore(d, form.industry) > 0;
+              const selected = form.designerId === d.id;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => set('designerId', d.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexShrink: 0,
+                    border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
+                    background: selected ? 'var(--teal-soft)' : 'var(--surface)',
+                    borderRadius: 999,
+                    padding: '6px 14px 6px 6px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Avatar name={d.name} avatarUrl={d.avatar_url} size={28} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{d.name}</span>
+                  {recommended && (
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-soft)', borderRadius: 999, padding: '1px 6px', textTransform: 'uppercase' }}>
+                      Match
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {(() => {
+            const selectedDesigner = designers.find((d) => d.id === form.designerId);
+            return selectedDesigner?.bio ? (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>{selectedDesigner.bio}</p>
+            ) : null;
+          })()}
+        </div>
+      </div>
+
+      {/* Row 1: Brand Details + Campaign Goal */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
+        <Section number={1} title="Brand Details">
+          <Field label="Product or brand name *">
+            <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
+          </Field>
+          <Field label="Product description *">
+            <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.productDescription} onChange={(e) => set('productDescription', e.target.value)} />
+          </Field>
+          <Field label="Logo">
+            <FileGrid
+              existing={existingAssets.filter((a) => a.type === 'logo')}
+              pending={logoFile ? [logoFile] : []}
+              onRemoveExisting={removeExisting}
+              onRemovePending={(p) => {
+                removePending(p);
+                setLogoFile(null);
+              }}
+            />
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              onChange={(e) => {
+                pickSingle('logo', Array.from(e.target.files ?? []), logoFile, setLogoFile);
+                e.target.value = '';
+              }}
+            />
+            <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
+          </Field>
+          <Field label="Product photos / footage">
+            <FileGrid
+              existing={existingAssets.filter((a) => a.type === 'product_file')}
+              pending={productFiles}
+              onRemoveExisting={removeExisting}
+              onRemovePending={(p) => {
+                removePending(p);
+                setProductFiles((prev) => prev.filter((x) => x !== p));
+              }}
+            />
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,video/mp4"
+              onChange={(e) => {
+                pickMultiple('product_file', Array.from(e.target.files ?? []), productFiles, setProductFiles);
+                e.target.value = '';
+              }}
+            />
+            <FieldHint text={UPLOAD_LIMITS.product_file.label} error={fileErrors.product_file} />
+          </Field>
+          <Field label="Brand colors">
+            <div style={{ display: 'flex', gap: 16 }}>
+              <ColorSwatchPicker label="Primary" value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
+              <ColorSwatchPicker label="Secondary" value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
+            </div>
+          </Field>
+        </Section>
+
+        <Section number={2} title="Campaign Goal">
+          <Field label="Goal *">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {GOALS.map((g) => {
+                const Icon = GOAL_ICONS[g.value];
+                const selected = form.goal === g.value;
                 return (
-                  <label
-                    key={d.id}
+                  <button
+                    key={g.value}
+                    onClick={() => set('goal', g.value)}
                     style={{
                       display: 'flex',
-                      gap: 10,
-                      alignItems: 'flex-start',
-                      border: '1px solid var(--line)',
-                      borderRadius: 10,
-                      padding: 10,
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 6,
+                      border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
+                      background: selected ? 'var(--teal-soft)' : 'var(--surface)',
+                      borderRadius: 8,
+                      padding: '12px 6px',
                       cursor: 'pointer',
-                      background: selected ? 'var(--teal-soft)' : 'transparent',
-                      borderColor: selected ? 'var(--teal)' : 'var(--line)',
                     }}
                   >
-                    <input type="radio" style={{ marginTop: 3 }} checked={selected} onChange={() => set('designerId', d.id)} />
-                    <Avatar name={d.name} avatarUrl={d.avatar_url} size={32} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <strong style={{ fontSize: 13.5 }}>{d.name}</strong>
-                        {recommended && (
-                          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-soft)', borderRadius: 999, padding: '1px 6px', textTransform: 'uppercase' }}>
-                            Match
-                          </span>
-                        )}
-                      </div>
-                      {d.bio && <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--text-soft)' }}>{d.bio}</p>}
-                    </div>
-                  </label>
+                    <Icon size={20} color={selected ? 'var(--teal)' : 'var(--text-soft)'} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: 'center', color: selected ? 'var(--teal)' : 'var(--text-soft)' }}>{g.label}</span>
+                  </button>
                 );
               })}
             </div>
-          </div>
-        </aside>
+          </Field>
+        </Section>
+      </div>
 
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 32 }}>
-      <Section title="The Basics">
-        <Field label="Product or brand name *">
-          <input style={fieldStyle()} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
-        </Field>
-        <Field label="Product description *">
-          <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.productDescription} onChange={(e) => set('productDescription', e.target.value)} />
-        </Field>
-        <Field label="Goal *">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {GOALS.map((g) => (
-              <button key={g} style={pill(form.goal === g)} onClick={() => set('goal', g)}>
-                {titleCase(g)}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Platform *">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {PLATFORMS.map((p) => (
-              <button key={p} style={pill(form.platform === p)} onClick={() => set('platform', p)}>
-                {titleCase(p)}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <Field label="Video length *">
+      {/* Row 2: Target Audience + Video Settings */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14, alignItems: 'stretch' }}>
+        <Section number={3} title="Target Audience">
+          <Field label="Audience *">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {TARGET_AUDIENCES.map((a) => {
+                const Icon = TARGET_AUDIENCE_ICONS[a.value];
+                const selected = form.targetAudience === a.value;
+                return (
+                  <button
+                    key={a.value}
+                    onClick={() => set('targetAudience', a.value)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 6,
+                      border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
+                      background: selected ? 'var(--teal-soft)' : 'var(--surface)',
+                      color: selected ? 'var(--teal)' : 'var(--text-soft)',
+                      borderRadius: 8,
+                      padding: '10px 6px',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon size={18} color={selected ? 'var(--teal)' : 'var(--text-soft)'} />
+                    <span style={{ textAlign: 'center' }}>{a.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </Section>
+
+        <Section number={4} title="Video Settings">
+          <Field label="Platform *">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {PLATFORMS.map((p) => (
+                <button key={p} style={pill(form.platform === p)} onClick={() => set('platform', p)}>
+                  {titleCase(p)}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Duration *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {LENGTHS.map((len) => (
                 <button key={len} style={pill(form.videoLengthSec === len)} onClick={() => set('videoLengthSec', len)}>
@@ -600,6 +744,42 @@ export function NewRequestPage() {
                 </button>
               ))}
             </div>
+          </Field>
+          <Field label="Aspect ratio">
+            <select style={fieldStyle()} value={form.aspectRatio ?? ''} onChange={(e) => set('aspectRatio', e.target.value)}>
+              {ASPECT_RATIOS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Language">
+            <select style={fieldStyle()} value={form.language ?? ''} onChange={(e) => set('language', e.target.value)}>
+              {LANGUAGES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Voice type">
+            <select style={fieldStyle()} value={form.voiceType ?? ''} onChange={(e) => set('voiceType', e.target.value)}>
+              {VOICE_TYPES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Subtitles">
+            <select style={fieldStyle()} value={form.subtitles ?? ''} onChange={(e) => set('subtitles', e.target.value)}>
+              {SUBTITLE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Variants needed">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -610,178 +790,154 @@ export function NewRequestPage() {
               ))}
             </div>
           </Field>
-        </div>
+        </Section>
+      </div>
+
+      {/* Row 3: Avatar Selection */}
+      <Section number={5} title="Avatar Selection">
+        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
+          Pick a primary and backup avatar preset from your designer's library, or upload your own.
+        </p>
+        <DualPickerField
+          designerId={form.designerId}
+          category="avatar"
+          industry={form.industry ?? ''}
+          kind="image"
+          primaryValue={avatarChoice}
+          backupValue={avatarBackupChoice}
+          onPrimaryChange={setAvatarChoice}
+          onBackupChange={setAvatarBackupChoice}
+        />
       </Section>
 
-      <Section title="Story & Characters">
-        <Field label="Characters *">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {CHARACTER_MODES.map((mode) => (
-              <label
-                key={mode}
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  border: '1px solid var(--line)',
-                  borderRadius: 8,
-                  padding: '11px 13px',
-                  cursor: 'pointer',
-                  background: form.charactersMode === mode ? 'var(--teal-soft)' : 'transparent',
-                  borderColor: form.charactersMode === mode ? 'var(--teal)' : 'var(--line)',
-                }}
-              >
-                <input type="radio" checked={form.charactersMode === mode} onChange={() => set('charactersMode', mode)} />
-                <strong style={{ fontSize: 13.5 }}>{titleCase(mode)}</strong>
-              </label>
-            ))}
-          </div>
-          {form.charactersMode === 'need_talent' && (
-            <div style={{ marginTop: 10 }}>
-              <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>Pick an avatar preset from your designer's library, or upload your own.</p>
-              <LibraryPickerField
-                designerId={form.designerId}
-                category="avatar"
-                industry={form.industry ?? ''}
-                kind="image"
-                value={avatarChoice}
-                onChange={setAvatarChoice}
-              />
+      {/* Row 4: Background Selection */}
+      <Section number={6} title="Background Selection">
+        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
+          Pick a primary and backup scene from your designer's library, or upload your own.
+        </p>
+        <DualPickerField
+          designerId={form.designerId}
+          category="background"
+          industry={form.industry ?? ''}
+          kind="image"
+          primaryValue={backgroundChoice}
+          backupValue={backgroundBackupChoice}
+          onPrimaryChange={setBackgroundChoice}
+          onBackupChange={setBackgroundBackupChoice}
+        />
+      </Section>
+
+      {/* Row 5: Visual Mood + Music + Script Direction */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, alignItems: 'stretch' }}>
+        <Section number={7} title="Visual Style / Mood">
+          <Field label="Mood">
+            <LibraryPickerField
+              designerId={form.designerId}
+              category="mood"
+              industry={form.industry ?? ''}
+              kind="image"
+              value={moodChoice}
+              onChange={setMoodChoice}
+            />
+          </Field>
+        </Section>
+
+        <Section number={8} title="Music Selection">
+          <Field label="Music / voiceover">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              {MUSIC_MODES.map((m) => (
+                <button key={m} style={{ ...pill(form.musicMode === m), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('musicMode', m)}>
+                  {titleCase(m)}
+                </button>
+              ))}
             </div>
-          )}
-        </Field>
-        <Field label="Visual mood">
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>The overall look and feel of the video — pick a reference image, or upload your own.</p>
-          <LibraryPickerField
-            designerId={form.designerId}
-            category="mood"
-            industry={form.industry ?? ''}
-            kind="image"
-            value={moodChoice}
-            onChange={setMoodChoice}
-          />
-        </Field>
-        <Field label="Story / script direction *">
-          <textarea style={{ ...fieldStyle(), minHeight: 84 }} value={form.storyDirection} onChange={(e) => set('storyDirection', e.target.value)} />
-        </Field>
-        <Field label="Script style">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {SCRIPT_STYLES.map((s) => (
-              <button key={s.value} style={pill(form.scriptStyle === s.value)} onClick={() => set('scriptStyle', s.value)}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Tone">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {TONES.map((t) => (
-              <button key={t} style={pill(form.tone === t)} onClick={() => set('tone', t)}>
-                {titleCase(t)}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Call to action style *">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {CTA_STYLES.map((c) => (
-              <button
-                key={c.value}
-                style={pill(form.ctaStyle === c.value)}
-                onClick={() => setForm((f) => ({ ...f, ctaStyle: c.value, cta: c.label }))}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </Field>
-      </Section>
-
-      <Section title="Brand & Assets">
-        <Field label="Color preferences">
-          <input
-            style={fieldStyle()}
-            placeholder="e.g. forest green, cream, gold accents"
-            value={form.colorPreferences ?? ''}
-            onChange={(e) => set('colorPreferences', e.target.value)}
-          />
-        </Field>
-        <Field label="Logo">
-          <FileGrid
-            existing={existingAssets.filter((a) => a.type === 'logo')}
-            pending={logoFile ? [logoFile] : []}
-            onRemoveExisting={removeExisting}
-            onRemovePending={(p) => {
-              removePending(p);
-              setLogoFile(null);
-            }}
-          />
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/svg+xml"
-            onChange={(e) => {
-              pickSingle('logo', Array.from(e.target.files ?? []), logoFile, setLogoFile);
-              e.target.value = '';
-            }}
-          />
-          <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
-        </Field>
-        <Field label="Product photos / footage">
-          <FileGrid
-            existing={existingAssets.filter((a) => a.type === 'product_file')}
-            pending={productFiles}
-            onRemoveExisting={removeExisting}
-            onRemovePending={(p) => {
-              removePending(p);
-              setProductFiles((prev) => prev.filter((x) => x !== p));
-            }}
-          />
-          <input
-            type="file"
-            multiple
-            accept="image/png,image/jpeg,video/mp4"
-            onChange={(e) => {
-              pickMultiple('product_file', Array.from(e.target.files ?? []), productFiles, setProductFiles);
-              e.target.value = '';
-            }}
-          />
-          <FieldHint text={UPLOAD_LIMITS.product_file.label} error={fileErrors.product_file} />
-        </Field>
-        <Field label="Music / voiceover">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-            {MUSIC_MODES.map((m) => (
-              <button key={m} style={pill(form.musicMode === m)} onClick={() => set('musicMode', m)}>
-                {titleCase(m)}
-              </button>
-            ))}
-          </div>
-          {form.musicMode === 'pick_for_me' && (
-            <>
-              <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>Pick a track from your designer's library, or upload your own.</p>
-              <LibraryPickerField
+            {form.musicMode === 'pick_for_me' && (
+              <DualPickerField
                 designerId={form.designerId}
                 category="music"
                 industry={form.industry ?? ''}
                 kind="audio"
-                value={musicChoice}
-                onChange={setMusicChoice}
+                primaryValue={musicChoice}
+                backupValue={musicBackupChoice}
+                onPrimaryChange={setMusicChoice}
+                onBackupChange={setMusicBackupChoice}
               />
-            </>
-          )}
-          {form.musicMode === 'customer_provided' && (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Attach your track in the Reference files section below.</p>
-          )}
-          {form.musicMode === 'describe_style' && (
-            <input
-              style={fieldStyle()}
-              placeholder="e.g. soft acoustic, no lyrics"
-              value={form.musicNote ?? ''}
-              onChange={(e) => set('musicNote', e.target.value)}
-            />
-          )}
-        </Field>
-      </Section>
+            )}
+            {form.musicMode === 'customer_provided' && (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Attach your track in the Reference files section below.</p>
+            )}
+            {form.musicMode === 'describe_style' && (
+              <input
+                style={fieldStyle()}
+                placeholder="e.g. soft acoustic, no lyrics"
+                value={form.musicNote ?? ''}
+                onChange={(e) => set('musicNote', e.target.value)}
+              />
+            )}
+          </Field>
+        </Section>
 
-      <Section title="References & Notes">
+        <Section number={9} title="Script Direction">
+          <Field label="Script style">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SCRIPT_STYLES.map((s) => (
+                <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <StoryDetailField value={form.storyDirection} onChange={(v) => set('storyDirection', v)} />
+            </div>
+          </Field>
+          <Field label="Tone">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TONES.map((t) => (
+                <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
+                  {titleCase(t)}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </Section>
+      </div>
+
+      {/* Row 6: Call-to-Action + Approval & Revision Rules */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 14, alignItems: 'stretch' }}>
+        <Section number={10} title="Call-to-Action">
+          <Field label="Call to action style *">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {CTA_STYLES.map((c) => (
+                <button
+                  key={c.value}
+                  style={pill(form.ctaStyle === c.value)}
+                  onClick={() => setForm((f) => ({ ...f, ctaStyle: c.value, cta: c.label }))}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </Section>
+
+        <Section number={11} title="Approval & Revision Rules">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {APPROVAL_TERMS.map((t, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
+                <CheckCircle2 size={15} style={{ color: 'var(--moss)', flexShrink: 0, marginTop: 2 }} />
+                <span>{t}</span>
+              </div>
+            ))}
+          </div>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={termsConfirmed} onChange={(e) => setTermsConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>I understand and confirm these terms *</span>
+          </label>
+        </Section>
+      </div>
+
+      {/* Row 7: References & Notes */}
+      <Section number={12} title="References & Notes">
         <Field label="Reference files">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'reference_file')}
@@ -829,8 +985,6 @@ export function NewRequestPage() {
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.additionalNotes ?? ''} onChange={(e) => set('additionalNotes', e.target.value)} />
         </Field>
       </Section>
-        </div>
-      </div>
 
       {error && (
         <p style={{ background: 'var(--crimson-soft)', border: '1px solid var(--crimson-line)', color: 'var(--crimson)', borderRadius: 8, padding: '10px 14px', fontSize: 13, margin: 0 }}>
@@ -863,10 +1017,29 @@ function FieldHint({ text, error }: { text: string; error?: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>{title}</h2>
+    <section className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <span
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            background: 'var(--ink)',
+            color: 'var(--paper)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 13,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          {number}
+        </span>
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h2>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>{children}</div>
     </section>
   );
@@ -877,6 +1050,167 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+function StoryDetailField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(!!value);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ border: 'none', background: 'none', color: 'var(--teal)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+      >
+        + Add specific dialogue or detail (optional)
+      </button>
+    );
+  }
+  return (
+    <div>
+      <textarea
+        style={{ ...fieldStyle(), minHeight: 70 }}
+        maxLength={300}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Optional — specific dialogue, exact wording, or extra detail"
+      />
+      <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{value.length}/300</p>
+    </div>
+  );
+}
+
+function ColorSwatchPicker({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
+  const hex = value || '#ffffff';
+  return (
+    <div>
+      <label
+        style={{
+          display: 'block',
+          width: 60,
+          height: 60,
+          borderRadius: 8,
+          border: '1.5px solid var(--line)',
+          background: hex,
+          cursor: 'pointer',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none', padding: 0 }}
+        />
+      </label>
+      <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{label}</p>
+      <p style={{ margin: '2px 0 0', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-soft)' }}>{hex.toUpperCase()}</p>
+    </div>
+  );
+}
+
+function PickerTile({
+  index,
+  label,
+  selected,
+  backupSelected,
+  kind,
+  imageUrl,
+  onClick,
+}: {
+  index: number;
+  label: string;
+  selected: boolean;
+  backupSelected: boolean;
+  kind: 'image' | 'audio';
+  imageUrl?: string;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick();
+      }}
+      style={{
+        position: 'relative',
+        width: 108,
+        border: `1.5px solid ${selected ? 'var(--teal)' : backupSelected ? 'var(--amber)' : 'var(--line)'}`,
+        borderRadius: 8,
+        padding: 6,
+        background: selected ? 'var(--teal-soft)' : backupSelected ? 'var(--amber-soft)' : 'var(--surface)',
+        cursor: 'pointer',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 4,
+          left: 4,
+          zIndex: 1,
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: 'rgba(10,11,14,0.7)',
+          color: '#f0f6f4',
+          fontSize: 10,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {index}
+      </span>
+      {selected && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 1,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: 'var(--teal)',
+            color: '#f0f6f4',
+            fontSize: 11,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ✓
+        </span>
+      )}
+      {backupSelected && !selected && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 1,
+            fontSize: 8.5,
+            fontWeight: 700,
+            color: 'var(--amber)',
+            background: 'var(--amber-soft)',
+            borderRadius: 999,
+            padding: '1px 5px',
+            textTransform: 'uppercase',
+          }}
+        >
+          Backup
+        </span>
+      )}
+      {kind === 'image' ? (
+        <img src={imageUrl} alt={label} style={{ width: '100%', height: 78, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }} />
+      ) : (
+        <div style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 4 }}>♪</div>
+      )}
+      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
     </div>
   );
 }
@@ -930,60 +1264,24 @@ function LibraryPickerField({
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {items.map((item) => {
-          const selected = value?.source === 'library' && value.assetId === item.id;
-          const select = () => onChange({ source: 'library', assetId: item.id, label: item.label });
-          return (
-            <div
-              key={item.id}
-              style={{
-                width: 96,
-                border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--line)'}`,
-                borderRadius: 8,
-                padding: 6,
-                background: selected ? 'var(--teal-soft)' : 'var(--surface)',
-              }}
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={select}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') select();
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {kind === 'image' ? (
-                  <img
-                    src={api.designers.library.fileUrl(item.id)}
-                    alt={item.label}
-                    style={{ width: '100%', height: 68, objectFit: 'cover', borderRadius: 6, marginBottom: 4, display: 'block' }}
-                  />
-                ) : (
-                  <div style={{ width: '100%', height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, marginBottom: 4 }}>
-                    ♪
-                  </div>
-                )}
-                <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</p>
-              </div>
-              {kind === 'audio' && (
-                <audio
-                  controls
-                  preload="none"
-                  src={api.designers.library.fileUrl(item.id)}
-                  style={{ width: '100%', height: 28, marginTop: 4 }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+        {items.map((item, i) => (
+          <PickerTile
+            key={item.id}
+            index={i + 1}
+            label={item.label}
+            kind={kind}
+            imageUrl={kind === 'image' ? api.designers.library.fileUrl(item.id) : undefined}
+            selected={value?.source === 'library' && value.assetId === item.id}
+            backupSelected={false}
+            onClick={() => onChange({ source: 'library', assetId: item.id, label: item.label })}
+          />
+        ))}
         <button
           onClick={() => onChange(uploadSelected ? null : { source: 'upload', assetId: '', label: 'Custom (attach in Reference files below)' })}
           style={{
-            width: 96,
-            height: kind === 'image' ? 98 : 66,
+            width: 108,
+            height: kind === 'image' ? 110 : 78,
             border: `1.5px dashed ${uploadSelected ? 'var(--teal)' : 'var(--line)'}`,
             borderRadius: 8,
             padding: 6,
@@ -998,6 +1296,121 @@ function LibraryPickerField({
           }}
         >
           {uploadSelected ? '✓ Uploading my own' : '+ Upload my own'}
+        </button>
+      </div>
+      {items.length === 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+          No presets yet for this industry — pick "Upload my own" or ask your designer to add some.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DualPickerField({
+  designerId,
+  category,
+  industry,
+  kind,
+  primaryValue,
+  backupValue,
+  onPrimaryChange,
+  onBackupChange,
+}: {
+  designerId: string;
+  category: LibraryCategory;
+  industry: string;
+  kind: 'image' | 'audio';
+  primaryValue: AssetChoice | null;
+  backupValue: AssetChoice | null;
+  onPrimaryChange: (choice: AssetChoice | null) => void;
+  onBackupChange: (choice: AssetChoice | null) => void;
+}) {
+  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'primary' | 'backup'>('primary');
+
+  useEffect(() => {
+    if (!designerId) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    api.designers.library
+      .fetchFor(designerId, category, industry || undefined)
+      .then(({ items }) => {
+        if (!cancelled) setItems(items);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [designerId, category, industry]);
+
+  if (!designerId) {
+    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Choose a designer first to see their presets.</p>;
+  }
+  if (loading) {
+    return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>Loading options…</p>;
+  }
+
+  function choose(choice: AssetChoice | null) {
+    if (mode === 'primary') onPrimaryChange(choice);
+    else onBackupChange(choice);
+  }
+
+  const uploadActiveSelected = mode === 'primary' ? primaryValue?.source === 'upload' : backupValue?.source === 'upload';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginBottom: 10 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
+          <input type="radio" checked={mode === 'primary'} onChange={() => setMode('primary')} />
+          Primary
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, cursor: 'pointer' }}>
+          <input type="radio" checked={mode === 'backup'} onChange={() => setMode('backup')} />
+          Backup
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+        {items.map((item, i) => (
+          <PickerTile
+            key={item.id}
+            index={i + 1}
+            label={item.label}
+            kind={kind}
+            imageUrl={kind === 'image' ? api.designers.library.fileUrl(item.id) : undefined}
+            selected={primaryValue?.source === 'library' && primaryValue.assetId === item.id}
+            backupSelected={backupValue?.source === 'library' && backupValue.assetId === item.id}
+            onClick={() => choose({ source: 'library', assetId: item.id, label: item.label })}
+          />
+        ))}
+        <button
+          onClick={() =>
+            choose(uploadActiveSelected ? null : { source: 'upload', assetId: '', label: 'Custom (attach in Reference files below)' })
+          }
+          style={{
+            width: 108,
+            height: kind === 'image' ? 110 : 78,
+            border: `1.5px dashed ${uploadActiveSelected ? 'var(--teal)' : 'var(--line)'}`,
+            borderRadius: 8,
+            padding: 6,
+            background: uploadActiveSelected ? 'var(--teal-soft)' : 'var(--surface)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            textAlign: 'center',
+          }}
+        >
+          {uploadActiveSelected ? `✓ Uploading my own (${mode})` : `+ Upload my own (${mode})`}
         </button>
       </div>
       {items.length === 0 && (

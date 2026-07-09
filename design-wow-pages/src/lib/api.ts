@@ -60,10 +60,22 @@ export type RequestRow = {
   additional_notes: string | null;
   industry: string | null;
   avatar_choice: string | null;
+  avatar_backup_choice: string | null;
   mood_choice: string | null;
   music_choice: string | null;
+  music_backup_choice: string | null;
+  background_choice: string | null;
+  background_backup_choice: string | null;
   script_style: string | null;
   cta_style: string | null;
+  target_audience: string | null;
+  aspect_ratio: string | null;
+  language: string | null;
+  voice_type: string | null;
+  subtitles: string | null;
+  brand_color_primary: string | null;
+  brand_color_secondary: string | null;
+  terms_confirmed_at: string | null;
   sla_hours: number;
   submitted_at: string | null;
   started_at: string | null;
@@ -98,10 +110,22 @@ export type RequestInput = {
   additionalNotes?: string | null;
   industry?: string | null;
   avatarChoice?: string | null;
+  avatarBackupChoice?: string | null;
   moodChoice?: string | null;
   musicChoice?: string | null;
+  musicBackupChoice?: string | null;
+  backgroundChoice?: string | null;
+  backgroundBackupChoice?: string | null;
   scriptStyle?: string | null;
   ctaStyle?: string | null;
+  targetAudience?: string | null;
+  aspectRatio?: string | null;
+  language?: string | null;
+  voiceType?: string | null;
+  subtitles?: string | null;
+  brandColorPrimary?: string | null;
+  brandColorSecondary?: string | null;
+  termsConfirmed?: boolean;
 };
 
 // Stored as a JSON string in *_choice columns — either a pick from the
@@ -112,7 +136,7 @@ export type AssetChoice = {
   label: string;
 };
 
-export type LibraryCategory = 'avatar' | 'mood' | 'music';
+export type LibraryCategory = 'avatar' | 'mood' | 'music' | 'background';
 
 export type LibraryAssetRow = {
   id: string;

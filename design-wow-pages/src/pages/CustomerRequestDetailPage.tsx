@@ -11,6 +11,7 @@ import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { getBriefFields } from '../lib/briefFields';
 
 const STEPS = [
   { key: 'submitted', label: 'Submitted' },
@@ -74,7 +75,7 @@ export function CustomerRequestDetailPage() {
   const [commentAssets, setCommentAssets] = useState<CommentAssetLink[]>([]);
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [links, setLinks] = useState<{ url: string }[]>([]);
-  const [showFullBrief, setShowFullBrief] = useState(false);
+  const [tab, setTab] = useState<'brief' | 'output'>('brief');
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<CommentRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -256,48 +257,47 @@ export function CustomerRequestDetailPage() {
         </div>
       )}
 
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h2 style={{ ...cardTitleStyle, margin: 0 }}>Request summary</h2>
+      <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid var(--line)' }}>
+        {(
+          [
+            { key: 'brief', label: 'Brief' },
+            { key: 'output', label: 'Output' },
+          ] as const
+        ).map((t) => (
           <button
-            onClick={() => setShowFullBrief((v) => !v)}
-            style={{ border: 'none', background: 'none', color: 'var(--teal)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              padding: '2px 0 10px',
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: tab === t.key ? 'var(--ink)' : 'var(--text-faint)',
+              borderBottom: `2px solid ${tab === t.key ? 'var(--ink)' : 'transparent'}`,
+              marginBottom: -1,
+            }}
           >
-            {showFullBrief ? 'Hide full brief' : 'View full brief →'}
+            {t.label}
           </button>
-        </div>
-        <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 22px', margin: 0 }}>
-          <SummaryItem label="Goal" value={titleCase(request.goal)} />
-          <SummaryItem label="Platform" value={titleCase(request.platform)} />
-          <SummaryItem label="Length" value={`${request.video_length_sec || 'Custom'}s`} />
-          <SummaryItem label="Variants" value={String(request.variants_count)} />
-          {request.tone && <SummaryItem label="Tone" value={titleCase(request.tone)} />}
-          {request.designer_name && <SummaryItem label="Designer" value={request.designer_name} />}
-        </dl>
-
-        {showFullBrief && (
-          <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
-            <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 22px', margin: 0 }}>
-              <SummaryItem full label="Product description" value={request.product_description} />
-              <SummaryItem
-                full
-                label="Characters"
-                value={`${titleCase(request.characters_mode)}${request.characters_desc ? ' — ' + request.characters_desc : ''}`}
-              />
-              <SummaryItem full label="Story / script direction" value={request.story_direction} />
-              <SummaryItem label="Call to action" value={request.cta} />
-              {request.color_preferences && <SummaryItem label="Color preferences" value={request.color_preferences} />}
-              <SummaryItem
-                label="Music"
-                value={`${titleCase(request.music_mode)}${request.music_note ? ' — ' + request.music_note : ''}`}
-              />
-              {request.restrictions && <SummaryItem full label="Do's and don'ts" value={request.restrictions} />}
-              {request.additional_notes && <SummaryItem full label="Additional notes" value={request.additional_notes} />}
-            </dl>
-          </div>
-        )}
+        ))}
       </div>
 
+      {tab === 'brief' && (
+        <div className="card">
+          <h2 style={{ ...cardTitleStyle, margin: '0 0 14px' }}>Request summary</h2>
+          <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 22px', margin: 0 }}>
+            {request.designer_name && <SummaryItem label="Designer" value={request.designer_name} />}
+            {getBriefFields(request).map((f) => (
+              <SummaryItem key={f.label} label={f.label} value={f.value} full={f.full} />
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {tab === 'output' && (
+        <>
       {hasDelivery && (
         <div className="card">
           <h2 style={cardTitleStyle}>Delivered files</h2>
@@ -470,6 +470,8 @@ export function CustomerRequestDetailPage() {
       />
 
       <StorageSection assets={assets} comments={comments} commentAssets={commentAssets} links={links} onOpenLightbox={setLightbox} />
+        </>
+      )}
 
       {lightbox && (
         <FileLightbox
