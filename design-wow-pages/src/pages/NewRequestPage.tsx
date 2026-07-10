@@ -158,158 +158,237 @@ function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
-// Onboarding/demo shortcuts — quickly fills a realistic brief so customers
-// and designers can see a full example without typing one by hand. Each
-// maps a real export-testimonial scenario onto the actual form fields.
+// Onboarding/demo shortcuts — quickly fills a full, submission-ready brief
+// so customers and designers can see a complete example without typing one
+// by hand. Every sample sets all 18 fields the Submit button actually
+// checks (see handleSubmit below) except the four picker choices
+// (Avatar/Background/Mood/Music — separate state, not part of this form
+// object) and Logo/Product photos (real files, can't be data-filled) and
+// Terms confirmed (a real confirmation, left for the customer to tick).
+// Story direction is written as a full scene-by-scene script matching each
+// sample's own goal/audience/platform/duration/style/tone — not generic
+// text, since that's what a real ChatGPT-generated script looks like now.
+// Brand names are invented (not real trademarks) but written to sound like
+// real export brands, per the request to make samples easy to recognize.
 const SAMPLE_USE_CASES: { label: string; data: Partial<RequestInput> }[] = [
   {
     label: 'Generic Pharmaceuticals',
     data: {
-      productName: 'Indian Pharmaceutical Exports',
-      productDescription: 'Generic pharmaceutical manufacturing for international healthcare markets, meeting global quality and compliance standards.',
-      goal: 'increase_sales',
+      productName: 'Sanjeevani BioPharma',
+      productDescription:
+        "International distributors struggle to find generic manufacturers who meet strict quality and compliance standards without long lead times. Sanjeevani BioPharma manufactures WHO-GMP certified generic medicines with full documentation support. Built for pharmaceutical distributors and healthcare buyers aged 30-55 sourcing for hospitals and pharmacies abroad. The result: reliable, compliant supply they can build long-term contracts around.",
+      goal: 'build_trust',
+      targetAudience: 'export_buyers',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "Most people don't realize many of the medicines we dispense every day are manufactured in India. Quality standards are incredibly high, which is why hospitals and pharmacies across Europe rely on Indian manufacturers.",
+      scriptStyle: 'quality_guarantee',
       tone: 'professional',
-      cta: 'Contact us to source pharmaceutical products from India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: A pharmacist in a lab coat holds up a blister pack, looking directly at camera in a clean pharmacy setting.\nDialogue: "Every generic medicine on this shelf raises the same question: can we actually trust where it came from?"\n\nScene 2 (6-12 sec)\nVisual: Cut to a WHO-GMP certified manufacturing floor, workers in full protective gear inspecting production lines.\nDialogue: "At Sanjeevani BioPharma, every batch is manufactured under WHO-GMP certification, with full documentation from raw material to final pack."\n\nScene 3 (12-18 sec)\nVisual: Close-up of a quality control technician reviewing compliance paperwork and test results on a screen.\nDialogue: "That means fewer failed audits, fewer customs delays, and fewer awkward calls explaining missing paperwork."\n\nScene 4 (18-24 sec)\nVisual: Pharmacist stacking boxes onto a shelf, then shaking hands with a distributor in an office.\nDialogue: "We\'ve supported hospitals and pharmacies across Europe and the Middle East with consistent, compliant supply for over a decade."\n\nScene 5 (24-30 sec)\nVisual: Text overlay "Sanjeevani BioPharma" with contact details; pharmacist nods confidently at camera.\nDialogue: "If you\'re sourcing generic pharmaceuticals and need a partner you can actually rely on, call us today."',
+      ctaStyle: 'call_today',
+      cta: 'Call us today to discuss compliant pharmaceutical sourcing',
+      brandColorPrimary: '#0b5fa5',
+      brandColorSecondary: '#00a99d',
+      restrictions: "No specific drug names or medical claims — keep messaging compliance-safe and generic.",
     },
   },
   {
     label: 'Engineering Goods',
     data: {
-      productName: 'Indian Engineering Goods',
-      productDescription: 'Precision-machined engineering components — castings, valves, pumps — for industrial buyers worldwide.',
-      goal: 'increase_sales',
+      productName: 'PrecisionForge Engineering',
+      productDescription:
+        'Industrial buyers often deal with inconsistent tolerances and missed delivery dates from overseas machining suppliers. PrecisionForge Engineering makes precision-machined castings, valves, and pumps to tight tolerances with consistent QC. Built for procurement managers and industrial buyers aged 35-55 at manufacturing and infrastructure companies. The result: fewer rejected batches and deliveries they can actually plan around.',
+      goal: 'drive_inquiries',
+      targetAudience: 'business_retail',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "We've been importing engineering components from India for the last few years. The machining quality is excellent, delivery is consistent, and the pricing makes sense. Whether it's castings, valves, pumps, or precision components, India has become one of our preferred sourcing destinations.",
+      scriptStyle: 'product_benefits',
       tone: 'professional',
-      cta: 'Get in touch to source engineering components from India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Procurement manager frowning at a delayed shipment notice on a tablet, factory floor in the background.\nDialogue: "Late deliveries and out-of-tolerance parts — every procurement manager knows that headache too well."\n\nScene 2 (6-12 sec)\nVisual: CNC machines cutting precision components, close-up of calipers measuring a finished valve.\nDialogue: "PrecisionForge Engineering machines castings, valves, and pumps to tight tolerances, checked on every single batch."\n\nScene 3 (12-18 sec)\nVisual: Warehouse worker scanning finished components into inventory, then loading pallets onto a truck.\nDialogue: "That consistency means fewer rejected shipments and deliveries you can actually schedule your production around."\n\nScene 4 (18-24 sec)\nVisual: Split screen showing components being installed into industrial machinery on the buyer\'s side.\nDialogue: "Manufacturing and infrastructure companies across three continents already build their production lines around our parts."\n\nScene 5 (24-30 sec)\nVisual: Engineer in safety gear giving a thumbs up beside a finished shipment; text overlay with contact details.\nDialogue: "If reliable machining is what your supply chain is missing, get in touch with us today."',
+      ctaStyle: 'call_today',
+      cta: 'Call us to discuss your precision component requirements',
+      brandColorPrimary: '#2b3a67',
+      brandColorSecondary: '#8a8d91',
+      additionalNotes: 'Highlight ISO certification and on-time delivery track record.',
     },
   },
   {
     label: 'Electrical Equipment',
     data: {
-      productName: 'Indian Electrical Equipment',
-      productDescription: 'Certified electrical components for commercial and industrial construction projects.',
-      goal: 'increase_sales',
+      productName: 'VoltEdge Electricals',
+      productDescription:
+        'Contractors on commercial projects lose time and money when electrical components fail certification or arrive late. VoltEdge Electricals supplies certified switchgear, cables, and panels tested to international safety standards. Built for procurement heads and contractors aged 30-50 managing commercial and industrial builds. The result: fewer site delays and equipment that passes inspection the first time.',
+      goal: 'build_trust',
+      targetAudience: 'business_retail',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "For our commercial projects, we've started sourcing more electrical components from India. The build quality is solid, certifications are available, and lead times have been surprisingly good. Definitely worth considering if you're sourcing internationally.",
+      scriptStyle: 'quality_guarantee',
       tone: 'professional',
-      cta: 'Reach out to source electrical equipment from India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Contractor on a construction site holding up a rejected inspection tag on electrical panel.\nDialogue: "One failed certification can push back an entire project by weeks — every contractor has lived through that."\n\nScene 2 (6-12 sec)\nVisual: Factory floor with switchgear and panels being tested on certification rigs, sparks and meters visible.\nDialogue: "VoltEdge Electricals tests every switchgear, cable, and panel to international safety standards before it ships."\n\nScene 3 (12-18 sec)\nVisual: Close-up of certification labels and documentation folders being handed to a site engineer.\nDialogue: "Full certification paperwork comes with every order, so your inspection day goes exactly as planned."\n\nScene 4 (18-24 sec)\nVisual: Commercial building under construction, electricians installing VoltEdge panels into a distribution room.\nDialogue: "Contractors on commercial and industrial builds trust us because our equipment passes inspection the first time."\n\nScene 5 (24-30 sec)\nVisual: Site engineer signing off a completed inspection form with a satisfied nod; text overlay with website link.\nDialogue: "For certified electrical equipment your next project can rely on, visit our website today."',
+      ctaStyle: 'visit_website',
+      cta: 'Visit our website to view our certified product range',
+      brandColorPrimary: '#f5a623',
+      brandColorSecondary: '#1c1c1c',
+      restrictions: 'Avoid comparing directly to named competitor brands.',
     },
   },
   {
     label: 'Rice (Basmati)',
     data: {
-      productName: 'Indian Basmati Rice',
-      productDescription: 'Authentic long-grain basmati rice, aromatic and export-grade, sourced from India.',
+      productName: 'Annapurna Gold Basmati',
+      productDescription:
+        "Home cooks and importers are often disappointed by basmati that loses its aroma and breaks apart after cooking. Annapurna Gold Basmati is aged for 12 months for extra-long grains that stay separate and fragrant every time. Made for home cooks and food importers aged 25-55 who care about authentic biryani and pulao. The result: restaurant-quality rice they can trust for every batch.",
       goal: 'increase_sales',
+      targetAudience: 'quality_conscious',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "Whenever I cook biryani, there's only one rice I look for—Indian basmati. The aroma, the long grains, and the texture after cooking are completely different. Once you've tried authentic Indian basmati, it's difficult to switch back.",
+      scriptStyle: 'customer_testimonial',
       tone: 'emotional',
-      cta: 'Try authentic Indian basmati rice today',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Home cook lifting the lid off a pot of biryani, steam rising, disappointed look at a previous mushy batch on the counter.\nDialogue: "I can\'t count how many times I\'ve ruined a biryani with rice that turns to mush the moment it\'s cooked."\n\nScene 2 (6-12 sec)\nVisual: Pouring Annapurna Gold Basmati grains into a bowl, close-up of the long, separate grains.\nDialogue: "Then I switched to Annapurna Gold Basmati — aged a full 12 months for grains that actually stay long and separate."\n\nScene 3 (12-18 sec)\nVisual: Rice cooking in a pot, steam rising, grains fluffing up perfectly without sticking together.\nDialogue: "The aroma fills the kitchen before it\'s even done, and every grain comes out fluffy, never sticky."\n\nScene 4 (18-24 sec)\nVisual: Family sitting down together, plates of biryani being served, everyone digging in happily.\nDialogue: "Now every biryani night actually tastes like the one from my favorite restaurant back home."\n\nScene 5 (24-30 sec)\nVisual: Customer holding up the rice pack toward camera, smiling; text overlay with WhatsApp contact.\nDialogue: "If you miss that real basmati taste, message us on WhatsApp and try it yourself."',
+      ctaStyle: 'whatsapp_us',
+      cta: 'WhatsApp us to order authentic aged basmati rice',
+      brandColorPrimary: '#c9a227',
+      brandColorSecondary: '#4b2e1e',
+      additionalNotes: 'Show the rice being cooked — steam and long grains should be clearly visible.',
     },
   },
   {
     label: 'Seafood',
     data: {
-      productName: 'Indian Seafood Exports',
-      productDescription: 'Fresh, export-grade shrimp and seafood sourced from India for restaurants and retailers.',
-      goal: 'increase_sales',
+      productName: 'CoastalPearl Seafoods',
+      productDescription:
+        "Restaurants and retailers struggle to find seafood suppliers who deliver consistent freshness at scale. CoastalPearl Seafoods exports IQF shrimp and fish processed and frozen within hours of catch, with full traceability. Built for restaurant buyers and retail distributors aged 30-50 who can't afford inconsistent quality. The result: a supplier they can build their menu around without surprises.",
+      goal: 'drive_inquiries',
+      targetAudience: 'business_retail',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        'We serve seafood every single day, so consistency matters. Indian shrimp has become one of our favorite imports because the quality is reliable and customers love the taste. It makes a real difference in our dishes.',
+      scriptStyle: 'product_benefits',
       tone: 'professional',
-      cta: 'Source premium seafood from India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Restaurant chef inspecting a delivery of seafood, checking texture and smell with a concerned look.\nDialogue: "Inconsistent seafood quality can wreck a menu — and every restaurant buyer has been burned by it."\n\nScene 2 (6-12 sec)\nVisual: Fishing boats docking, shrimp and fish being sorted and IQF frozen within a processing facility.\nDialogue: "CoastalPearl Seafoods processes and IQF-freezes shrimp and fish within hours of catch, with full traceability."\n\nScene 3 (12-18 sec)\nVisual: Quality control staff checking frozen shrimp batches, packing them into export cartons.\nDialogue: "That means the freshness and texture you check today is exactly what shows up at your door every time."\n\nScene 4 (18-24 sec)\nVisual: Chef plating a finished seafood dish in a restaurant kitchen, looking satisfied.\nDialogue: "Restaurants and retail distributors build entire menus around us because we don\'t give them surprises."\n\nScene 5 (24-30 sec)\nVisual: Chef giving a thumbs-up beside a CoastalPearl shipment; text overlay with WhatsApp contact.\nDialogue: "If your menu needs a seafood supplier you can count on, message us on WhatsApp today."',
+      ctaStyle: 'whatsapp_us',
+      cta: 'WhatsApp us to discuss your seafood sourcing needs',
+      brandColorPrimary: '#005f73',
+      brandColorSecondary: '#eae2b7',
+      restrictions: 'Keep the tone appetizing — avoid graphic raw-seafood close-ups.',
     },
   },
   {
     label: 'Jewelry',
     data: {
-      productName: 'Indian Gold & Diamond Jewelry',
-      productDescription: 'Handcrafted gold and diamond jewelry collections, made in India.',
-      goal: 'increase_sales',
+      productName: 'Heritage Gold & Diamonds',
+      productDescription:
+        "Buyers looking for fine jewelry often can't find pieces that feel both authentic and modern. Heritage Gold & Diamonds handcrafts gold and diamond collections blending traditional techniques with contemporary design. Made for buyers aged 25-45 shopping for weddings, gifting, or personal milestones. The result: a piece that feels timeless but doesn't look dated.",
+      goal: 'promote_new_product',
+      targetAudience: 'luxury_buyers',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        'A lot of our customers ask where these pieces come from. Many of our gold and diamond collections are crafted in India. The craftsmanship is exceptional, and the finishing quality speaks for itself.',
+      scriptStyle: 'founder_story',
       tone: 'emotional',
-      cta: 'Explore jewelry crafted in India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Craftsman\'s hands carefully setting a diamond into a gold setting under a jeweler\'s lamp.\nDialogue: "I started Heritage Gold & Diamonds because I kept seeing beautiful gold work paired with designs that felt stuck in the past."\n\nScene 2 (6-12 sec)\nVisual: Close-up of hands polishing a finished necklace, craftsman inspecting it against the light.\nDialogue: "Every piece we make blends techniques passed down for generations with designs that feel right for today."\n\nScene 3 (12-18 sec)\nVisual: A bride trying on a necklace in a mirror, her expression lighting up.\nDialogue: "Whether it\'s a wedding, a gift, or a milestone worth marking, we want the piece to feel like it was made for that moment."\n\nScene 4 (18-24 sec)\nVisual: Close-up shots of finished rings and earrings displayed on velvet, catching the light.\nDialogue: "That\'s the difference between jewelry that\'s just gold and diamonds, and jewelry that actually means something."\n\nScene 5 (24-30 sec)\nVisual: Craftsman holding up a finished piece toward camera with pride; text overlay with DM contact.\nDialogue: "Explore our new collection — DM us to find the piece that\'s meant for your story."',
+      ctaStyle: 'dm_to_order',
+      cta: 'DM us to explore our latest handcrafted collection',
+      brandColorPrimary: '#d4af37',
+      brandColorSecondary: '#1a1a1a',
+      additionalNotes: 'Emphasize craftsmanship close-ups — hands shaping or polishing the piece.',
     },
   },
   {
     label: 'Textiles & Garments',
     data: {
-      productName: 'Indian Textiles & Garments',
-      productDescription: 'Quality apparel manufacturing — cotton fabrics, stitching, and unique designs — made in India.',
-      goal: 'increase_sales',
+      productName: 'Indigo Threads Textiles',
+      productDescription:
+        'Apparel brands often struggle to find manufacturers who deliver consistent fabric quality at scale without long delays. Indigo Threads Textiles produces cotton fabrics and finished garments with in-house stitching and quality control. Built for apparel brand buyers and importers aged 28-50 sourcing for retail collections. The result: consistent quality across every production run, not just the sample.',
+      goal: 'drive_inquiries',
+      targetAudience: 'business_retail',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "I've recently discovered clothing manufactured in India, and honestly the fabric quality surprised me. Soft cotton, beautiful stitching, and unique designs. If you're looking for reliable apparel manufacturers, India has some incredible options.",
+      scriptStyle: 'customer_testimonial',
       tone: 'energetic',
-      cta: 'Discover apparel manufactured in India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Apparel buyer unpacking a sample garment, comparing it against a bulk-order piece that looks noticeably different.\nDialogue: "The sample always looks perfect — it\'s the bulk order that tells you who you\'re really working with."\n\nScene 2 (6-12 sec)\nVisual: Factory floor with rolls of cotton fabric, workers stitching garments, quality checkers inspecting each piece.\nDialogue: "With Indigo Threads Textiles, every single production run goes through the same in-house quality control as the sample."\n\nScene 3 (12-18 sec)\nVisual: Close-up of stitching detail, fabric texture, and finished garments being folded and packed.\nDialogue: "Soft cotton, clean stitching, and designs that hold up — batch after batch, not just the first one."\n\nScene 4 (18-24 sec)\nVisual: Buyer inspecting a full shipment of garments on racks, nodding approvingly, checking off a list.\nDialogue: "That\'s exactly why apparel brands sourcing for their retail collections keep coming back to us."\n\nScene 5 (24-30 sec)\nVisual: Buyer holding up a finished garment toward camera with a big smile; text overlay with WhatsApp contact.\nDialogue: "If reliable apparel manufacturing is what you need, message us on WhatsApp and let\'s talk."',
+      ctaStyle: 'whatsapp_us',
+      cta: 'WhatsApp us to discuss your apparel manufacturing needs',
+      brandColorPrimary: '#6a0dad',
+      brandColorSecondary: '#f4a300',
+      restrictions: "No claims about fabric certifications we don't currently hold.",
     },
   },
   {
     label: 'Organic Chemicals',
     data: {
-      productName: 'Indian Organic Chemicals',
-      productDescription: 'High-quality organic chemical manufacturing with technical documentation for industrial buyers.',
-      goal: 'increase_sales',
+      productName: 'PureSynth Chemicals',
+      productDescription:
+        'Manufacturers sourcing organic chemicals often deal with inconsistent purity and missing technical documentation. PureSynth Chemicals supplies high-purity organic chemicals with full technical data sheets and REACH-ready documentation. Built for procurement and technical teams aged 30-55 at manufacturing companies abroad. The result: fewer failed quality checks and paperwork that\'s ready when customs needs it.',
+      goal: 'build_trust',
+      targetAudience: 'export_buyers',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        'Our production depends on high-quality chemical suppliers. India has become one of our trusted sourcing partners because they offer consistent quality, technical documentation, and competitive pricing. That\'s why many manufacturers work with Indian suppliers.',
+      scriptStyle: 'quality_guarantee',
       tone: 'professional',
-      cta: 'Partner with Indian chemical suppliers',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Technical buyer frowning at an incomplete documentation folder on a lab desk, chemical drums in the background.\nDialogue: "Inconsistent purity and missing paperwork — that\'s the recurring nightmare for anyone sourcing organic chemicals."\n\nScene 2 (6-12 sec)\nVisual: Lab technician running purity tests on samples, data appearing on a monitor with clean results.\nDialogue: "PureSynth Chemicals tests every batch for purity and ships it with full technical data sheets, REACH-ready."\n\nScene 3 (12-18 sec)\nVisual: Warehouse worker sealing drums, labeling them with batch numbers and documentation attached.\nDialogue: "That means the paperwork your customs team needs is ready before the shipment even leaves our facility."\n\nScene 4 (18-24 sec)\nVisual: Manufacturing plant abroad receiving the shipment, technical team checking it into production seamlessly.\nDialogue: "Procurement and technical teams at manufacturing companies abroad trust us because there are no surprises at intake."\n\nScene 5 (24-30 sec)\nVisual: Technical lead giving an approving nod while reviewing the documentation; text overlay with website link.\nDialogue: "For organic chemicals with the documentation already sorted, visit our website today."',
+      ctaStyle: 'visit_website',
+      cta: 'Visit our website to request technical data sheets',
+      brandColorPrimary: '#1b7a43',
+      brandColorSecondary: '#2e2e2e',
+      additionalNotes: 'Mention REACH / technical documentation availability for international buyers.',
     },
   },
   {
     label: 'Spices',
     data: {
-      productName: 'Indian Spices',
-      productDescription: 'Fresh, aromatic spices — turmeric, cumin, cardamom, chili — sourced directly from India.',
+      productName: 'Spice Trail India',
+      productDescription:
+        "Buyers often can't tell real spice quality apart until it's too late — and by then a batch is already ruined. Spice Trail India sources and processes turmeric, cumin, cardamom, and chili directly from farms with strict aroma and purity checks. Made for retailers, distributors, and food brands aged 28-55 who need consistency batch after batch. The result: spices customers can smell the difference in.",
       goal: 'increase_sales',
+      targetAudience: 'quality_conscious',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "The secret behind amazing Indian food isn't just the recipe—it's the spices. Fresh turmeric, cumin, cardamom, and chili from India completely change the flavor. You can literally smell the difference the moment you open the package.",
+      scriptStyle: 'demo_walkthrough',
       tone: 'energetic',
-      cta: 'Taste the difference with Indian spices',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Retailer opening a spice sack, sniffing it, unimpressed expression compared to one on the shelf beside it.\nDialogue: "Most spice buyers can\'t tell quality apart just by looking — smell is where the real test happens."\n\nScene 2 (6-12 sec)\nVisual: Farm visuals — turmeric and chili being harvested, then processed and tested in a facility.\nDialogue: "At Spice Trail India, every batch of turmeric, cumin, cardamom, and chili is checked for aroma and purity straight from the farm."\n\nScene 3 (12-18 sec)\nVisual: Close-up of spices being packed, vibrant colors, steam/aroma visual effect rising from an open pack.\nDialogue: "You can genuinely smell the difference the moment you open the pack — that\'s not marketing, that\'s the point."\n\nScene 4 (18-24 sec)\nVisual: Retailer stocking shelves with Spice Trail packaging, customers picking it up and smiling.\nDialogue: "Retailers, distributors, and food brands choose us because every batch tastes as good as the last one."\n\nScene 5 (24-30 sec)\nVisual: Retailer holding up an open spice pack toward camera, inhaling deeply; text overlay with WhatsApp contact.\nDialogue: "If your customers deserve spices this fresh, message us on WhatsApp and taste the difference."',
+      ctaStyle: 'whatsapp_us',
+      cta: 'WhatsApp us to order fresh, aromatic Indian spices',
+      brandColorPrimary: '#c1440e',
+      brandColorSecondary: '#e8a33d',
+      restrictions: 'Avoid showing raw chili handling without gloves — food safety optics.',
     },
   },
   {
     label: 'Ceramic Tiles / Building Materials',
     data: {
-      productName: 'Indian Ceramic Tiles',
-      productDescription: 'Modern, durable ceramic tiles and building materials for premium residential and commercial projects.',
+      productName: 'TerraCraft Ceramics',
+      productDescription:
+        'Builders and homeowners often settle for tiles that look good in the showroom but chip or fade within a year. TerraCraft Ceramics makes durable, modern ceramic tiles tested for wear, water resistance, and color retention. Built for architects, contractors, and homeowners aged 30-55 working on premium residential and commercial projects. The result: floors and walls that still look new years later.',
       goal: 'increase_sales',
+      targetAudience: 'business_retail',
       platform: 'instagram_reels',
       videoLengthSec: 30,
       charactersMode: 'need_talent',
-      storyDirection:
-        "Everyone keeps asking where we sourced these tiles. They're actually manufactured in India. The finish, durability, and modern designs are fantastic, especially for premium residential projects.",
+      scriptStyle: 'product_benefits',
       tone: 'professional',
-      cta: 'Source premium tiles manufactured in India',
+      storyDirection:
+        'Scene 1 (0-6 sec)\nVisual: Homeowner pointing at a chipped, faded tile in an older installation, disappointed expression.\nDialogue: "Showroom tiles always look perfect — the real test is what they look like a year after installation."\n\nScene 2 (6-12 sec)\nVisual: Factory testing rig showing tiles being tested for wear resistance, water drops beading on the surface.\nDialogue: "TerraCraft Ceramics tests every tile for wear, water resistance, and color retention before it ever reaches you."\n\nScene 3 (12-18 sec)\nVisual: Installation footage — tiles being laid in a modern living room, finish looking sharp and clean.\nDialogue: "That\'s why architects and contractors spec our tiles for premium residential and commercial projects."\n\nScene 4 (18-24 sec)\nVisual: Same room shown "years later" with tiles still looking vibrant and undamaged, family walking through.\nDialogue: "The floors and walls still look brand new, long after the project\'s been handed over."\n\nScene 5 (24-30 sec)\nVisual: Contractor giving a satisfied nod while walking across the finished floor; text overlay with contact number.\nDialogue: "For tiles that hold up as well as they look, call us today to discuss your project."',
+      ctaStyle: 'call_today',
+      cta: 'Call us today to discuss tiles for your next project',
+      brandColorPrimary: '#7a7a7a',
+      brandColorSecondary: '#a9744f',
+      additionalNotes: 'Show tiles in an actual room setting, not just flat-lay samples.',
     },
   },
 ];
