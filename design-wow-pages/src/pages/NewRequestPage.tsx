@@ -1511,7 +1511,7 @@ function UploadOwnTile({
         </div>
       )}
       <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {active ? fileName : ''}
+        {active ? 'Local file' : ''}
       </p>
     </div>
   );
@@ -1576,6 +1576,19 @@ function LibraryPickerField({
 
   return (
     <div>
+      {/* With a long library (25+ items), scrolling to find the current pick
+          loses sight of it — a persistent summary keeps it visible regardless
+          of scroll position. */}
+      <div style={{ marginBottom: 10 }}>
+        <SelectionSummary
+          label="Selected"
+          color="var(--teal)"
+          soft="var(--teal-soft)"
+          choice={value}
+          thumbUrl={thumbUrlFor(value, uploadFile)}
+          kind={kind}
+        />
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
         {items.map((item, i) => (
           <PickerTile
@@ -1603,6 +1616,71 @@ function LibraryPickerField({
           No presets yet for this industry — pick "Upload my own" or ask your designer to add some.
         </p>
       )}
+    </div>
+  );
+}
+
+function thumbUrlFor(choice: AssetChoice | null, uploadFile: PendingFile | null): string | undefined {
+  if (!choice) return undefined;
+  if (choice.source === 'library') return api.designers.library.fileUrl(choice.assetId);
+  return uploadFile?.previewUrl ?? (choice.assetId ? api.assets.fileUrl(choice.assetId) : undefined);
+}
+
+function SelectionSummary({
+  label,
+  color,
+  soft,
+  choice,
+  thumbUrl,
+  kind,
+}: {
+  label: string;
+  color: string;
+  soft: string;
+  choice: AssetChoice | null;
+  thumbUrl?: string;
+  kind: 'image' | 'audio';
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        border: `1.5px solid ${choice ? color : 'var(--line)'}`,
+        background: choice ? soft : 'var(--surface)',
+        borderRadius: 8,
+        padding: '5px 10px 5px 5px',
+        minHeight: 40,
+      }}
+    >
+      {kind === 'image' ? (
+        thumbUrl ? (
+          <img src={thumbUrl} alt="" style={{ width: 30, height: 30, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: 30, height: 30, borderRadius: 6, background: 'var(--surface-2)', flexShrink: 0 }} />
+        )
+      ) : choice && thumbUrl ? (
+        <AudioPlayButton src={thumbUrl} size={26} />
+      ) : (
+        <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--surface-2)', flexShrink: 0 }} />
+      )}
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 9.5, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11.5,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: 140,
+          }}
+        >
+          {choice ? (choice.source === 'upload' ? 'Local file' : choice.label) : 'Not set'}
+        </p>
+      </div>
     </div>
   );
 }
@@ -1683,6 +1761,29 @@ function DualPickerField({
 
   return (
     <div>
+      {/* Primary and Backup are picked via the same mode-toggled grid below, so
+          without this, switching the toggle to Backup makes it look like the
+          Primary pick vanished — it's just not the tile currently shown as
+          "selected" in that mode. Keeping both summarized here regardless of
+          which mode tab is active fixes that. */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+        <SelectionSummary
+          label="Primary"
+          color="var(--teal)"
+          soft="var(--teal-soft)"
+          choice={primaryValue}
+          thumbUrl={thumbUrlFor(primaryValue, primaryUploadFile)}
+          kind={kind}
+        />
+        <SelectionSummary
+          label="Backup"
+          color="var(--amber)"
+          soft="var(--amber-soft)"
+          choice={backupValue}
+          thumbUrl={thumbUrlFor(backupValue, backupUploadFile)}
+          kind={kind}
+        />
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
         {items.map((item, i) => (
           <PickerTile

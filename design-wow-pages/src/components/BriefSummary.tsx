@@ -187,7 +187,9 @@ function ChoiceTile({ choice, kind, badge }: { choice: AssetChoice; kind: 'image
           <AudioPlayButton src={url} />
         </div>
       )}
-      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{choice.label}</p>
+      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {choice.source === 'upload' ? 'Local file' : choice.label}
+      </p>
     </div>
   );
 }
