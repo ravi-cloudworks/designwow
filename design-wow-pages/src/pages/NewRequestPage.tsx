@@ -679,30 +679,31 @@ export function NewRequestPage() {
     const hasReferencesOrNotes = hasReferenceFile || hasReferenceLink || !!form.restrictions?.trim() || !!form.additionalNotes?.trim();
     const trimmedStory = form.storyDirection.trim();
     const isUnreplacedPrompt = storyDirectionPrompts.some((s) => s.value === trimmedStory);
-    const checks: [boolean, string][] = [
-      [!form.designerId, 'Please choose a designer before submitting.'],
-      [!form.productName.trim(), 'Please add your product or brand name.'],
-      [!form.productDescription.trim(), 'Please add a product description.'],
-      [!hasLogo, 'Please upload a logo before submitting.'],
-      [!hasProductFile, 'Please upload at least one product photo or footage before submitting.'],
-      [!form.brandColorPrimary?.trim(), 'Please set your primary brand color.'],
-      [!form.brandColorSecondary?.trim(), 'Please set your secondary brand color.'],
-      [!form.targetAudience, 'Please choose a target audience.'],
-      [!avatarChoice, 'Please choose an avatar (or upload your own) before submitting.'],
-      [!backgroundChoice, 'Please choose a background (or upload your own) before submitting.'],
-      [!moodChoice, 'Please choose a visual mood (or upload your own) before submitting.'],
-      [!musicChoice, 'Please choose music (or upload your own) before submitting.'],
-      [!form.ctaStyle, 'Please choose a call-to-action style.'],
-      [!trimmedStory, 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.'],
-      [isUnreplacedPrompt, 'Please replace the ChatGPT prompt with your actual generated story before submitting.'],
-      [!isUnreplacedPrompt && trimmedStory.length < 1000, 'Story direction / dialogue must be at least 1000 characters.'],
-      [!hasReferencesOrNotes, 'Please add at least one reference file, reference link, do\'s/don\'ts, or additional note.'],
-      [!termsConfirmed, 'Please confirm the Approval & Revision Rules before submitting.'],
+    const checks: [boolean, string, string][] = [
+      [!form.designerId, 'Please choose a designer before submitting.', 'field-designer'],
+      [!form.productName.trim(), 'Please add your product or brand name.', 'field-1-1'],
+      [!form.productDescription.trim(), 'Please add a product description.', 'field-1-2'],
+      [!hasLogo, 'Please upload a logo before submitting.', 'field-1-3'],
+      [!hasProductFile, 'Please upload at least one product photo or footage before submitting.', 'field-1-5'],
+      [!form.brandColorPrimary?.trim(), 'Please set your primary brand color.', 'field-1-4'],
+      [!form.brandColorSecondary?.trim(), 'Please set your secondary brand color.', 'field-1-4'],
+      [!form.targetAudience, 'Please choose a target audience.', 'section-3'],
+      [!avatarChoice, 'Please choose an avatar (or upload your own) before submitting.', 'section-6'],
+      [!backgroundChoice, 'Please choose a background (or upload your own) before submitting.', 'section-7'],
+      [!moodChoice, 'Please choose a visual mood (or upload your own) before submitting.', 'section-8'],
+      [!musicChoice, 'Please choose music (or upload your own) before submitting.', 'section-9'],
+      [!form.ctaStyle, 'Please choose a call-to-action style.', 'section-10'],
+      [!trimmedStory, 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.', 'field-5-3'],
+      [isUnreplacedPrompt, 'Please replace the ChatGPT prompt with your actual generated story before submitting.', 'field-5-3'],
+      [!isUnreplacedPrompt && trimmedStory.length < 1000, 'Story direction / dialogue must be at least 1000 characters.', 'field-5-3'],
+      [!hasReferencesOrNotes, 'Please add at least one reference file, reference link, do\'s/don\'ts, or additional note.', 'section-11'],
+      [!termsConfirmed, 'Please confirm the Approval & Revision Rules before submitting.', 'section-12'],
     ];
-    for (const [failed, message] of checks) {
+    for (const [failed, message, targetId] of checks) {
       if (failed) {
         setError(message);
         showToast(message, 'error');
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
     }
@@ -849,7 +850,7 @@ export function NewRequestPage() {
           <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>Don't see your industry? Contact us to have it added.</p>
         </div>
 
-        <div>
+        <div id="field-designer" style={{ scrollMarginTop: 20 }}>
           <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>Choose Designer *</label>
           <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
             {sortedDesigners.map((d) => {
@@ -896,11 +897,11 @@ export function NewRequestPage() {
       <Section number={1} title="Brand Details" description="Your product or brand name, description, logo, product photos, and brand colors — the basics your designer starts from.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Field label="1.1 Product or brand name *">
+            <Field id="field-1-1" label="1.1 Product or brand name *">
               <input style={fieldStyle()} maxLength={100} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
               <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.productName.length}/100</p>
             </Field>
-            <Field label="1.2 Product description *">
+            <Field id="field-1-2" label="1.2 Product description *">
               <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-faint)' }}>
                 This gets used to write your video's actual script — the more real detail here, the better. Include:
                 the customer's pain point this solves, your product's key features, who it's for (age group,
@@ -917,7 +918,7 @@ export function NewRequestPage() {
             </Field>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Field label="1.3 Logo *">
+            <Field id="field-1-3" label="1.3 Logo *">
               <FileGrid
                 existing={existingAssets.filter((a) => a.type === 'logo')}
                 pending={logoFile ? [logoFile] : []}
@@ -933,7 +934,7 @@ export function NewRequestPage() {
               />
               <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
             </Field>
-            <Field label="1.4 Brand colors *">
+            <Field id="field-1-4" label="1.4 Brand colors *">
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ColorSwatchPicker label="Primary" required value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
                 <ColorSwatchPicker label="Secondary" required value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
@@ -942,7 +943,7 @@ export function NewRequestPage() {
             </Field>
           </div>
         </div>
-        <Field label="1.5 Product photos / footage *">
+        <Field id="field-1-5" label="1.5 Product photos / footage *">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'product_file')}
             pending={productFiles}
@@ -996,7 +997,7 @@ export function NewRequestPage() {
           </Field>
         </Section>
 
-        <Section number={3} title="Target Audience" description="Who this video is speaking to.">
+        <Section id="section-3" number={3} title="Target Audience" description="Who this video is speaking to.">
           <Field label="Audience *">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {TARGET_AUDIENCES.map((a) => {
@@ -1116,15 +1117,15 @@ export function NewRequestPage() {
             </div>
           </Field>
         </div>
-        <Field label="5.3 Story direction / dialogue *">
+        <Field id="field-5-3" label="5.3 Story direction / dialogue *">
           <ol style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 12, color: 'var(--text-faint)', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <li>Tap a style below for a ready-made ChatGPT prompt (built from your product details and chosen duration above).</li>
             <li>Click "Open ChatGPT" below (or copy the prompt yourself) and get the script from ChatGPT.</li>
             <li>
               <strong style={{ color: 'var(--text-soft)' }}>
-                Come back here, copy ChatGPT's response, and paste it in place of the prompt
+                Come back here, review and modify ChatGPT's response to fit your UGC video script/dialogue, then paste it in place of the prompt.
               </strong>{' '}
-              — review it before submitting. Minimum 1000 characters.
+              Minimum 1000 characters.
             </li>
           </ol>
           <QuickReplies items={storyDirectionPrompts} onPick={handlePickStoryPrompt} />
@@ -1160,13 +1161,25 @@ export function NewRequestPage() {
             <CopyButton text={form.storyDirection} />
           </div>
           <textarea
-            style={{ ...fieldStyle(), minHeight: 100 }}
+            style={{
+              ...fieldStyle(),
+              minHeight: 100,
+              border: `1.5px solid ${form.storyDirection.trim().length >= 1000 ? 'var(--line)' : 'var(--crimson)'}`,
+            }}
             maxLength={2000}
             value={form.storyDirection}
             onChange={(e) => set('storyDirection', e.target.value)}
             placeholder="Specific dialogue, storyboard beats, or exact wording — the more detail here, the fewer rounds of back-and-forth."
           />
-          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 11,
+              fontWeight: form.storyDirection.trim().length >= 1000 ? 400 : 700,
+              color: form.storyDirection.trim().length >= 1000 ? 'var(--text-faint)' : 'var(--crimson)',
+              textAlign: 'right',
+            }}
+          >
             {form.storyDirection.length}/2000 (min 1000)
           </p>
         </Field>
@@ -1175,6 +1188,7 @@ export function NewRequestPage() {
       {/* Row 5: Avatar Selection + Background Selection */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
         <Section
+          id="section-6"
           number={6}
           title="Avatar Selection *"
           description="Primary + backup avatar preset from your designer's library, or upload your own."
@@ -1199,6 +1213,7 @@ export function NewRequestPage() {
         </Section>
 
         <Section
+          id="section-7"
           number={7}
           title="Background Selection *"
           description="Primary + backup scene from your designer's library, or upload your own."
@@ -1225,7 +1240,7 @@ export function NewRequestPage() {
 
       {/* Row 6: Visual Mood + Music Selection */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
-        <Section number={8} title="Visual Style / Mood *" description="The overall look and feel of the video — pick a reference image, or upload your own.">
+        <Section id="section-8" number={8} title="Visual Style / Mood *" description="The overall look and feel of the video — pick a reference image, or upload your own.">
           <Field label="Mood">
             <LibraryPickerField
               designerId={form.designerId}
@@ -1245,6 +1260,7 @@ export function NewRequestPage() {
         </Section>
 
         <Section
+          id="section-9"
           number={9}
           title="Music Selection *"
           description="Primary + backup track from your designer's library, or upload your own."
@@ -1272,7 +1288,7 @@ export function NewRequestPage() {
       </div>
 
       {/* Row 7: Call-to-Action */}
-      <Section number={10} title="Call-to-Action" description="How the video should ask viewers to act.">
+      <Section id="section-10" number={10} title="Call-to-Action" description="How the video should ask viewers to act.">
         <Field label="Call to action style *">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {CTA_STYLES.map((c) => (
@@ -1290,6 +1306,7 @@ export function NewRequestPage() {
 
       {/* Row 8: References & Notes */}
       <Section
+        id="section-11"
         number={11}
         title="References & Notes *"
         description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts. At least one of the four below is required."
@@ -1348,7 +1365,7 @@ export function NewRequestPage() {
       </Section>
 
       {/* Row 9: Approval & Revision Rules */}
-      <Section number={12} title="Approval & Revision Rules" description="What to expect on delivery, revisions, and payment — please read before confirming.">
+      <Section id="section-12" number={12} title="Approval & Revision Rules" description="What to expect on delivery, revisions, and payment — please read before confirming.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {APPROVAL_TERMS.map((t, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
@@ -1413,16 +1430,45 @@ export function NewRequestPage() {
 }
 
 function ModeToggle({ mode, onChange }: { mode: 'primary' | 'backup'; onChange: (mode: 'primary' | 'backup') => void }) {
+  // A segmented pill toggle instead of bare native radio buttons — teal for
+  // Primary and amber for Backup match the same colors PickerTile already
+  // uses to badge a selected primary vs. backup item below.
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-        <input type="radio" checked={mode === 'primary'} onChange={() => onChange('primary')} />
+    <div style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 999, padding: 2, gap: 2, flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => onChange('primary')}
+        style={{
+          border: 'none',
+          borderRadius: 999,
+          padding: '4px 12px',
+          fontSize: 11.5,
+          fontWeight: 600,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          background: mode === 'primary' ? 'var(--teal)' : 'transparent',
+          color: mode === 'primary' ? '#f0f6f4' : 'var(--text-faint)',
+        }}
+      >
         Primary
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-        <input type="radio" checked={mode === 'backup'} onChange={() => onChange('backup')} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('backup')}
+        style={{
+          border: 'none',
+          borderRadius: 999,
+          padding: '4px 12px',
+          fontSize: 11.5,
+          fontWeight: 600,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          background: mode === 'backup' ? 'var(--amber)' : 'transparent',
+          color: mode === 'backup' ? '#f0f6f4' : 'var(--text-faint)',
+        }}
+      >
         Backup
-      </label>
+      </button>
     </div>
   );
 }
@@ -1461,12 +1507,14 @@ function FieldHint({ text, error }: { text: string; error?: string }) {
 }
 
 function Section({
+  id,
   number,
   title,
   description,
   headerRight,
   children,
 }: {
+  id?: string;
   number: number;
   title: string;
   description?: React.ReactNode;
@@ -1474,7 +1522,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="card">
+    <section id={id} className="card" style={{ scrollMarginTop: 20 }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -1506,9 +1554,9 @@ function Section({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ id, label, children }: { id?: string; label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div id={id} style={{ scrollMarginTop: 20 }}>
       <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{label}</label>
       {children}
     </div>
@@ -1914,6 +1962,7 @@ function LibraryPickerField({
           choice={value}
           thumbUrl={thumbUrlFor(value, uploadFile)}
           kind={kind}
+          onClear={() => onChange(null)}
         />
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
@@ -1960,6 +2009,7 @@ function SelectionSummary({
   choice,
   thumbUrl,
   kind,
+  onClear,
 }: {
   label: string;
   color: string;
@@ -1967,6 +2017,7 @@ function SelectionSummary({
   choice: AssetChoice | null;
   thumbUrl?: string;
   kind: 'image' | 'audio';
+  onClear?: () => void;
 }) {
   return (
     <div
@@ -2008,6 +2059,28 @@ function SelectionSummary({
           {choice ? (choice.source === 'upload' ? 'Local file' : choice.label) : 'Not set'}
         </p>
       </div>
+      {choice && onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Remove ${label.toLowerCase()}`}
+          style={{
+            marginLeft: 'auto',
+            flexShrink: 0,
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            border: '1px solid var(--line)',
+            background: 'var(--surface)',
+            color: 'var(--crimson)',
+            fontSize: 13,
+            lineHeight: 1,
+            cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
@@ -2101,6 +2174,7 @@ function DualPickerField({
           choice={primaryValue}
           thumbUrl={thumbUrlFor(primaryValue, primaryUploadFile)}
           kind={kind}
+          onClear={() => onPrimaryChange(null)}
         />
         <SelectionSummary
           label="Backup"
@@ -2109,6 +2183,7 @@ function DualPickerField({
           choice={backupValue}
           thumbUrl={thumbUrlFor(backupValue, backupUploadFile)}
           kind={kind}
+          onClear={() => onBackupChange(null)}
         />
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
