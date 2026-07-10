@@ -340,7 +340,17 @@ export function NewRequestPage() {
       setDesigners(designers);
 
       if (draftIdParam) {
-        const detail = await api.requests.get(draftIdParam);
+        let detail;
+        try {
+          detail = await api.requests.get(draftIdParam);
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('404')) {
+            showToast('This draft no longer exists — it may have been deleted in another tab.', 'error');
+            navigate('/new', { replace: true });
+            return;
+          }
+          throw err;
+        }
         const r = detail.request;
         setForm({
           designerId: r.designer_id,
@@ -532,9 +542,14 @@ export function NewRequestPage() {
       showToast('Draft saved');
       navigate('/dashboard');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save draft';
-      setError(message);
-      showToast(message, 'error');
+      if (err instanceof Error && err.message.includes('404')) {
+        showToast('This draft no longer exists — it may have been deleted in another tab.', 'error');
+        navigate('/new', { replace: true });
+      } else {
+        const message = err instanceof Error ? err.message : 'Failed to save draft';
+        setError(message);
+        showToast(message, 'error');
+      }
     } finally {
       setSaving(false);
       setProgress(null);
@@ -580,6 +595,9 @@ export function NewRequestPage() {
     } catch (err) {
       if (err instanceof Error && err.message.includes('409')) {
         setError("You already have an active request in progress — you can submit this one once it's done.");
+      } else if (err instanceof Error && err.message.includes('404')) {
+        showToast('This request no longer exists — it may have been deleted in another tab.', 'error');
+        navigate('/new', { replace: true });
       } else {
         const message = err instanceof Error ? err.message : 'Failed to submit';
         setError(message);

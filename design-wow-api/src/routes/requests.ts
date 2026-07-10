@@ -179,7 +179,7 @@ requests.patch('/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json<RequestBody>();
 
-  await c.env.DB.prepare(
+  const result = await c.env.DB.prepare(
     `UPDATE requests SET
        designer_id = ?, subscription_id = ?, sla_hours = ?,
        product_name = ?, product_description = ?, goal = ?, platform = ?,
@@ -209,6 +209,11 @@ requests.patch('/:id', async (c) => {
     body.termsConfirmed ? 1 : 0,
     id
   ).run();
+
+  // Zero rows matched means the draft was deleted (e.g. from another tab) or
+  // already submitted — reporting success here would silently discard the
+  // edit instead of telling the caller their changes didn't actually save.
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
 
   return c.json({ ok: true });
 });
