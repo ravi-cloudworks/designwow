@@ -119,13 +119,15 @@ function buildStoryPrompt(
   const languageLine = ctx.language && ctx.language !== 'english' ? ` Write the dialogue in ${languageLabel}, not English.` : '';
   const subtitlesLine =
     ctx.subtitles === 'yes' ? ' This video will have subtitles, so keep sentences clear and well-paced for on-screen text.' : '';
+  const sceneCount = ctx.videoLengthSec <= 15 ? '2-3' : ctx.videoLengthSec <= 30 ? '4-5' : '6-8';
   return (
     `Write the exact spoken dialogue for a ${durationPhrase} UGC-style ${platformPhrase} video ad (${aspectRatioLabel}) for "${ctx.productName}" — ${ctx.productDescription}. ` +
     `${template.angle} ` +
     `Script style: ${scriptStyleLabel}.${toneLine} ` +
     `Voice: ${voiceTypeLabel}.${languageLine}${subtitlesLine} ` +
     `Write out the literal words to be spoken on camera, word for word — this is a script, not a summary or description of the story. ` +
-    `Make sure the total spoken content fits naturally within ${durationPhrase} when read aloud at a normal conversational pace, and is at least 1000 characters long.`
+    `Structure the response as numbered scenes covering the full ${durationPhrase} (${sceneCount} scenes, dividing the time evenly). For each scene include: a timing range (e.g. "Scene 1 (0-5 sec)"), a one-line Visual direction describing what's happening on camera, and the Dialogue — the exact words spoken in that scene. This will be handed directly to a video creator to shoot from, so the visual and dialogue for each scene need to be clear enough to act on without further explanation. ` +
+    `Make sure the total spoken content fits naturally within ${durationPhrase} when read aloud at a normal conversational pace, and your entire response (including scene labels and visual notes) is at least 1000 characters long.`
   );
 }
 
