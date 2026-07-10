@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type AssetRow, type CommentAssetLink, type CommentRow, type FeedbackRating, type RequestRow } from '../lib/api';
+import { api, type AssetRow, type ChangeLogEntry, type CommentAssetLink, type CommentRow, type FeedbackRating, type RequestRow } from '../lib/api';
 import { formatDuration, parseSqliteUtc, timerState, urgencyColor } from '../lib/timer';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { AttachmentPicker, type AttachmentPickerHandle } from '../components/AttachmentPicker';
@@ -12,6 +12,7 @@ import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { BriefSummary } from '../components/BriefSummary';
+import { ChangeTimeline } from '../components/ChangeTimeline';
 
 const STEPS = [
   { key: 'submitted', label: 'Submitted' },
@@ -75,6 +76,7 @@ export function CustomerRequestDetailPage() {
   const [commentAssets, setCommentAssets] = useState<CommentAssetLink[]>([]);
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [links, setLinks] = useState<{ url: string }[]>([]);
+  const [changes, setChanges] = useState<ChangeLogEntry[]>([]);
   const [tab, setTab] = useState<'brief' | 'output'>('brief');
   const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<CommentRow | null>(null);
@@ -92,12 +94,13 @@ export function CustomerRequestDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const detail = await api.requests.get(id);
+      const [detail, changeLog] = await Promise.all([api.requests.get(id), api.requests.changeLog(id)]);
       setRequest(detail.request);
       setComments(detail.comments);
       setCommentAssets(detail.commentAssets);
       setAssets(detail.assets);
       setLinks(detail.links);
+      setChanges(changeLog.changes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load this request');
     } finally {
@@ -294,7 +297,18 @@ export function CustomerRequestDetailPage() {
         </a>
       </div>
 
-      {tab === 'brief' && <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />}
+      {tab === 'brief' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <BriefSummary
+            request={request}
+            assets={assets}
+            links={links}
+            onOpenLightbox={setLightbox}
+            changedFields={new Set(changes.map((c) => c.field_name))}
+          />
+          <ChangeTimeline changes={changes} />
+        </div>
+      )}
 
       {tab === 'output' && (
         <>

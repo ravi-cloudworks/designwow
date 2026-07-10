@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, type AssetRow, type CommentAssetLink, type CommentRow, type RequestRow } from '../lib/api';
+import { api, type AssetRow, type ChangeLogEntry, type CommentAssetLink, type CommentRow, type RequestRow } from '../lib/api';
 import { formatDuration, timerState } from '../lib/timer';
 import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { AttachmentPicker, type AttachmentPickerHandle } from '../components/AttachmentPicker';
@@ -14,6 +14,7 @@ import { useToast } from '../components/ToastProvider';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { UpdateFieldModal } from '../components/UpdateFieldModal';
 import { BriefSummary } from '../components/BriefSummary';
+import { ChangeTimeline } from '../components/ChangeTimeline';
 
 function titleCase(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -49,6 +50,7 @@ export function RequestDetailPage() {
   useDocumentTitle(request ? `${request.product_name} — Design Wow` : 'Request — Design Wow');
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [links, setLinks] = useState<{ url: string }[]>([]);
+  const [changes, setChanges] = useState<ChangeLogEntry[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [commentAssets, setCommentAssets] = useState<CommentAssetLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,12 +68,13 @@ export function RequestDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const detail = await api.requests.get(id);
+      const [detail, changeLog] = await Promise.all([api.requests.get(id), api.requests.changeLog(id)]);
       setRequest(detail.request);
       setAssets(detail.assets);
       setLinks(detail.links);
       setComments(detail.comments);
       setCommentAssets(detail.commentAssets);
+      setChanges(changeLog.changes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load request');
     } finally {
@@ -237,7 +240,18 @@ export function RequestDetailPage() {
             </a>
           </div>
 
-          {tab === 'brief' && <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} />}
+          {tab === 'brief' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <BriefSummary
+                request={request}
+                assets={assets}
+                links={links}
+                onOpenLightbox={setLightbox}
+                changedFields={new Set(changes.map((c) => c.field_name))}
+              />
+              <ChangeTimeline changes={changes} />
+            </div>
+          )}
 
           {tab === 'notes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -286,7 +300,7 @@ export function RequestDetailPage() {
               <div style={cardStyle}>
                 <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>Update the brief</label>
                 <button className="btn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setShowUpdateModal(true)}>
-                  Update VIP
+                  Update Brief
                 </button>
                 <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
                   Posts a note here automatically so the customer sees exactly what changed.

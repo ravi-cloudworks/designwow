@@ -32,7 +32,37 @@ function pillStyle(selected: boolean): CSSProperties {
   };
 }
 
-function SectionCard({ number, title, description, children }: { number: number; title: string; description: string; children: ReactNode }) {
+export function UpdatedBadge() {
+  return (
+    <span
+      style={{
+        fontSize: 9.5,
+        fontWeight: 700,
+        color: 'var(--teal)',
+        background: 'var(--teal-soft)',
+        borderRadius: 999,
+        padding: '1px 6px',
+        textTransform: 'uppercase',
+      }}
+    >
+      Updated
+    </span>
+  );
+}
+
+function SectionCard({
+  number,
+  title,
+  description,
+  badge,
+  children,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  badge?: boolean;
+  children: ReactNode;
+}) {
   return (
     <section className="card">
       <div style={{ marginBottom: 16 }}>
@@ -55,6 +85,7 @@ function SectionCard({ number, title, description, children }: { number: number;
             {number}
           </span>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</h2>
+          {badge && <UpdatedBadge />}
         </div>
         <p style={{ margin: '6px 0 0 36px', fontSize: 12, color: 'var(--text-faint)' }}>{description}</p>
       </div>
@@ -63,10 +94,13 @@ function SectionCard({ number, title, description, children }: { number: number;
   );
 }
 
-function FieldBlock({ label, children }: { label: string; children: ReactNode }) {
+function FieldBlock({ label, badge, children }: { label: string; badge?: boolean; children: ReactNode }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>{label}</label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>
+        {label}
+        {badge && <UpdatedBadge />}
+      </label>
       {children}
     </div>
   );
@@ -248,12 +282,18 @@ export function BriefSummary({
   assets,
   links,
   onOpenLightbox,
+  changedFields = new Set<string>(),
 }: {
   request: RequestRow;
   assets: AssetRow[];
   links: { url: string }[];
   onOpenLightbox: (lightbox: { files: LightboxFile[]; index: number }) => void;
+  // Field keys that have at least one change-log entry — draws an
+  // "Updated" badge next to that field/section so a viewer can spot what
+  // moved since the original submission.
+  changedFields?: Set<string>;
 }) {
+  const changed = (key: string) => changedFields.has(key);
   const logoAssets = assets.filter((a) => a.type === 'logo');
   const productAssets = assets.filter((a) => a.type === 'product_file');
   const referenceAssets = assets.filter((a) => a.type === 'reference_file');
@@ -295,10 +335,10 @@ export function BriefSummary({
 
       <SectionCard number={1} title="Brand Details" description="Product or brand name, description, logo, product photos, and brand colors.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <FieldBlock label="Product description">
+          <FieldBlock label="Product description" badge={changed('product_description')}>
             <PlainText>{request.product_description}</PlainText>
           </FieldBlock>
-          <FieldBlock label="Brand colors">
+          <FieldBlock label="Brand colors" badge={changed('brand_color_primary') || changed('brand_color_secondary')}>
             {request.brand_color_primary || request.brand_color_secondary ? (
               <div style={{ display: 'flex', gap: 16 }}>
                 {[
@@ -328,24 +368,24 @@ export function BriefSummary({
       </SectionCard>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
-        <SectionCard number={2} title="Campaign Goal" description="What this video needs to achieve.">
+        <SectionCard number={2} title="Campaign Goal" description="What this video needs to achieve." badge={changed('goal')}>
           <IconPillGrid options={GOALS} value={request.goal} icons={GOAL_ICONS} />
         </SectionCard>
-        <SectionCard number={3} title="Target Audience" description="Who this video is speaking to.">
+        <SectionCard number={3} title="Target Audience" description="Who this video is speaking to." badge={changed('target_audience')}>
           <IconPillGrid options={TARGET_AUDIENCES} value={request.target_audience} icons={TARGET_AUDIENCE_ICONS} />
         </SectionCard>
       </div>
 
       <SectionCard number={4} title="Script Direction" description="The story, tone, and specific dialogue or beats requested.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <FieldBlock label="Script style">
+          <FieldBlock label="Script style" badge={changed('script_style')}>
             <PillRow options={SCRIPT_STYLES} value={request.script_style} />
           </FieldBlock>
-          <FieldBlock label="Tone">
+          <FieldBlock label="Tone" badge={changed('tone')}>
             <PillRow options={TONES.map((t) => ({ value: t, label: titleCase(t) }))} value={request.tone} />
           </FieldBlock>
         </div>
-        <FieldBlock label="Story direction / dialogue">
+        <FieldBlock label="Story direction / dialogue" badge={changed('story_direction')}>
           <PlainText>{request.story_direction}</PlainText>
         </FieldBlock>
       </SectionCard>
@@ -396,13 +436,13 @@ export function BriefSummary({
       </div>
 
       <SectionCard number={10} title="Call-to-Action" description="How the video should ask viewers to act.">
-        <FieldBlock label="Call to action style">
+        <FieldBlock label="Call to action style" badge={changed('cta_style')}>
           <PillRow options={CTA_STYLES} value={request.cta_style} />
         </FieldBlock>
         {/* Picking a style auto-fills this with the same label — only worth a
-            second field once it's been customized (e.g. via a VIP update). */}
+            second field once it's been customized (e.g. via an Update Brief edit). */}
         {request.cta && request.cta !== labelFor(CTA_STYLES, request.cta_style) && (
-          <FieldBlock label="Call to action text">
+          <FieldBlock label="Call to action text" badge={changed('cta')}>
             <PlainText>{request.cta}</PlainText>
           </FieldBlock>
         )}
@@ -425,8 +465,12 @@ export function BriefSummary({
             <EmptyNote />
           )}
         </FieldBlock>
-        <FieldBlock label="Do's and don'ts">{request.restrictions ? <PlainText>{request.restrictions}</PlainText> : <EmptyNote />}</FieldBlock>
-        <FieldBlock label="Additional notes">{request.additional_notes ? <PlainText>{request.additional_notes}</PlainText> : <EmptyNote />}</FieldBlock>
+        <FieldBlock label="Do's and don'ts" badge={changed('restrictions')}>
+          {request.restrictions ? <PlainText>{request.restrictions}</PlainText> : <EmptyNote />}
+        </FieldBlock>
+        <FieldBlock label="Additional notes" badge={changed('additional_notes')}>
+          {request.additional_notes ? <PlainText>{request.additional_notes}</PlainText> : <EmptyNote />}
+        </FieldBlock>
       </SectionCard>
     </div>
   );

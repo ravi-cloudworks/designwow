@@ -1,46 +1,11 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, type ChangeLogEntry, type RequestRow } from '../lib/api';
-import { getBriefFields } from '../lib/briefFields';
-import { UPDATABLE_FIELDS } from '../lib/industries';
-import { parseSqliteUtc } from '../lib/timer';
+import { api, type AssetRow, type ChangeLogEntry, type RequestRow } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
-
-const cardTitleStyle: CSSProperties = {
-  fontFamily: 'var(--display)',
-  fontSize: 13,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: 'var(--text-soft)',
-  margin: '0 0 14px',
-};
-
-function formatDate(sqliteDatetime: string): string {
-  return new Date(parseSqliteUtc(sqliteDatetime)).toLocaleString();
-}
-
-function fieldLabel(key: string): string {
-  return UPDATABLE_FIELDS.find((f) => f.key === key)?.label ?? key;
-}
-
-function UpdatedBadge() {
-  return (
-    <span
-      style={{
-        fontSize: 9.5,
-        fontWeight: 700,
-        color: 'var(--teal)',
-        background: 'var(--teal-soft)',
-        borderRadius: 999,
-        padding: '1px 6px',
-        textTransform: 'uppercase',
-      }}
-    >
-      Updated
-    </span>
-  );
-}
+import { BriefSummary, UpdatedBadge } from '../components/BriefSummary';
+import { ChangeTimeline } from '../components/ChangeTimeline';
+import type { LightboxFile } from '../components/FileLightbox';
+import { FileLightbox } from '../components/FileLightbox';
 
 // The "living contract" view — always rendered fresh from the request's
 // current field values plus its own change log, so unlike a generated PDF
@@ -50,6 +15,9 @@ export function VipPage() {
   const { id } = useParams();
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [changes, setChanges] = useState<ChangeLogEntry[]>([]);
+  const [assets, setAssets] = useState<AssetRow[]>([]);
+  const [links, setLinks] = useState<{ url: string }[]>([]);
+  const [lightbox, setLightbox] = useState<{ files: LightboxFile[]; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useDocumentTitle(request ? `VIP — ${request.product_name}` : 'VIP — Design Wow');
@@ -59,6 +27,8 @@ export function VipPage() {
     Promise.all([api.requests.get(id), api.requests.changeLog(id)])
       .then(([reqDetail, changeLog]) => {
         setRequest(reqDetail.request);
+        setAssets(reqDetail.assets);
+        setLinks(reqDetail.links);
         setChanges(changeLog.changes);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
@@ -70,10 +40,9 @@ export function VipPage() {
   if (!request) return <p style={{ padding: 32 }}>Not found.</p>;
 
   const changedFieldKeys = new Set(changes.map((c) => c.field_name));
-  const fields = getBriefFields(request);
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div className="vip-no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn" onClick={() => window.print()}>
           Print / Save as PDF
@@ -93,41 +62,18 @@ export function VipPage() {
         </p>
       </div>
 
-      <div className="card">
-        <h2 style={cardTitleStyle}>Brief</h2>
-        <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 22px', margin: 0 }}>
-          {fields.map((f) => (
-            <div key={f.label} style={f.full ? { gridColumn: '1 / -1' } : undefined}>
-              <dt style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                {f.label}
-                {f.fieldKey && changedFieldKeys.has(f.fieldKey) && <UpdatedBadge />}
-              </dt>
-              <dd style={{ margin: 0, fontSize: 13.5, lineHeight: 1.4 }}>{f.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      <BriefSummary request={request} assets={assets} links={links} onOpenLightbox={setLightbox} changedFields={changedFieldKeys} />
 
-      {changes.length > 0 && (
-        <div className="card">
-          <h2 style={cardTitleStyle}>
-            Change timeline ({changes.length} update{changes.length === 1 ? '' : 's'})
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {changes.map((c) => (
-              <div key={c.id} style={{ borderLeft: '2px solid var(--teal-line)', paddingLeft: 12 }}>
-                <p style={{ margin: '0 0 2px', fontSize: 11.5, color: 'var(--text-faint)' }}>
-                  {formatDate(c.created_at)} &middot; {c.changed_by_name}
-                </p>
-                <p style={{ margin: 0, fontSize: 13.5 }}>
-                  <strong>{fieldLabel(c.field_name)}</strong>: {c.old_value ? `${c.old_value} → ` : ''}
-                  {c.new_value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {lightbox && (
+        <FileLightbox
+          files={lightbox.files}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox((lb) => (lb ? { ...lb, index } : lb))}
+        />
       )}
+
+      <ChangeTimeline changes={changes} />
     </div>
   );
 }
