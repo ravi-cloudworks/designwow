@@ -28,7 +28,7 @@ import {
   TONES,
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
-import { CheckCircle2, Pencil } from 'lucide-react';
+import { CheckCircle2, Pencil, ExternalLink } from 'lucide-react';
 
 // Sample phrases for the two most open-ended fields on the form — many
 // customers don't know what to write for "restrictions" or "notes" until
@@ -338,7 +338,7 @@ const emptyForm: RequestInput = {
   industry: '',
   scriptStyle: 'product_benefits',
   ctaStyle: '',
-  targetAudience: '',
+  targetAudience: 'families',
   aspectRatio: ASPECT_RATIOS[0].value,
   language: LANGUAGES[0].value,
   voiceType: VOICE_TYPES[2].value,
@@ -490,7 +490,7 @@ export function NewRequestPage() {
           industry: r.industry ?? '',
           scriptStyle: r.script_style ?? 'product_benefits',
           ctaStyle: r.cta_style ?? '',
-          targetAudience: r.target_audience ?? '',
+          targetAudience: r.target_audience ?? 'families',
           aspectRatio: r.aspect_ratio ?? ASPECT_RATIOS[0].value,
           language: r.language ?? LANGUAGES[0].value,
           voiceType: r.voice_type ?? VOICE_TYPES[2].value,
@@ -1117,13 +1117,46 @@ export function NewRequestPage() {
           </Field>
         </div>
         <Field label="5.3 Story direction / dialogue *">
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
-            Not sure what to write? Tap a style below for a ready-made ChatGPT prompt (using your product details and
-            chosen duration above), copy it into ChatGPT, then paste the script it gives you here in place of the
-            prompt (minimum 1000 characters).
-          </p>
+          <ol style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 12, color: 'var(--text-faint)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <li>Tap a style below for a ready-made ChatGPT prompt (built from your product details and chosen duration above).</li>
+            <li>Click "Open ChatGPT" below (or copy the prompt yourself) and get the script from ChatGPT.</li>
+            <li>
+              <strong style={{ color: 'var(--text-soft)' }}>
+                Come back here, copy ChatGPT's response, and paste it in place of the prompt
+              </strong>{' '}
+              — review it before submitting. Minimum 1000 characters.
+            </li>
+          </ol>
           <QuickReplies items={storyDirectionPrompts} onPick={handlePickStoryPrompt} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 6 }}>
+            {/* chatgpt.com/?q= pre-fills ChatGPT's compose box (doesn't
+                auto-send) — an unofficial, undocumented parameter, so Copy
+                stays as the reliable fallback if this ever stops working. */}
+            <a
+              href={form.storyDirection.trim() ? `https://chatgpt.com/?q=${encodeURIComponent(form.storyDirection)}` : undefined}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => {
+                if (!form.storyDirection.trim()) e.preventDefault();
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                border: '1px solid var(--line)',
+                background: 'var(--surface)',
+                color: 'var(--text-soft)',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: 'none',
+                opacity: form.storyDirection.trim() ? 1 : 0.5,
+                cursor: form.storyDirection.trim() ? 'pointer' : 'default',
+              }}
+            >
+              <ExternalLink size={13} /> Open ChatGPT
+            </a>
             <CopyButton text={form.storyDirection} />
           </div>
           <textarea
