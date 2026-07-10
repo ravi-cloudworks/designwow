@@ -4,11 +4,11 @@ import { currentUserId } from '../lib/auth';
 
 const requests = new Hono<{ Bindings: Bindings }>();
 
-// VIP (Video Implementation Plan) "Update a field" — the only way a
-// structured brief field can change post-submission (the plain draft-update
-// route is locked to status='draft'). Keeping this to a fixed whitelist both
-// prevents SQL injection via the column name and keeps the field picker in
-// the UI to a manageable, deliberately-chosen list rather than every column.
+// "Update Brief" — the only way a structured brief field can change
+// post-submission (the plain draft-update route is locked to status='draft').
+// Keeping this to a fixed whitelist both prevents SQL injection via the
+// column name and keeps the field picker in the UI to a manageable,
+// deliberately-chosen list rather than every column.
 const UPDATABLE_FIELDS: Record<string, { column: string; label: string; maxLength: number }> = {
   product_name: { column: 'product_name', label: 'Product or brand name', maxLength: 100 },
   product_description: { column: 'product_description', label: 'Product description', maxLength: 1000 },
@@ -470,7 +470,9 @@ requests.post('/:id/request-payment', async (c) => {
 requests.post('/:id/update-field', async (c) => {
   // Designer-only. Updates one whitelisted brief field, logs the before/
   // after to request_change_log, and auto-posts a note in the existing
-  // thread (same table/UI as any other note) linking to the VIP page.
+  // thread (same table/UI as any other note) — the Brief tab already shows
+  // the field's new value and the full change timeline, so the note doesn't
+  // need to link anywhere.
   const id = c.req.param('id');
   const authorId = currentUserId(c);
   if (!authorId) return c.json({ error: 'unauthenticated' }, 401);
@@ -490,8 +492,8 @@ requests.post('/:id/update-field', async (c) => {
 
   const changeId = crypto.randomUUID();
   const commentId = crypto.randomUUID();
-  const preview = trimmed.length > 400 ? `${trimmed.slice(0, 400)}… (see VIP for full text)` : trimmed;
-  const message = `${def.label} updated: ${preview}\n\nView VIP: ${c.env.FRONTEND_ORIGIN}/vip/${id}`;
+  const preview = trimmed.length > 400 ? `${trimmed.slice(0, 400)}… (see the Brief tab for full text)` : trimmed;
+  const message = `${def.label} updated: ${preview}`;
 
   try {
     await c.env.DB.batch([

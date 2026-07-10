@@ -111,8 +111,8 @@ export const APPROVAL_TERMS: string[] = [
   'Remaining balance is settled directly with your designer via UPI',
 ];
 
-// Fields a designer can update post-submission, via the VIP "Update a
-// field" action — kept to a fixed whitelist matching the backend exactly.
+// Fields a designer can update post-submission, via the "Update Brief"
+// action — kept to a fixed whitelist matching the backend exactly.
 // Fields with `options` show a select (so the new value always matches a
 // real choice); everything else is free text.
 export type UpdatableFieldKey =

@@ -49,7 +49,7 @@ export function UpdateFieldModal({
     setSaving(true);
     try {
       await api.requests.updateField(request.id, def.key, newValue.trim());
-      showToast('VIP updated');
+      showToast('Brief updated');
       onUpdated();
       onClose();
     } catch (err) {
@@ -74,7 +74,7 @@ export function UpdateFieldModal({
     >
       <div style={{ background: 'var(--surface)', borderRadius: 12, width: 440, maxWidth: '100%', padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <strong style={{ fontSize: 15 }}>Update VIP</strong>
+          <strong style={{ fontSize: 15 }}>Update Brief</strong>
           <button onClick={onClose} aria-label="Cancel" style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--text-faint)' }}>
             ×
           </button>
@@ -162,7 +162,7 @@ export function UpdateFieldModal({
             Cancel
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || !def || !newValue.trim()}>
-            {saving ? 'Updating…' : 'Update VIP'}
+            {saving ? 'Updating…' : 'Update Brief'}
           </button>
         </div>
       </div>
