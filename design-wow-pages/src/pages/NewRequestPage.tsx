@@ -99,6 +99,8 @@ function buildStoryPrompt(
   ctx: {
     productName: string;
     productDescription: string;
+    goal: string;
+    targetAudience: string;
     videoLengthSec: number;
     platform: string;
     aspectRatio: string;
@@ -115,16 +117,24 @@ function buildStoryPrompt(
   const voiceTypeLabel = VOICE_TYPES.find((v) => v.value === ctx.voiceType)?.label ?? titleCase(ctx.voiceType);
   const languageLabel = LANGUAGES.find((l) => l.value === ctx.language)?.label ?? titleCase(ctx.language);
   const scriptStyleLabel = SCRIPT_STYLES.find((s) => s.value === ctx.scriptStyle)?.label ?? titleCase(ctx.scriptStyle);
-  const toneLine = ctx.tone ? ` Tone of voice: ${titleCase(ctx.tone)}.` : '';
-  const languageLine = ctx.language && ctx.language !== 'english' ? ` Write the dialogue in ${languageLabel}, not English.` : '';
+  // Tone/Goal/Target audience are always stated regardless of value (rather
+  // than only appearing conditionally) — a field that silently disappears
+  // depending on its value reads as "not considered" to whoever's reading
+  // the prompt, which is exactly the confusion this caused before.
+  const toneLabel = titleCase(ctx.tone || 'professional');
+  const goalLabel = GOALS.find((g) => g.value === ctx.goal)?.label ?? titleCase(ctx.goal);
+  const audienceLabel = TARGET_AUDIENCES.find((a) => a.value === ctx.targetAudience)?.label;
+  const audienceLine = audienceLabel ? ` Target audience: ${audienceLabel}.` : '';
+  const languageInstruction = ctx.language && ctx.language !== 'english' ? ` Write the dialogue in ${languageLabel}, not English.` : '';
   const subtitlesLine =
     ctx.subtitles === 'yes' ? ' This video will have subtitles, so keep sentences clear and well-paced for on-screen text.' : '';
   const sceneCount = ctx.videoLengthSec <= 15 ? '2-3' : ctx.videoLengthSec <= 30 ? '4-5' : '6-8';
   return (
     `Write the exact spoken dialogue for a ${durationPhrase} UGC-style ${platformPhrase} video ad (${aspectRatioLabel}) for "${ctx.productName}" — ${ctx.productDescription}. ` +
+    `Campaign goal: ${goalLabel}.${audienceLine} ` +
     `${template.angle} ` +
-    `Script style: ${scriptStyleLabel}.${toneLine} ` +
-    `Voice: ${voiceTypeLabel}.${languageLine}${subtitlesLine} ` +
+    `Script style: ${scriptStyleLabel}. Tone of voice: ${toneLabel}. ` +
+    `Voice: ${voiceTypeLabel}. Language: ${languageLabel}.${languageInstruction}${subtitlesLine} ` +
     `Write out the literal words to be spoken on camera, word for word — this is a script, not a summary or description of the story. ` +
     `Structure the response as numbered scenes covering the full ${durationPhrase} (${sceneCount} scenes, dividing the time evenly). For each scene include: a timing range (e.g. "Scene 1 (0-5 sec)"), a one-line Visual direction describing what's happening on camera, and the Dialogue — the exact words spoken in that scene. This will be handed directly to a video creator to shoot from, so the visual and dialogue for each scene need to be clear enough to act on without further explanation. ` +
     `Make sure the total spoken content fits naturally within ${durationPhrase} when read aloud at a normal conversational pace, and your entire response (including scene labels and visual notes) is at least 1000 characters long.`
@@ -318,7 +328,7 @@ const emptyForm: RequestInput = {
   charactersMode: 'need_talent',
   charactersDesc: '',
   storyDirection: '',
-  tone: '',
+  tone: 'professional',
   cta: '',
   colorPreferences: '',
   musicMode: 'pick_for_me',
@@ -469,7 +479,7 @@ export function NewRequestPage() {
           charactersMode: r.characters_mode,
           charactersDesc: r.characters_desc ?? '',
           storyDirection: r.story_direction,
-          tone: r.tone ?? '',
+          tone: r.tone ?? 'professional',
           cta: r.cta,
           colorPreferences: r.color_preferences ?? '',
           musicMode: r.music_mode,
@@ -728,6 +738,8 @@ export function NewRequestPage() {
         value: buildStoryPrompt(t, {
           productName: form.productName,
           productDescription: form.productDescription,
+          goal: form.goal,
+          targetAudience: form.targetAudience ?? '',
           videoLengthSec: form.videoLengthSec,
           platform: form.platform,
           aspectRatio: form.aspectRatio ?? '',
@@ -741,6 +753,8 @@ export function NewRequestPage() {
     [
       form.productName,
       form.productDescription,
+      form.goal,
+      form.targetAudience,
       form.videoLengthSec,
       form.platform,
       form.aspectRatio,
@@ -752,13 +766,35 @@ export function NewRequestPage() {
     ],
   );
 
+  // Remembers which chip was last tapped, and the exact text we last set
+  // programmatically — so if any of the 12 tracked fields change afterward,
+  // the box updates to match, but only as long as the customer hasn't
+  // started replacing it with their own/ChatGPT's text yet (once
+  // storyDirection no longer matches what we last set, we stop touching it).
+  const [selectedPromptLabel, setSelectedPromptLabel] = useState<string | null>(null);
+  const lastAutoPromptRef = useRef<string | null>(null);
+
   function handlePickStoryPrompt(text: string) {
     if (!form.productName.trim() || !form.productDescription.trim()) {
       showToast('Please fill in your product/brand name and description (Section 1) before generating a prompt.', 'error');
       return;
     }
+    const picked = storyDirectionPrompts.find((p) => p.value === text);
     set('storyDirection', text);
+    lastAutoPromptRef.current = text;
+    setSelectedPromptLabel(picked?.label ?? null);
   }
+
+  useEffect(() => {
+    if (!selectedPromptLabel) return;
+    if (form.storyDirection !== lastAutoPromptRef.current) return;
+    const current = storyDirectionPrompts.find((p) => p.label === selectedPromptLabel);
+    if (current && current.value !== form.storyDirection) {
+      set('storyDirection', current.value);
+      lastAutoPromptRef.current = current.value;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyDirectionPrompts, selectedPromptLabel]);
 
   if (loading) return <p style={{ color: 'var(--text-faint)' }}>Loading…</p>;
 
