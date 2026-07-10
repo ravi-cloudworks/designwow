@@ -6,7 +6,7 @@ import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { AttachmentPicker, type AttachmentPickerHandle } from '../components/AttachmentPicker';
 import { ConversationThread } from '../components/ConversationThread';
 import { StorageSection } from '../components/StorageSection';
-import { QuickReplies, appendQuickReply } from '../components/QuickReplies';
+import { QuickReplies, appendQuickReply, simpleItems, CUSTOMER_PHRASES } from '../components/QuickReplies';
 import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
 import { useToast } from '../components/ToastProvider';
@@ -451,7 +451,7 @@ export function CustomerRequestDetailPage() {
             <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>
               {request.status === 'needs_info' ? 'Your reply' : 'Send a message'}
             </label>
-            <QuickReplies role="customer" onPick={(phrase) => setReplyText((t) => appendQuickReply(t, phrase))} />
+            <QuickReplies items={simpleItems(CUSTOMER_PHRASES)} onPick={(phrase) => setReplyText((t) => appendQuickReply(t, phrase))} />
             <textarea
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}

@@ -6,7 +6,7 @@ import { FileLightbox, type LightboxFile } from '../components/FileLightbox';
 import { AttachmentPicker, type AttachmentPickerHandle } from '../components/AttachmentPicker';
 import { ConversationThread } from '../components/ConversationThread';
 import { StorageSection } from '../components/StorageSection';
-import { QuickReplies, appendQuickReply } from '../components/QuickReplies';
+import { QuickReplies, appendQuickReply, simpleItems, DESIGNER_PHRASES } from '../components/QuickReplies';
 import { PaymentRequestForm } from '../components/PaymentRequestForm';
 import { PaymentQrModal } from '../components/PaymentQrModal';
 import { Spinner } from '../components/Spinner';
@@ -268,7 +268,7 @@ export function RequestDetailPage() {
                       <label style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6, display: 'block' }}>
                         Ask a clarifying question
                       </label>
-                      <QuickReplies role="designer" onPick={(phrase) => setQuestion((q) => appendQuickReply(q, phrase))} />
+                      <QuickReplies items={simpleItems(DESIGNER_PHRASES)} onPick={(phrase) => setQuestion((q) => appendQuickReply(q, phrase))} />
                       <textarea
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}

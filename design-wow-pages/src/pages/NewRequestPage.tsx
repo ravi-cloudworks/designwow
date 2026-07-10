@@ -10,6 +10,8 @@ import { Spinner } from '../components/Spinner';
 import { Avatar } from '../components/Avatar';
 import { ImageCropModal } from '../components/ImageCropModal';
 import { AudioPlayButton } from '../components/AudioPlayButton';
+import { QuickReplies, appendQuickReply, simpleItems, type QuickReplyItem } from '../components/QuickReplies';
+import { CopyButton } from '../components/CopyButton';
 import {
   INDUSTRIES,
   SCRIPT_STYLES,
@@ -27,6 +29,84 @@ import {
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
 import { CheckCircle2 } from 'lucide-react';
+
+// Sample phrases for the two most open-ended fields on the form — many
+// customers don't know what to write for "restrictions" or "notes" until
+// they see an example, so these are tappable starting points rather than a
+// blank box (same tap-to-append mechanic as the Notes thread's QuickReplies).
+const RESTRICTIONS_PHRASES = [
+  'No competitor brand names or logos',
+  "Don't show alcohol or tobacco",
+  'Keep it family-friendly',
+  'No children in the video',
+  'Avoid direct pricing claims',
+];
+
+const ADDITIONAL_NOTES_PHRASES = [
+  "Match our Instagram page's tone",
+  'Prefer a female voiceover',
+  'Avoid a stock-photo look',
+  'Highlight export / certification quality',
+  'Keep the pace fast and energetic',
+];
+
+// One ChatGPT prompt per script style — most customers don't know how to
+// write a script from scratch, but they can describe their product and let
+// ChatGPT draft it. Tapping a chip replaces the box with the prompt (not a
+// filled-in example — a filled-in example just gets edited word-for-word
+// instead of actually customized), the customer copies it into ChatGPT,
+// then pastes the generated script back here in its place. The prompt is
+// built from the customer's own product name/description and their chosen
+// duration/platform (see buildStoryPrompt below) rather than a static
+// bracket placeholder, so it's ready to paste with no manual editing.
+type StoryStyleTemplate = { label: string; angle: string };
+
+const STORY_STYLE_TEMPLATES: StoryStyleTemplate[] = [
+  {
+    label: 'Founder Story prompt',
+    angle:
+      "It should sound like a real founder speaking directly to camera: personal, conversational, and specific — mention the problem you saw, why you started, and what makes your product different from what's already out there. Avoid formal marketing language. Structure it with a hook in the first two sentences, the founding story in the middle, and a clear call to action at the end.",
+  },
+  {
+    label: 'Customer Testimonial prompt',
+    angle:
+      "It should sound like a real, everyday customer speaking casually to camera about their own experience — not a scripted ad. Include what problem they had before finding the product, how it helped, and one specific, believable detail they loved. Keep the tone warm and conversational, like a voice note to a friend rather than a commercial, and end with why they'd recommend it.",
+  },
+  {
+    label: 'Product Benefits prompt',
+    angle:
+      "Clearly explain what the product does, its most important benefits, and why it's better than the alternatives people currently use — in a natural, conversational tone, as if explaining it to a friend. Use specific, concrete details rather than vague claims. Structure it with a strong opening hook, the core benefits in the middle, and a clear call to action at the end.",
+  },
+  {
+    label: 'Demo / Walkthrough prompt',
+    angle:
+      'Walk through how to use the product step by step, in a simple, natural voice, like showing a friend how it works rather than reading instructions. Include the starting point, the key steps in order, and the end result the viewer can expect. Keep the language casual and specific about what the viewer will see, hear, or feel at each step.',
+  },
+  {
+    label: 'Quality Guarantee prompt',
+    angle:
+      "Highlight the process, materials, or certifications that back up the product's quality, and reassure the viewer with a genuine, trustworthy tone rather than sounding overly formal or corporate. Include one specific, concrete proof point rather than a vague claim like 'high quality'. End with a confident, reassuring call to action.",
+  },
+  {
+    label: 'Offer / Discount Promo prompt',
+    angle:
+      "Create genuine urgency around a limited-time offer, clearly explain what's included and why it's a good deal, and end with a clear, specific call to action — how to claim it, and by when. Keep the tone upbeat, energetic, and conversational rather than pushy or salesy.",
+  },
+];
+
+function buildStoryPrompt(
+  template: StoryStyleTemplate,
+  ctx: { productName: string; productDescription: string; videoLengthSec: number; platform: string }
+): string {
+  const durationPhrase = `${ctx.videoLengthSec}-second`;
+  const platformPhrase = titleCase(ctx.platform);
+  return (
+    `Write the exact spoken dialogue for a ${durationPhrase} UGC-style ${platformPhrase} video ad for "${ctx.productName}" — ${ctx.productDescription}. ` +
+    `${template.angle} ` +
+    `Write out the literal words to be spoken on camera, word for word — this is a script, not a summary or description of the story. ` +
+    `Make sure the total spoken content fits naturally within ${durationPhrase} when read aloud at a normal conversational pace, and is at least 1000 characters long.`
+  );
+}
 
 // How well a designer's free-text specialty tags match the chosen industry —
 // used only to sort the picker list, so a loose substring match is enough.
@@ -562,6 +642,8 @@ export function NewRequestPage() {
     const hasReferenceFile = existingAssets.some((a) => a.type === 'reference_file') || referenceFiles.length > 0;
     const hasReferenceLink = existingLinks.length > 0 || newLinks.some((u) => u.trim());
     const hasReferencesOrNotes = hasReferenceFile || hasReferenceLink || !!form.restrictions?.trim() || !!form.additionalNotes?.trim();
+    const trimmedStory = form.storyDirection.trim();
+    const isUnreplacedPrompt = storyDirectionPrompts.some((s) => s.value === trimmedStory);
     const checks: [boolean, string][] = [
       [!form.designerId, 'Please choose a designer before submitting.'],
       [!form.productName.trim(), 'Please add your product or brand name.'],
@@ -574,7 +656,9 @@ export function NewRequestPage() {
       [!moodChoice, 'Please choose a visual mood (or upload your own) before submitting.'],
       [!musicChoice, 'Please choose music (or upload your own) before submitting.'],
       [!form.ctaStyle, 'Please choose a call-to-action style.'],
-      [!form.storyDirection.trim(), 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.'],
+      [!trimmedStory, 'Please add your story direction / dialogue before submitting — your designer needs this to avoid back-and-forth.'],
+      [isUnreplacedPrompt, 'Please replace the ChatGPT prompt with your actual generated story before submitting.'],
+      [!isUnreplacedPrompt && trimmedStory.length < 1000, 'Story direction / dialogue must be at least 1000 characters.'],
       [!hasReferencesOrNotes, 'Please add at least one reference file, reference link, do\'s/don\'ts, or additional note.'],
       [!termsConfirmed, 'Please confirm the Approval & Revision Rules before submitting.'],
     ];
@@ -613,6 +697,28 @@ export function NewRequestPage() {
     () => [...designers].sort((a, b) => industryMatchScore(b, form.industry ?? '') - industryMatchScore(a, form.industry ?? '')),
     [designers, form.industry],
   );
+
+  const storyDirectionPrompts: QuickReplyItem[] = useMemo(
+    () =>
+      STORY_STYLE_TEMPLATES.map((t) => ({
+        label: t.label,
+        value: buildStoryPrompt(t, {
+          productName: form.productName,
+          productDescription: form.productDescription,
+          videoLengthSec: form.videoLengthSec,
+          platform: form.platform,
+        }),
+      })),
+    [form.productName, form.productDescription, form.videoLengthSec, form.platform],
+  );
+
+  function handlePickStoryPrompt(text: string) {
+    if (!form.productName.trim() || !form.productDescription.trim()) {
+      showToast('Please fill in your product/brand name and description (Section 1) before generating a prompt.', 'error');
+      return;
+    }
+    set('storyDirection', text);
+  }
 
   if (loading) return <p style={{ color: 'var(--text-faint)' }}>Loading…</p>;
 
@@ -838,42 +944,11 @@ export function NewRequestPage() {
         </Section>
       </div>
 
-      {/* Row 3: Script Direction */}
-      <Section number={4} title="Script Direction" description="The story, tone, and specific dialogue or beats you want — the more detail here, the fewer revision rounds later.">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <Field label="Script style">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {SCRIPT_STYLES.map((s) => (
-                <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Tone">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {TONES.map((t) => (
-                <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
-                  {titleCase(t)}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
-        <Field label="Story direction / dialogue *">
-          <textarea
-            style={{ ...fieldStyle(), minHeight: 100 }}
-            maxLength={2000}
-            value={form.storyDirection}
-            onChange={(e) => set('storyDirection', e.target.value)}
-            placeholder="Specific dialogue, storyboard beats, or exact wording — the more detail here, the fewer rounds of back-and-forth."
-          />
-          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.storyDirection.length}/2000</p>
-        </Field>
-      </Section>
-
-      {/* Row 4: Video Settings */}
-      <Section number={5} title="Video Settings" description="Platform, length, and technical delivery preferences.">
+      {/* Row 3: Video Settings — moved ahead of Script Direction so duration
+          and platform are already picked by the time the customer generates
+          a ChatGPT prompt for the story, since the prompt needs to know how
+          long the script should be. */}
+      <Section number={4} title="Video Settings" description="Platform, length, and technical delivery preferences.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
           <Field label="Platform *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -930,6 +1005,51 @@ export function NewRequestPage() {
             </select>
           </Field>
         </div>
+      </Section>
+
+      {/* Row 4: Script Direction */}
+      <Section number={5} title="Script Direction" description="The story, tone, and specific dialogue or beats you want — the more detail here, the fewer revision rounds later.">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <Field label="Script style">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SCRIPT_STYLES.map((s) => (
+                <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Tone">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TONES.map((t) => (
+                <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
+                  {titleCase(t)}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+        <Field label="Story direction / dialogue *">
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
+            Not sure what to write? Tap a style below for a ready-made ChatGPT prompt (using your product details and
+            chosen duration above), copy it into ChatGPT, then paste the script it gives you here in place of the
+            prompt (minimum 1000 characters).
+          </p>
+          <QuickReplies items={storyDirectionPrompts} onPick={handlePickStoryPrompt} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <CopyButton text={form.storyDirection} />
+          </div>
+          <textarea
+            style={{ ...fieldStyle(), minHeight: 100 }}
+            maxLength={2000}
+            value={form.storyDirection}
+            onChange={(e) => set('storyDirection', e.target.value)}
+            placeholder="Specific dialogue, storyboard beats, or exact wording — the more detail here, the fewer rounds of back-and-forth."
+          />
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>
+            {form.storyDirection.length}/2000 (min 1000)
+          </p>
+        </Field>
       </Section>
 
       {/* Row 5: Avatar Selection + Background Selection */}
@@ -1098,9 +1218,11 @@ export function NewRequestPage() {
           )}
         </Field>
         <Field label="Do's and don'ts">
+          <QuickReplies items={simpleItems(RESTRICTIONS_PHRASES)} onPick={(phrase) => set('restrictions', appendQuickReply(form.restrictions ?? '', phrase))} />
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.restrictions ?? ''} onChange={(e) => set('restrictions', e.target.value)} />
         </Field>
         <Field label="Additional notes">
+          <QuickReplies items={simpleItems(ADDITIONAL_NOTES_PHRASES)} onPick={(phrase) => set('additionalNotes', appendQuickReply(form.additionalNotes ?? '', phrase))} />
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.additionalNotes ?? ''} onChange={(e) => set('additionalNotes', e.target.value)} />
         </Field>
       </Section>

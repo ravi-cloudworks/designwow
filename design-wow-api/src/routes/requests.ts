@@ -326,7 +326,11 @@ requests.post('/:id/submit', async (c) => {
   if (!hasChoice(request.mood_choice)) missing.push('visual mood selection');
   if (!hasChoice(request.music_choice)) missing.push('music selection');
   if (!request.cta_style) missing.push('call-to-action style');
-  if (!request.story_direction.trim()) missing.push('story direction / dialogue');
+  if (!request.story_direction.trim()) {
+    missing.push('story direction / dialogue');
+  } else if (request.story_direction.trim().length < 1000) {
+    missing.push('story direction / dialogue (needs at least 1000 characters)');
+  }
   if (!hasReferencesOrNotes) missing.push("reference file, reference link, do's/don'ts, or additional note");
   if (!request.terms_confirmed_at) missing.push('approval & revision rules confirmation');
 

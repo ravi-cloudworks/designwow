@@ -378,21 +378,7 @@ export function BriefSummary({
         </SectionCard>
       </div>
 
-      <SectionCard number={4} title="Script Direction" description="The story, tone, and specific dialogue or beats requested.">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <FieldBlock label="Script style" badge={changed('script_style')}>
-            <PillRow options={SCRIPT_STYLES} value={request.script_style} />
-          </FieldBlock>
-          <FieldBlock label="Tone" badge={changed('tone')}>
-            <PillRow options={TONES.map((t) => ({ value: t, label: titleCase(t) }))} value={request.tone} />
-          </FieldBlock>
-        </div>
-        <FieldBlock label="Story direction / dialogue" badge={changed('story_direction')}>
-          <PlainText>{request.story_direction}</PlainText>
-        </FieldBlock>
-      </SectionCard>
-
-      <SectionCard number={5} title="Video Settings" description="Platform, length, and technical delivery preferences.">
+      <SectionCard number={4} title="Video Settings" description="Platform, length, and technical delivery preferences.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
           <FieldBlock label="Platform">
             <PillRow options={PLATFORMS.map((p) => ({ value: p, label: titleCase(p) }))} value={request.platform} />
@@ -417,6 +403,20 @@ export function BriefSummary({
             <PlainText>{labelFor(SUBTITLE_OPTIONS, request.subtitles) ?? '—'}</PlainText>
           </FieldBlock>
         </div>
+      </SectionCard>
+
+      <SectionCard number={5} title="Script Direction" description="The story, tone, and specific dialogue or beats requested.">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <FieldBlock label="Script style" badge={changed('script_style')}>
+            <PillRow options={SCRIPT_STYLES} value={request.script_style} />
+          </FieldBlock>
+          <FieldBlock label="Tone" badge={changed('tone')}>
+            <PillRow options={TONES.map((t) => ({ value: t, label: titleCase(t) }))} value={request.tone} />
+          </FieldBlock>
+        </div>
+        <FieldBlock label="Story direction / dialogue" badge={changed('story_direction')}>
+          <PlainText>{request.story_direction}</PlainText>
+        </FieldBlock>
       </SectionCard>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
