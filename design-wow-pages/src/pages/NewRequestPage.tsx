@@ -96,13 +96,34 @@ const STORY_STYLE_TEMPLATES: StoryStyleTemplate[] = [
 
 function buildStoryPrompt(
   template: StoryStyleTemplate,
-  ctx: { productName: string; productDescription: string; videoLengthSec: number; platform: string }
+  ctx: {
+    productName: string;
+    productDescription: string;
+    videoLengthSec: number;
+    platform: string;
+    aspectRatio: string;
+    language: string;
+    voiceType: string;
+    subtitles: string;
+    scriptStyle: string;
+    tone: string;
+  }
 ): string {
   const durationPhrase = `${ctx.videoLengthSec}-second`;
   const platformPhrase = titleCase(ctx.platform);
+  const aspectRatioLabel = ASPECT_RATIOS.find((a) => a.value === ctx.aspectRatio)?.label ?? ctx.aspectRatio;
+  const voiceTypeLabel = VOICE_TYPES.find((v) => v.value === ctx.voiceType)?.label ?? titleCase(ctx.voiceType);
+  const languageLabel = LANGUAGES.find((l) => l.value === ctx.language)?.label ?? titleCase(ctx.language);
+  const scriptStyleLabel = SCRIPT_STYLES.find((s) => s.value === ctx.scriptStyle)?.label ?? titleCase(ctx.scriptStyle);
+  const toneLine = ctx.tone ? ` Tone of voice: ${titleCase(ctx.tone)}.` : '';
+  const languageLine = ctx.language && ctx.language !== 'english' ? ` Write the dialogue in ${languageLabel}, not English.` : '';
+  const subtitlesLine =
+    ctx.subtitles === 'yes' ? ' This video will have subtitles, so keep sentences clear and well-paced for on-screen text.' : '';
   return (
-    `Write the exact spoken dialogue for a ${durationPhrase} UGC-style ${platformPhrase} video ad for "${ctx.productName}" — ${ctx.productDescription}. ` +
+    `Write the exact spoken dialogue for a ${durationPhrase} UGC-style ${platformPhrase} video ad (${aspectRatioLabel}) for "${ctx.productName}" — ${ctx.productDescription}. ` +
     `${template.angle} ` +
+    `Script style: ${scriptStyleLabel}.${toneLine} ` +
+    `Voice: ${voiceTypeLabel}.${languageLine}${subtitlesLine} ` +
     `Write out the literal words to be spoken on camera, word for word — this is a script, not a summary or description of the story. ` +
     `Make sure the total spoken content fits naturally within ${durationPhrase} when read aloud at a normal conversational pace, and is at least 1000 characters long.`
   );
@@ -303,7 +324,7 @@ const emptyForm: RequestInput = {
   restrictions: '',
   additionalNotes: '',
   industry: '',
-  scriptStyle: '',
+  scriptStyle: 'product_benefits',
   ctaStyle: '',
   targetAudience: '',
   aspectRatio: ASPECT_RATIOS[0].value,
@@ -454,7 +475,7 @@ export function NewRequestPage() {
           restrictions: r.restrictions ?? '',
           additionalNotes: r.additional_notes ?? '',
           industry: r.industry ?? '',
-          scriptStyle: r.script_style ?? '',
+          scriptStyle: r.script_style ?? 'product_benefits',
           ctaStyle: r.cta_style ?? '',
           targetAudience: r.target_audience ?? '',
           aspectRatio: r.aspect_ratio ?? ASPECT_RATIOS[0].value,
@@ -707,9 +728,26 @@ export function NewRequestPage() {
           productDescription: form.productDescription,
           videoLengthSec: form.videoLengthSec,
           platform: form.platform,
+          aspectRatio: form.aspectRatio ?? '',
+          language: form.language ?? '',
+          voiceType: form.voiceType ?? '',
+          subtitles: form.subtitles ?? '',
+          scriptStyle: form.scriptStyle ?? '',
+          tone: form.tone ?? '',
         }),
       })),
-    [form.productName, form.productDescription, form.videoLengthSec, form.platform],
+    [
+      form.productName,
+      form.productDescription,
+      form.videoLengthSec,
+      form.platform,
+      form.aspectRatio,
+      form.language,
+      form.voiceType,
+      form.subtitles,
+      form.scriptStyle,
+      form.tone,
+    ],
   );
 
   function handlePickStoryPrompt(text: string) {
@@ -821,6 +859,12 @@ export function NewRequestPage() {
               <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.productName.length}/100</p>
             </Field>
             <Field label="Product description *">
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-faint)' }}>
+                This gets used to write your video's actual script — the more real detail here, the better. Include:
+                the customer's pain point this solves, your product's key features, who it's for (age group,
+                demographics), and the value or benefit they get. A vague description here means a generic, less
+                useful script later.
+              </p>
               <textarea
                 style={{ ...fieldStyle(), minHeight: 84 }}
                 maxLength={1000}
