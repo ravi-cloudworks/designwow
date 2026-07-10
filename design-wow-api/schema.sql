@@ -193,6 +193,7 @@ CREATE TABLE requests (
   subtitles             TEXT,
   brand_color_primary   TEXT,
   brand_color_secondary TEXT,
+  brand_color_accent    TEXT,
   -- Set when the customer confirms the (informational-only, not enforced)
   -- Approval & Revision Rules terms shown on the request form.
   terms_confirmed_at    TEXT,

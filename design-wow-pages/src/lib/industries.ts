@@ -127,6 +127,7 @@ export type UpdatableFieldKey =
   | 'cta'
   | 'brand_color_primary'
   | 'brand_color_secondary'
+  | 'brand_color_accent'
   | 'restrictions'
   | 'additional_notes';
 
@@ -158,6 +159,7 @@ export const UPDATABLE_FIELDS: {
   { key: 'cta', label: 'Call to action', maxLength: 200 },
   { key: 'brand_color_primary', label: 'Brand color (primary)', maxLength: 20 },
   { key: 'brand_color_secondary', label: 'Brand color (secondary)', maxLength: 20 },
+  { key: 'brand_color_accent', label: 'Brand color (accent)', maxLength: 20 },
   { key: 'restrictions', label: "Do's and don'ts", maxLength: 1000, multiline: true },
   { key: 'additional_notes', label: 'Additional notes', maxLength: 1000, multiline: true },
 ];

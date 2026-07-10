@@ -21,6 +21,7 @@ const UPDATABLE_FIELDS: Record<string, { column: string; label: string; maxLengt
   cta: { column: 'cta', label: 'Call to action', maxLength: 200 },
   brand_color_primary: { column: 'brand_color_primary', label: 'Brand color (primary)', maxLength: 20 },
   brand_color_secondary: { column: 'brand_color_secondary', label: 'Brand color (secondary)', maxLength: 20 },
+  brand_color_accent: { column: 'brand_color_accent', label: 'Brand color (accent)', maxLength: 20 },
   restrictions: { column: 'restrictions', label: "Do's and don'ts", maxLength: 1000 },
   additional_notes: { column: 'additional_notes', label: 'Additional notes', maxLength: 1000 },
 };
@@ -140,6 +141,7 @@ type RequestBody = {
   subtitles?: string | null;
   brandColorPrimary?: string | null;
   brandColorSecondary?: string | null;
+  brandColorAccent?: string | null;
   termsConfirmed?: boolean;
 };
 
@@ -162,9 +164,9 @@ requests.post('/', async (c) => {
        music_choice, music_backup_choice, background_choice, background_backup_choice,
        script_style, cta_style,
        target_audience, aspect_ratio, language, voice_type, subtitles,
-       brand_color_primary, brand_color_secondary, terms_confirmed_at,
+       brand_color_primary, brand_color_secondary, brand_color_accent, terms_confirmed_at,
        sla_hours
-     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') ELSE NULL END, ?)`
+     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') ELSE NULL END, ?)`
   ).bind(
     id, userId, body.designerId, body.subscriptionId,
     body.productName, body.productDescription, body.goal, body.platform,
@@ -176,7 +178,7 @@ requests.post('/', async (c) => {
     body.musicChoice ?? null, body.musicBackupChoice ?? null, body.backgroundChoice ?? null, body.backgroundBackupChoice ?? null,
     body.scriptStyle ?? null, body.ctaStyle ?? null,
     body.targetAudience ?? null, body.aspectRatio ?? null, body.language ?? null, body.voiceType ?? null, body.subtitles ?? null,
-    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null,
+    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null, body.brandColorAccent ?? null,
     body.termsConfirmed ? 1 : 0,
     body.slaHours
   ).run();
@@ -201,7 +203,7 @@ requests.patch('/:id', async (c) => {
        music_choice = ?, music_backup_choice = ?, background_choice = ?, background_backup_choice = ?,
        script_style = ?, cta_style = ?,
        target_audience = ?, aspect_ratio = ?, language = ?, voice_type = ?, subtitles = ?,
-       brand_color_primary = ?, brand_color_secondary = ?,
+       brand_color_primary = ?, brand_color_secondary = ?, brand_color_accent = ?,
        terms_confirmed_at = CASE WHEN ? THEN COALESCE(terms_confirmed_at, datetime('now')) ELSE terms_confirmed_at END,
        updated_at = datetime('now')
      WHERE id = ? AND status = 'draft'`
@@ -216,7 +218,7 @@ requests.patch('/:id', async (c) => {
     body.musicChoice ?? null, body.musicBackupChoice ?? null, body.backgroundChoice ?? null, body.backgroundBackupChoice ?? null,
     body.scriptStyle ?? null, body.ctaStyle ?? null,
     body.targetAudience ?? null, body.aspectRatio ?? null, body.language ?? null, body.voiceType ?? null, body.subtitles ?? null,
-    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null,
+    body.brandColorPrimary ?? null, body.brandColorSecondary ?? null, body.brandColorAccent ?? null,
     body.termsConfirmed ? 1 : 0,
     id
   ).run();
@@ -266,7 +268,7 @@ requests.post('/:id/submit', async (c) => {
     `SELECT designer_id, product_name, product_description, target_audience,
             cta_style, story_direction, terms_confirmed_at, status,
             avatar_choice, background_choice, mood_choice, music_choice,
-            restrictions, additional_notes
+            restrictions, additional_notes, brand_color_primary, brand_color_secondary
      FROM requests WHERE id = ?`
   ).bind(id).first<{
     designer_id: string | null;
@@ -283,6 +285,8 @@ requests.post('/:id/submit', async (c) => {
     music_choice: string | null;
     restrictions: string | null;
     additional_notes: string | null;
+    brand_color_primary: string | null;
+    brand_color_secondary: string | null;
   }>();
   if (!request) return c.json({ error: 'not_found' }, 404);
   if (request.status !== 'draft') return c.json({ error: 'not_a_draft' }, 409);
@@ -320,6 +324,8 @@ requests.post('/:id/submit', async (c) => {
   if (!request.product_description.trim()) missing.push('product description');
   if (!logoCount) missing.push('logo');
   if (!productFileCount) missing.push('product photos / footage');
+  if (!request.brand_color_primary?.trim()) missing.push('brand color (primary)');
+  if (!request.brand_color_secondary?.trim()) missing.push('brand color (secondary)');
   if (!request.target_audience) missing.push('target audience');
   if (!hasChoice(request.avatar_choice)) missing.push('avatar selection');
   if (!hasChoice(request.background_choice)) missing.push('background selection');

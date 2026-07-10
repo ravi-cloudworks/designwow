@@ -16,6 +16,7 @@ function getCurrentValue(request: RequestRow, key: UpdatableFieldKey): string {
     cta: request.cta,
     brand_color_primary: request.brand_color_primary,
     brand_color_secondary: request.brand_color_secondary,
+    brand_color_accent: request.brand_color_accent,
     restrictions: request.restrictions,
     additional_notes: request.additional_notes,
   };

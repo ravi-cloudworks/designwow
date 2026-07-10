@@ -340,12 +340,16 @@ export function BriefSummary({
           <FieldBlock label="Product description" badge={changed('product_description')}>
             <PlainText>{request.product_description}</PlainText>
           </FieldBlock>
-          <FieldBlock label="Brand colors" badge={changed('brand_color_primary') || changed('brand_color_secondary')}>
-            {request.brand_color_primary || request.brand_color_secondary ? (
+          <FieldBlock
+            label="Brand colors"
+            badge={changed('brand_color_primary') || changed('brand_color_secondary') || changed('brand_color_accent')}
+          >
+            {request.brand_color_primary || request.brand_color_secondary || request.brand_color_accent ? (
               <div style={{ display: 'flex', gap: 16 }}>
                 {[
                   { label: 'Primary', hex: request.brand_color_primary },
                   { label: 'Secondary', hex: request.brand_color_secondary },
+                  { label: 'Accent', hex: request.brand_color_accent },
                 ]
                   .filter((c) => c.hex)
                   .map((c) => (

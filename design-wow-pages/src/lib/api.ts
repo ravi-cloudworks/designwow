@@ -89,6 +89,7 @@ export type RequestRow = {
   subtitles: string | null;
   brand_color_primary: string | null;
   brand_color_secondary: string | null;
+  brand_color_accent: string | null;
   terms_confirmed_at: string | null;
   sla_hours: number;
   submitted_at: string | null;
@@ -139,6 +140,7 @@ export type RequestInput = {
   subtitles?: string | null;
   brandColorPrimary?: string | null;
   brandColorSecondary?: string | null;
+  brandColorAccent?: string | null;
   termsConfirmed?: boolean;
 };
 

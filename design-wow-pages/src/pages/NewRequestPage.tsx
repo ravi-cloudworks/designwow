@@ -28,7 +28,7 @@ import {
   TONES,
 } from '../lib/industries';
 import { GOAL_ICONS, TARGET_AUDIENCE_ICONS } from '../lib/pickerIcons';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Pencil } from 'lucide-react';
 
 // Sample phrases for the two most open-ended fields on the form — many
 // customers don't know what to write for "restrictions" or "notes" until
@@ -345,6 +345,7 @@ const emptyForm: RequestInput = {
   subtitles: SUBTITLE_OPTIONS[0].value,
   brandColorPrimary: '',
   brandColorSecondary: '',
+  brandColorAccent: '',
 };
 
 function fieldStyle() {
@@ -496,6 +497,7 @@ export function NewRequestPage() {
           subtitles: r.subtitles ?? SUBTITLE_OPTIONS[0].value,
           brandColorPrimary: r.brand_color_primary ?? '',
           brandColorSecondary: r.brand_color_secondary ?? '',
+          brandColorAccent: r.brand_color_accent ?? '',
         });
         setAvatarChoice(r.avatar_choice ? JSON.parse(r.avatar_choice) : null);
         setAvatarBackupChoice(r.avatar_backup_choice ? JSON.parse(r.avatar_backup_choice) : null);
@@ -683,6 +685,8 @@ export function NewRequestPage() {
       [!form.productDescription.trim(), 'Please add a product description.'],
       [!hasLogo, 'Please upload a logo before submitting.'],
       [!hasProductFile, 'Please upload at least one product photo or footage before submitting.'],
+      [!form.brandColorPrimary?.trim(), 'Please set your primary brand color.'],
+      [!form.brandColorSecondary?.trim(), 'Please set your secondary brand color.'],
       [!form.targetAudience, 'Please choose a target audience.'],
       [!avatarChoice, 'Please choose an avatar (or upload your own) before submitting.'],
       [!backgroundChoice, 'Please choose a background (or upload your own) before submitting.'],
@@ -929,10 +933,11 @@ export function NewRequestPage() {
               />
               <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
             </Field>
-            <Field label="Brand colors">
-              <div style={{ display: 'flex', gap: 16 }}>
-                <ColorSwatchPicker label="Primary" value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
-                <ColorSwatchPicker label="Secondary" value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
+            <Field label="Brand colors *">
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <ColorSwatchPicker label="Primary" required value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
+                <ColorSwatchPicker label="Secondary" required value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
+                <ColorSwatchPicker label="Accent" value={form.brandColorAccent ?? ''} onChange={(v) => set('brandColorAccent', v)} />
               </div>
             </Field>
           </div>
@@ -1477,32 +1482,99 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function ColorSwatchPicker({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
-  const hex = value || '#ffffff';
+// Accepts a hex code with or without a leading "#", and expands 3-digit
+// shorthand (#fff -> #ffffff) — copied hex values very often omit the "#".
+// Returns null (not a fallback color) when the input isn't a recognizable
+// hex at all, so callers can distinguish "no valid color yet" from "white".
+function resolveHexColor(value: string): string | null {
+  const trimmed = value.trim();
+  const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (/^#[0-9a-fA-F]{6}$/.test(withHash)) return withHash.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(withHash)) {
+    const [, r, g, b] = withHash;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return null;
+}
+
+function ColorSwatchPicker({
+  label,
+  required,
+  value,
+  onChange,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  // A bare colored square with an invisible native color input on top gave
+  // no visual hint it was clickable, and there was no way to just type a
+  // hex code someone already has from brand guidelines. Now: a pencil badge
+  // makes the swatch's click target obvious, and a text input next to it
+  // accepts a hex code directly — both write to the same value.
+  const swatchHex = resolveHexColor(value) ?? '#ffffff';
   return (
     <div>
-      <label
-        style={{
-          display: 'block',
-          width: 60,
-          height: 60,
-          borderRadius: 8,
-          border: '1.5px solid var(--line)',
-          background: hex,
-          cursor: 'pointer',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'flex-end',
+            width: 44,
+            height: 44,
+            borderRadius: 8,
+            border: '1.5px solid var(--line)',
+            background: swatchHex,
+            cursor: 'pointer',
+            position: 'relative',
+            overflow: 'hidden',
+            flexShrink: 0,
+            padding: 3,
+          }}
+        >
+          <input
+            type="color"
+            value={swatchHex}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none', padding: 0 }}
+          />
+          <span
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <Pencil size={9} color="#333" />
+          </span>
+        </label>
         <input
-          type="color"
-          value={hex}
+          type="text"
+          value={value}
           onChange={(e) => onChange(e.target.value)}
-          style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none', padding: 0 }}
+          onBlur={() => {
+            // Pasted hex codes very often come without a leading "#" (Figma,
+            // Photoshop, etc. show them that way) — normalize once the
+            // customer's done typing rather than fighting them mid-keystroke.
+            const normalized = resolveHexColor(value);
+            if (normalized && normalized !== value) onChange(normalized);
+          }}
+          placeholder="#RRGGBB"
+          maxLength={7}
+          style={{ width: 92, border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'var(--mono)' }}
         />
-      </label>
-      <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{label}</p>
-      <p style={{ margin: '2px 0 0', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-soft)' }}>{hex.toUpperCase()}</p>
+      </div>
+      <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>
+        {label}
+        {required && ' *'}
+      </p>
     </div>
   );
 }
