@@ -59,6 +59,17 @@ requests.get('/', async (c) => {
 
 requests.get('/:id', async (c) => {
   const id = c.req.param('id');
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const owner = await c.env.DB.prepare('SELECT customer_id, designer_id FROM requests WHERE id = ?')
+    .bind(id)
+    .first<{ customer_id: string; designer_id: string }>();
+  if (!owner) return c.json({ error: 'not_found' }, 404);
+  if (userId !== owner.customer_id && userId !== owner.designer_id) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
+
   const request = await c.env.DB.prepare(
     `SELECT r.*,
             du.name AS designer_name, du.avatar_url AS designer_avatar_url,
