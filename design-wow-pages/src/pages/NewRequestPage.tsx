@@ -896,11 +896,11 @@ export function NewRequestPage() {
       <Section number={1} title="Brand Details" description="Your product or brand name, description, logo, product photos, and brand colors — the basics your designer starts from.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Field label="Product or brand name *">
+            <Field label="1.1 Product or brand name *">
               <input style={fieldStyle()} maxLength={100} value={form.productName} onChange={(e) => set('productName', e.target.value)} />
               <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-faint)', textAlign: 'right' }}>{form.productName.length}/100</p>
             </Field>
-            <Field label="Product description *">
+            <Field label="1.2 Product description *">
               <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-faint)' }}>
                 This gets used to write your video's actual script — the more real detail here, the better. Include:
                 the customer's pain point this solves, your product's key features, who it's for (age group,
@@ -917,7 +917,7 @@ export function NewRequestPage() {
             </Field>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <Field label="Logo *">
+            <Field label="1.3 Logo *">
               <FileGrid
                 existing={existingAssets.filter((a) => a.type === 'logo')}
                 pending={logoFile ? [logoFile] : []}
@@ -933,7 +933,7 @@ export function NewRequestPage() {
               />
               <FieldHint text={UPLOAD_LIMITS.logo.label} error={fileErrors.logo} />
             </Field>
-            <Field label="Brand colors *">
+            <Field label="1.4 Brand colors *">
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ColorSwatchPicker label="Primary" required value={form.brandColorPrimary ?? ''} onChange={(v) => set('brandColorPrimary', v)} />
                 <ColorSwatchPicker label="Secondary" required value={form.brandColorSecondary ?? ''} onChange={(v) => set('brandColorSecondary', v)} />
@@ -942,7 +942,7 @@ export function NewRequestPage() {
             </Field>
           </div>
         </div>
-        <Field label="Product photos / footage *">
+        <Field label="1.5 Product photos / footage *">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'product_file')}
             pending={productFiles}
@@ -1037,7 +1037,7 @@ export function NewRequestPage() {
           long the script should be. */}
       <Section number={4} title="Video Settings" description="Platform, length, and technical delivery preferences.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
-          <Field label="Platform *">
+          <Field label="4.1 Platform *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {PLATFORMS.map((p) => (
                 <button key={p} style={pill(form.platform === p)} onClick={() => set('platform', p)}>
@@ -1046,7 +1046,7 @@ export function NewRequestPage() {
               ))}
             </div>
           </Field>
-          <Field label="Duration *">
+          <Field label="4.2 Duration *">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {LENGTHS.map((len) => (
                 <button key={len} style={pill(form.videoLengthSec === len)} onClick={() => set('videoLengthSec', len)}>
@@ -1055,7 +1055,7 @@ export function NewRequestPage() {
               ))}
             </div>
           </Field>
-          <Field label="Aspect ratio">
+          <Field label="4.3 Aspect ratio">
             <select style={fieldStyle()} value={form.aspectRatio ?? ''} onChange={(e) => set('aspectRatio', e.target.value)}>
               {ASPECT_RATIOS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -1064,7 +1064,7 @@ export function NewRequestPage() {
               ))}
             </select>
           </Field>
-          <Field label="Language">
+          <Field label="4.4 Language">
             <select style={fieldStyle()} value={form.language ?? ''} onChange={(e) => set('language', e.target.value)}>
               {LANGUAGES.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -1073,7 +1073,7 @@ export function NewRequestPage() {
               ))}
             </select>
           </Field>
-          <Field label="Voice type">
+          <Field label="4.5 Voice type">
             <select style={fieldStyle()} value={form.voiceType ?? ''} onChange={(e) => set('voiceType', e.target.value)}>
               {VOICE_TYPES.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -1082,7 +1082,7 @@ export function NewRequestPage() {
               ))}
             </select>
           </Field>
-          <Field label="Subtitles">
+          <Field label="4.6 Subtitles">
             <select style={fieldStyle()} value={form.subtitles ?? ''} onChange={(e) => set('subtitles', e.target.value)}>
               {SUBTITLE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -1097,7 +1097,7 @@ export function NewRequestPage() {
       {/* Row 4: Script Direction */}
       <Section number={5} title="Script Direction" description="The story, tone, and specific dialogue or beats you want — the more detail here, the fewer revision rounds later.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-          <Field label="Script style">
+          <Field label="5.1 Script style">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {SCRIPT_STYLES.map((s) => (
                 <button key={s.value} style={{ ...pill(form.scriptStyle === s.value), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('scriptStyle', s.value)}>
@@ -1106,7 +1106,7 @@ export function NewRequestPage() {
               ))}
             </div>
           </Field>
-          <Field label="Tone">
+          <Field label="5.2 Tone">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TONES.map((t) => (
                 <button key={t} style={{ ...pill(form.tone === t), fontSize: 11.5, padding: '6px 10px' }} onClick={() => set('tone', t)}>
@@ -1116,7 +1116,7 @@ export function NewRequestPage() {
             </div>
           </Field>
         </div>
-        <Field label="Story direction / dialogue *">
+        <Field label="5.3 Story direction / dialogue *">
           <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)' }}>
             Not sure what to write? Tap a style below for a ready-made ChatGPT prompt (using your product details and
             chosen duration above), copy it into ChatGPT, then paste the script it gives you here in place of the
@@ -1261,7 +1261,7 @@ export function NewRequestPage() {
         title="References & Notes *"
         description="Anything else that doesn't fit above — competitor examples, brand guidelines, do's and don'ts. At least one of the four below is required."
       >
-        <Field label="Reference files">
+        <Field label="11.1 Reference files">
           <FileGrid
             existing={existingAssets.filter((a) => a.type === 'reference_file')}
             pending={referenceFiles}
@@ -1278,7 +1278,7 @@ export function NewRequestPage() {
           />
           <FieldHint text={UPLOAD_LIMITS.reference_file.label} error={fileErrors.reference_file} />
         </Field>
-        <Field label="Reference links">
+        <Field label="11.2 Reference links">
           {existingLinks.map((url, i) => (
             <p key={i} style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '0 0 6px', wordBreak: 'break-all' }}>
               {url}
@@ -1304,11 +1304,11 @@ export function NewRequestPage() {
             <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>Max 5 links.</p>
           )}
         </Field>
-        <Field label="Do's and don'ts">
+        <Field label="11.3 Do's and don'ts">
           <QuickReplies items={simpleItems(RESTRICTIONS_PHRASES)} onPick={(phrase) => set('restrictions', appendQuickReply(form.restrictions ?? '', phrase))} />
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.restrictions ?? ''} onChange={(e) => set('restrictions', e.target.value)} />
         </Field>
-        <Field label="Additional notes">
+        <Field label="11.4 Additional notes">
           <QuickReplies items={simpleItems(ADDITIONAL_NOTES_PHRASES)} onPick={(phrase) => set('additionalNotes', appendQuickReply(form.additionalNotes ?? '', phrase))} />
           <textarea style={{ ...fieldStyle(), minHeight: 74 }} value={form.additionalNotes ?? ''} onChange={(e) => set('additionalNotes', e.target.value)} />
         </Field>
