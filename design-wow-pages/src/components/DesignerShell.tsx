@@ -10,6 +10,10 @@ const navItems = [
   { to: '/designer/profile', label: 'Profile' },
 ];
 
+// Static prototype pages — plain files in public/, not SPA routes, so they
+// open in a new tab as a real navigation rather than a NavLink.
+const toolItems = [{ href: '/tools/ugc-vip-6stage.html', label: 'UGC Video Implementation Package' }];
+
 export function DesignerShell() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -74,6 +78,22 @@ export function DesignerShell() {
             </NavLink>
           ))}
         </nav>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ padding: '0 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>
+            Tools
+          </span>
+          {toolItems.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              style={{ padding: '9px 10px', borderRadius: 7, fontSize: 14, textDecoration: 'none', color: 'var(--text-soft)' }}
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
         <button
           onClick={handleLogout}
           style={{

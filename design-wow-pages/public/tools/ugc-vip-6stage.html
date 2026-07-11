@@ -1,0 +1,1493 @@
+<title>UGC VIP — 6-Stage Production Console</title>
+<style>
+  :root {
+    --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
+    --text: #14161b; --text-soft: #565b66; --text-faint: #8b92a1;
+    --line: #dbdfe2; --line-soft: #e8ebed;
+    --teal: #176b5e; --teal-soft: #e3f1ee; --teal-line: #bcded6;
+    --amber: #a05f10; --amber-soft: #fbeedb; --amber-line: #eccd9a;
+    --crimson: #b23a37; --crimson-soft: #fbe6e5; --crimson-line: #edc0be;
+    --moss: #2f7a4f; --moss-soft: #e3f3e9; --moss-line: #bfe0cc;
+    --display: "Avenir Next", "Century Gothic", "Segoe UI Semibold", ui-sans-serif, system-ui, sans-serif;
+    --body: -apple-system, "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+    --mono: "SF Mono", "Roboto Mono", ui-monospace, "Consolas", monospace;
+    --radius: 10px;
+    --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 1px 1px rgba(20, 22, 27, 0.03);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+      --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+      --line: #2c313a; --line-soft: #23272f;
+      --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+      --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+      --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
+      --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef1f2; --paper: #14161b; --surface: #1c1f26; --surface-2: #23272f;
+    --text: #eef1f2; --text-soft: #a7adb8; --text-faint: #6b7280;
+    --line: #2c313a; --line-soft: #23272f;
+    --teal: #4fb3a2; --teal-soft: #1b3733; --teal-line: #2f5850;
+    --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
+    --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
+    --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+  }
+  :root[data-theme="light"] {
+    --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
+    --text: #14161b; --text-soft: #565b66; --text-faint: #8b92a1;
+    --line: #dbdfe2; --line-soft: #e8ebed;
+    --teal: #176b5e; --teal-soft: #e3f1ee; --teal-line: #bcded6;
+    --amber: #a05f10; --amber-soft: #fbeedb; --amber-line: #eccd9a;
+    --crimson: #b23a37; --crimson-soft: #fbe6e5; --crimson-line: #edc0be;
+    --moss: #2f7a4f; --moss-soft: #e3f3e9; --moss-line: #bfe0cc;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--paper); color: var(--text); font-family: var(--body);
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  svg.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .topbar-title { display: flex; align-items: center; gap: 10px; }
+  .topbar-title .mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--ink); color: var(--paper);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 16px; font-weight: 700; }
+  .topbar p { margin: 1px 0 0; font-size: 11.5px; color: var(--text-faint); }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text-faint); }
+  .mode-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 10px; border-radius: 999px;
+    background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line);
+  }
+
+  /* ---- Stage tabs: a horizontal pipeline strip, same idea as the
+     submitted/in-progress status tracker on the request detail page ---- */
+  .stage-tabs {
+    display: flex; gap: 4px; overflow-x: auto; padding: 10px 22px; background: var(--surface);
+    border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5;
+  }
+  .stage-tab {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 999px;
+    border: 1px solid transparent; background: none; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .stage-tab:hover { background: var(--surface-2); }
+  .stage-tab.active { background: var(--teal-soft); border-color: var(--teal-line); }
+  .stage-num {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 11.5px; font-weight: 700; font-family: var(--display);
+    background: var(--surface-2); color: var(--text-faint);
+  }
+  .stage-tab.active .stage-num { background: var(--teal); color: #f0f6f4; }
+  .stage-tab.status-ready .stage-num { background: var(--moss); color: #f0f6f4; }
+  .stage-tab.status-editing .stage-num { background: var(--amber); color: #f0f6f4; }
+  .stage-tab.active.status-ready .stage-num,
+  .stage-tab.active.status-editing .stage-num { background: var(--teal); }
+  .stage-tab .name { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .stage-tab:not(.active) .name { color: var(--text-soft); }
+
+  /* ---- Single scrolling column, matches the real app's Brief/Notes/Storage pages ---- */
+  .col-main { flex: 1; max-width: 800px; width: 100%; margin: 0 auto; padding: 22px 22px 60px; }
+
+  /* ---- Section card: matches the real app's numbered-circle Section ---- */
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 14px;
+  }
+  .section-card .section-head { margin-bottom: 18px; }
+  .section-card .section-head-row { display: flex; align-items: center; gap: 14px; }
+  .section-card .section-num {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--paper);
+    display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700;
+    flex-shrink: 0; font-family: var(--display);
+  }
+  .section-card h2 { font-size: 21px; font-weight: 700; }
+  .section-card .section-desc { margin: 6px 0 0 54px; font-size: 12.5px; color: var(--text-faint); max-width: 62ch; }
+  .section-card .section-body { display: flex; flex-direction: column; gap: 18px; }
+
+  .subhead {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-soft); margin: 0 0 2px; display: flex; align-items: center; gap: 6px;
+  }
+
+  .field { }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .field .hint { font-size: 11px; color: var(--text-faint); margin: 4px 0 0; }
+  .char-counter { display: block; text-align: right; font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 640px) { .row2, .row3 { grid-template-columns: 1fr; } }
+
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+    padding: 10px 12px; font-size: 14px;
+  }
+  textarea { resize: vertical; min-height: 84px; font-family: var(--body); line-height: 1.5; }
+  select { cursor: pointer; }
+  .hidden-file-input { display: none; }
+
+  /* "+ Choose" upload trigger, matches /new's file-picker link style */
+  .choose-link {
+    display: inline-flex; align-items: center; gap: 4px; border: none; background: none; padding: 0;
+    color: var(--teal); font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  .choose-link:hover { text-decoration: underline; }
+
+  /* Plain pill row — the real app's default single-choice control */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    border: 1px solid var(--line); background: var(--surface); color: var(--text-soft);
+    padding: 8px 14px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  }
+  .pill.selected { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+  /* Icon tile grid — Goal / Audience style choice, 3-up like the real app */
+  .option-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 480px) { .option-grid { grid-template-columns: 1fr 1fr; } }
+  .option-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px;
+    border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--surface);
+    font-size: 12.5px; font-weight: 600; color: var(--text-soft); text-align: center;
+  }
+  .option-tile.selected { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .option-tile svg.icon { width: 26px; height: 26px; }
+
+  /* Brand color swatch + hex pair, matches /new's picker */
+  .swatch-field { display: flex; flex-direction: column; gap: 6px; }
+  .swatch-row { display: flex; gap: 8px; align-items: center; }
+  .swatch-box { position: relative; width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); flex-shrink: 0; }
+  .swatch-native { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .swatch-pencil {
+    position: absolute; bottom: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--line); font-size: 9px; display: flex;
+    align-items: center; justify-content: center; pointer-events: none;
+  }
+  .swatch-hex { width: 116px; font-size: 13px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text-faint); }
+  .swatch-field label { font-size: 12px; font-weight: 600; color: var(--text-soft); margin: 0; }
+
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+  .checkbox-row input { width: auto; }
+  .checkbox-stack { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Real uploaded assets — logo / product photos preview thumbnails */
+  .asset-preview { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .asset-preview img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+  .asset-preview span { font-size: 12px; color: var(--text-faint); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .asset-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .asset-thumb { position: relative; width: 64px; height: 64px; }
+  .asset-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+  .thumb-remove, .asset-remove {
+    position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ink); color: var(--paper); border: none; font-size: 11px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .asset-remove { position: static; width: auto; height: auto; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; }
+
+  .list-item {
+    border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--surface-2);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .list-item-head { display: flex; align-items: center; justify-content: space-between; }
+  .tag {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    background: var(--ink); color: var(--paper); padding: 2px 9px; border-radius: 999px;
+  }
+  .scene-stack { display: flex; flex-direction: column; gap: 12px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 9px 16px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+    color: var(--text);
+  }
+  .btn:hover { border-color: var(--text-faint); }
+  .btn-primary { background: var(--teal); border-color: var(--teal); color: #f0f6f4; }
+  .btn-primary:hover { opacity: 0.92; border-color: var(--teal); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-danger { color: var(--crimson); }
+  .add-row { display: flex; justify-content: flex-start; }
+
+  .tiny-list { display: flex; flex-direction: column; gap: 8px; }
+  .tiny-list .tiny-row { display: flex; gap: 8px; align-items: center; }
+  .tiny-list input { flex: 1; }
+
+  .duration-check {
+    display: flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 6px 10px; border-radius: 999px;
+    background: var(--surface-2); color: var(--text-faint); font-weight: 600; align-self: flex-start;
+  }
+  .duration-check.ok { background: var(--moss-soft); color: var(--moss); }
+  .duration-check.off { background: var(--amber-soft); color: var(--amber); }
+
+  /* ---- Output: lives inside the same stage card, below the fields ---- */
+  .output-divider { border-top: 1px solid var(--line-soft); margin: 2px 0 0; padding-top: 18px; }
+  .out-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
+  .out-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+  .out-tab {
+    border: none; background: none; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    cursor: pointer; color: var(--text-faint);
+  }
+  .out-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+  .out-panel { display: none; }
+  .out-panel.active { display: block; }
+  pre.code {
+    margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+    word-break: break-word; background: var(--ink); color: var(--paper); border-radius: var(--radius);
+    padding: 16px; max-height: 60vh; overflow: auto;
+  }
+  .prompt-block { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; }
+  .prompt-block h4 {
+    margin: 0 0 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal);
+  }
+  .prompt-block p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text); font-family: var(--body); }
+  .prompt-block.negative h4 { color: var(--crimson); }
+  .prompt-block.negative ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface);
+    border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--text-soft);
+  }
+  .copy-btn.copied { background: var(--moss-soft); border-color: var(--moss-line); color: var(--moss); }
+
+  .empty-note { font-size: 12.5px; color: var(--text-faint); font-style: italic; margin: 0; }
+
+  /* "What to do with this" — action steps + expected outcome, per stage */
+  .usage-box { border: 1px solid var(--teal-line); background: var(--teal-soft); border-radius: var(--radius); padding: 14px 16px; margin-top: 14px; }
+  .usage-box h4 {
+    margin: 0 0 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--teal); display: flex; align-items: center; gap: 6px;
+  }
+  .usage-box ol { margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--text); }
+  .usage-box .outcome { font-size: 13px; line-height: 1.6; margin: 0; color: var(--text); }
+  .usage-box .outcome b { color: var(--teal); }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .stage-tab, .option-tile, .pill, .copy-btn { transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
+  }
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-title">
+      <span class="mark" id="topbarIcon"></span>
+      <div>
+        <h1>UGC VIP — 6-Stage Production Console</h1>
+        <p id="modeSubtitle">Standalone mode — Stage 1 entered manually, same as Stages 2-6</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="mode-pill" id="modePill"></span>
+    </div>
+  </div>
+  <nav class="stage-tabs" id="stageTabs"></nav>
+  <div class="col-main" id="colMain"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Icons (small hand-drawn stroke set, Lucide-style) ----------
+  const ICON = {
+    clapper: '<svg class="icon" viewBox="0 0 24 24"><path d="M20.2 6 3 11l1.2 4L21.4 10Z"/><path d="M4.5 10.5 3 15.5A2 2 0 0 0 4.9 18H19a2 2 0 0 0 2-2v-6"/><path d="m6 8 2 3M10 7l2 3M14 6l2 3"/></svg>',
+    film: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
+    camera: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    aperture: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m14.31 8 5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16 3.95 6.06M14.31 16H2.83M16.62 12l-5.74 9.94"/></svg>',
+    sun: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    sunset: '<svg class="icon" viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0"/><path d="M12 9V2M4.2 10.2l1.4 1.4M19.8 10.2l-1.4 1.4M2 18h20M8 6l4-4 4 4"/></svg>',
+    cloud: '<svg class="icon" viewBox="0 0 24 24"><path d="M6.5 19a4.5 4.5 0 0 1-.4-9 5.5 5.5 0 0 1 10.7-1.7A4 4 0 0 1 17 19Z"/></svg>',
+    moon: '<svg class="icon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>',
+    bulb: '<svg class="icon" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.3 1 2.2h5.2c0-.9.4-1.7 1-2.2A6 6 0 0 0 12 3Z"/></svg>',
+    palette: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 1 9-9c0 1.7-1.3 3-3 3h-1.5a1.5 1.5 0 0 0 0 3H17a1 1 0 0 1 1 1c0 1.1-2.7 2-6 2Z"/><circle cx="7" cy="10" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14" cy="7" r="1"/></svg>',
+    user: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
+    users: '<svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 13.5A4.4 4.4 0 0 1 20.5 18"/></svg>',
+    mapPin: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 21s7-6.6 7-12a7 7 0 1 0-14 0c0 5.4 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>',
+    clock: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+    package: '<svg class="icon" viewBox="0 0 24 24"><path d="m3.5 7.5 8.5-4 8.5 4L12 11.5Z"/><path d="M3.5 7.5v9l8.5 4 8.5-4v-9M12 11.5V21"/></svg>',
+    check: '<svg class="icon" viewBox="0 0 24 24"><path d="m5 13 4 4 10-10"/></svg>',
+    circle: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>',
+    zoomIn: '<svg class="icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m21 21-4.35-4.35M10.5 8v5M8 10.5h5"/></svg>',
+    zoomOut: '<svg class="icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m21 21-4.35-4.35M8 10.5h5"/></svg>',
+    move: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>',
+    rotate: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>',
+    tripod: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3v9M12 12l-6 9M12 12l6 9M7 8h10"/></svg>',
+    drone: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><path d="M4 4l5.5 5.5M20 4l-5.5 5.5M4 20l5.5-5.5M20 20l-5.5-5.5"/><circle cx="4" cy="4" r="1.6"/><circle cx="20" cy="4" r="1.6"/><circle cx="4" cy="20" r="1.6"/><circle cx="20" cy="20" r="1.6"/></svg>',
+    lock: '<svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>',
+    layers: '<svg class="icon" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>',
+    wand: '<svg class="icon" viewBox="0 0 24 24"><path d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1ZM4 20l9-9M18 13l1 2 2 1-2 1-1 2-1-2-2-1 2-1Z"/></svg>',
+    box: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 8v8l-9 5-9-5V8l9-5 9 5Z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>',
+    cart: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>',
+    megaphone: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1Z"/><path d="M17 9a3 3 0 0 1 0 6M13 19l1 3"/></svg>',
+    chat: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4V5Z"/></svg>',
+    shieldCheck: '<svg class="icon" viewBox="0 0 24 24"><path d="m12 3 7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6Z"/><path d="m9 12 2 2 4-4"/></svg>',
+    gift: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="4"/><rect x="4" y="13" width="16" height="7"/><path d="M12 9v11"/><path d="M12 9c-1.5-4-6-4-6-1.5S9 9 12 9Zm0 0c1.5-4 6-4 6-1.5S15 9 12 9Z"/></svg>',
+    tag: '<svg class="icon" viewBox="0 0 24 24"><path d="M12.6 3H20v7.4a2 2 0 0 1-.6 1.4l-7 7a2 2 0 0 1-2.8 0l-6-6a2 2 0 0 1 0-2.8l7-7a2 2 0 0 1 1.4-.6Z"/><circle cx="16" cy="8" r="1.4"/></svg>',
+    home: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>',
+    heart: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9a4.6 4.6 0 0 1 6.5 6.5Z"/></svg>',
+    store: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16l1.5 5a2.2 2.2 0 0 1-4.3.8 2.2 2.2 0 0 1-4.2 0 2.2 2.2 0 0 1-4.2 0 2.2 2.2 0 0 1-4.3-.8Z"/><path d="M5 10v10h14V10M9 20v-6h6v6"/></svg>',
+    briefcase: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>',
+    diamond: '<svg class="icon" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9Z"/><path d="M2 9h20M9 3l3 6-3 12M15 3l-3 6 3 12"/></svg>',
+    plane: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2 7L21 3Z"/><path d="M10.5 13 21 3"/></svg>',
+    checkBadge: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 2l2.2 1.4 2.6-.3 1 2.4 2.4 1-.3 2.6L21 11l-1.4 2.2.3 2.6-2.4 1-1 2.4-2.6-.3L12 20l-2.2-1.4-2.6.3-1-2.4-2.4-1 .3-2.6L3 11l1.4-2.2-.3-2.6 2.4-1 1-2.4 2.6.3Z"/><path d="m8.5 12 2.3 2.3L16 9"/></svg>',
+    listSteps: '<svg class="icon" viewBox="0 0 24 24"><path d="M4 6h1M4 12h1M4 18h1M9 6h11M9 12h11M9 18h11"/></svg>',
+    swap: '<svg class="icon" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
+    list: '<svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="6" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="18" r="1.3"/><path d="M9 6h11M9 12h11M9 18h11"/></svg>',
+    monitor: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+    star: '<svg class="icon" viewBox="0 0 24 24"><path d="m12 3 2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 17l-5.6 3.1 1.4-6.3-4.8-4.3 6.4-.6Z"/></svg>',
+    flame: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3s-5 4.5-5 9a5 5 0 0 0 10 0c0-1-.4-1.8-1-2.5.2 1.5-.6 2.5-1.5 2.5-1.2 0-1.5-1-1-2C14 8 12 5 12 3Z"/></svg>',
+    helpCircle: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.8 1c0 1.5-2.3 1.6-2.3 3.5"/><circle cx="12" cy="17" r="0.6"/></svg>',
+    shuffle: '<svg class="icon" viewBox="0 0 24 24"><path d="m4 5 5 5m11-5-6 6M4 19l5-5m6 0 6 5M15 5h4v4M15 19h4v-4"/></svg>',
+    bolt: '<svg class="icon" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6Z"/></svg>',
+    leaf: '<svg class="icon" viewBox="0 0 24 24"><path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14Z"/><path d="M5 19c2-6 6-10 12-12"/></svg>',
+    smile: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h.01M15.5 10h.01M8 14.5c1.2 1.3 2.6 2 4 2s2.8-.7 4-2"/></svg>'
+  };
+
+  // ---------- Static option vocab ----------
+  const GOALS = [
+    { v: 'Increase Sales', i: 'cart' }, { v: 'Brand Awareness', i: 'megaphone' },
+    { v: 'Drive Inquiries', i: 'chat' }, { v: 'Build Trust', i: 'shieldCheck' },
+    { v: 'Promote New Product', i: 'gift' }, { v: 'Announce Offer', i: 'tag' }
+  ];
+  const TARGET_AUDIENCES = [
+    { v: 'Families', i: 'users' }, { v: 'Home / Personal Use', i: 'home' }, { v: 'Quality-Conscious Buyers', i: 'checkBadge' },
+    { v: 'Health Conscious', i: 'heart' }, { v: 'Business & Retail Buyers', i: 'store' }, { v: 'Young Professionals', i: 'briefcase' },
+    { v: 'Luxury Buyers', i: 'diamond' }, { v: 'Domestic Market', i: 'mapPin' }, { v: 'Export / International Buyers', i: 'plane' }
+  ];
+  // 10 UGC video format archetypes (bambassadors.com/blog/10-types-of-ugc-videos)
+  // — each carries a prompt "angle" folded into Stage 1's compiled summary,
+  // shaping the whole video's structure the way STORY_STYLE_TEMPLATES does
+  // for the customer-facing ChatGPT prompt on the New Request form.
+  const VIDEO_STYLES = [
+    { v: 'Tutorial / How-To', i: 'listSteps', angle: 'Structure this as a clear step-by-step tutorial: show the process in a numbered sequence the viewer can follow and replicate.' },
+    { v: 'Before & After', i: 'swap', angle: 'Build the story around a strong before/after contrast — open on the problem state, close on the transformed result, making the change unmistakable.' },
+    { v: 'Listicle', i: 'list', angle: "Present the content as a quick countdown or list of points (e.g. '3 reasons why...'), with each scene delivering one distinct point." },
+    { v: 'Green Screen', i: 'monitor', angle: 'Frame the character speaking direct-to-camera in front of a green screen, with the background replaced by product/lifestyle imagery behind them.' },
+    { v: 'Product Feature', i: 'star', angle: 'Focus each scene on showcasing a specific product feature, function, or benefit in clear, demonstrable detail.' },
+    { v: 'Trend / Viral', i: 'flame', angle: 'Lean into a current trending audio/format/challenge style — fast cuts, meme-like pacing, and a hook built for virality.' },
+    { v: 'Problem → Solution', i: 'bulb', angle: 'Open on a relatable problem the audience faces, then position the product as the clear, satisfying solution.' },
+    { v: 'Q&A', i: 'helpCircle', angle: 'Frame this as the character answering a common question the audience asks, in a direct, conversational response format.' },
+    { v: 'Mashup', i: 'shuffle', angle: 'Blend multiple short moments/clips into one fast-paced compilation-style edit rather than one continuous scene.' },
+    { v: 'Behind the Scenes', i: 'clapper', angle: 'Show the authentic, unpolished process behind making/using the product — candid, observational, less produced-feeling.' }
+  ];
+  const MOODS = [
+    { v: 'Energetic', i: 'bolt' }, { v: 'Calm', i: 'leaf' }, { v: 'Warm', i: 'sun' },
+    { v: 'Playful', i: 'smile' }, { v: 'Luxurious', i: 'diamond' }, { v: 'Emotional', i: 'heart' }
+  ];
+  const MUSIC_STYLES = ['Upbeat Pop', 'Cinematic Orchestral', 'Lo-fi Chill', 'Corporate Motivational', 'Acoustic Warm', 'Electronic Energetic'];
+  const BROLL_TYPES = ['None', 'Product Macro Shot', 'Product Spin', 'Slow-Motion Detail', 'Texture Close-up', 'Lifestyle Cutaway'];
+  const TRANSITIONS = ['Hard Cut', 'Whip Pan', 'Match Cut', 'Fade', 'Zoom Transition'];
+  const PLATFORMS = ['Instagram Reels', 'TikTok', 'YouTube Shorts'];
+  const DURATIONS = [15, 30, 60];
+  const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Other'];
+  const GENDERS = ['Female', 'Male', 'Non-binary'];
+  const SKIN_TONES = ['Fair', 'Wheatish', 'Dusky', 'Dark'];
+  const LIGHTING = [
+    { v: 'Morning Natural', i: 'sun' }, { v: 'Golden Hour', i: 'sunset' },
+    { v: 'Studio Softbox', i: 'bulb' }, { v: 'Overcast', i: 'cloud' }, { v: 'Night Neon', i: 'moon' }
+  ];
+  const BG_STYLES = ['Minimal', 'Rustic', 'Luxury', 'Industrial', 'Cozy'];
+  const ASPECTS = ['9:16', '1:1', '4:5', '16:9'];
+  const CAMERAS = [
+    { v: 'Handheld UGC', i: 'camera' }, { v: 'Tripod Static', i: 'tripod' },
+    { v: 'Gimbal Smooth', i: 'move' }, { v: 'Drone Aerial', i: 'drone' }
+  ];
+  const COLOR_GRADES = ['Warm Cinematic', 'Cool Modern', 'Natural', 'Vintage Film', 'High Contrast'];
+  const OBJECTIVES = ['Hook', 'Problem', 'Solution', 'Proof', 'Demo', 'CTA'];
+  const EMOTIONS = ['Frustrated', 'Curious', 'Relieved', 'Happy', 'Excited', 'Confident', 'Calm'];
+  const SHOT_TYPES = ['Close-up', 'Wide', 'Macro', 'Medium', 'POV', 'Over-the-shoulder'];
+  const SHOT_CAMERAS = [
+    { v: 'Handheld', i: 'camera' }, { v: 'Tripod', i: 'tripod' }, { v: 'Gimbal', i: 'move' }, { v: 'Drone', i: 'drone' }
+  ];
+  const LENSES = ['24mm', '35mm', '50mm', '85mm'];
+  const MOVEMENTS = [
+    { v: 'Static', i: 'circle' }, { v: 'Push In', i: 'zoomIn' }, { v: 'Pull Out', i: 'zoomOut' },
+    { v: 'Pan', i: 'move' }, { v: 'Tilt', i: 'rotate' }, { v: 'Whip Pan', i: 'rotate' }
+  ];
+
+  const STAGES = [
+    { n: 1, name: 'Creative Brief', desc: 'Approve the marketing concept before any visual work.' },
+    { n: 2, name: 'Visual Lookbook', desc: 'Lock avatar, product, and environment.' },
+    { n: 3, name: 'Scene Blueprint', desc: 'Approve the story flow, scene by scene.' },
+    { n: 4, name: 'Director Shot List', desc: 'Approve the cinematography for every scene.' },
+    { n: 5, name: 'Google Flow Package', desc: 'Compile approved assets into Flow-ready prompts.' },
+    { n: 6, name: 'Production Package', desc: 'Package the entire project for generation and delivery.' }
+  ];
+
+  // ---------- State ----------
+  const isRequestLinked = false; // demo toggle point — real integration flips this + supplies stage1 read-only
+
+  const state = {
+    active: 1,
+    outTab: { 1: 'json', 2: 'json', 3: 'json', 4: 'json', 5: 'prompt', 6: 'json' },
+    // Real uploaded files (Mode B / standalone only) — kept as actual File
+    // objects so their real names can be embedded in the JSON and their
+    // bytes can be zipped up for download, not just described in prose.
+    assets: {
+      logoFile: null, logoPreviewUrl: null, productPhotoFiles: [], productPhotoPreviewUrls: [],
+      avatarFile: null, avatarPreviewUrl: null, backgroundFile: null, backgroundPreviewUrl: null
+    },
+    stage1: {
+      product: 'Fresh Ready-to-Go Seafood',
+      productDescription: 'Pre-cleaned, ready-to-cook seafood packs for busy professionals who love seafood but hate the cleaning and prep. Each pack is deboned, deveined, and portioned — just open and cook. Saves 20+ minutes of kitchen prep per meal.',
+      audience: 'Young Professionals', goal: 'Increase Sales',
+      platform: 'Instagram Reels', duration: 30, language: 'Tamil', hook: 'No more cleaning seafood!',
+      storyboard: 'Scene 1 (0-6 sec)\nVisual: Kitchen. Person holding a raw fish/shrimp packet.\nDialogue: "Seafood saapidanum-nu aasai irukum... aana clean pannura velai nenachaale vaangave thonaadhu."\n\nScene 2 (6-12 sec)\nVisual: Shows the ready-to-go packet.\nDialogue: "Athanaala thaan naan ippo intha Fresh Ready-to-Go Seafood Pack thaan vaanguren."\n\nScene 3 (12-18 sec)\nVisual: Opens packet and directly puts seafood into a pan.\nDialogue: "Already clean pannii, neatly pack pannii irukku. Wash panna neram waste panna vendiyadhillai."\n\nScene 4 (18-24 sec)\nVisual: Cooking. Family waiting. Close-up of the finished dish.\nDialogue: "Fresh-aa irukku... Taste super... mukkiyama kitchen mess-e illa!"\n\nScene 5 (24-30 sec)\nVisual: Holding the packet beside the cooked dish.\nDialogue: "Time save aaganum... fresh seafood vendum... apadinaa idha kandippa try pannunga."',
+      cta: 'Try it today',
+      brandColorPrimary: '#8a3b2e', brandColorSecondary: '#f2c14e', brandColorAccent: '',
+      videoStyle: 'Problem → Solution'
+    },
+    stage2: {
+      character: { id: 'Hero01', gender: 'Female', age: 27, skin_tone: 'Dusky', hair: 'Long ponytail', outfit: 'Yellow T-shirt, blue jeans' },
+      background: { location: 'Modern Kitchen', lighting: 'Morning Natural', style: 'Minimal' },
+      product: { brand: '', packaging: 'Grey and red pouch' },
+      global_style: { aspect_ratio: '9:16', camera: 'Handheld UGC', color_grade: 'Warm Cinematic' },
+      mood: 'Warm', music: 'Acoustic Warm'
+    },
+    stage3: {
+      scenes: [
+        { scene: 1, objective: 'Hook', location: 'Kitchen', action: 'Opens the fridge, looks tired', dialogue: '', emotion: 'Frustrated', duration: 6, broll: 'None', transition: 'Whip Pan' },
+        { scene: 2, objective: 'Solution', location: 'Kitchen counter', action: 'Shows the ready-to-go packet to camera', dialogue: '', emotion: 'Curious', duration: 6, broll: 'Product Macro Shot', transition: 'Match Cut' },
+        { scene: 3, objective: 'Demo', location: 'Stovetop', action: 'Opens packet, pours straight into the pan', dialogue: '', emotion: 'Relieved', duration: 6, broll: 'Texture Close-up', transition: 'Match Cut' },
+        { scene: 4, objective: 'Proof', location: 'Dining table', action: 'Family eating together, happy', dialogue: '', emotion: 'Happy', duration: 6, broll: 'Lifestyle Cutaway', transition: 'Fade' },
+        { scene: 5, objective: 'CTA', location: 'Kitchen counter', action: 'Holds packet next to the cooked dish', dialogue: '', emotion: 'Confident', duration: 6, broll: 'Product Spin', transition: 'Fade' }
+      ]
+    },
+    stage4: {
+      shots: {
+        1: [{ shot: 1, type: 'Medium', camera: 'Handheld', lens: '35mm', movement: 'Push In', duration: 6 }],
+        2: [{ shot: 1, type: 'Close-up', camera: 'Handheld', lens: '35mm', movement: 'Static', duration: 3 }, { shot: 2, type: 'Macro', camera: 'Handheld', lens: '85mm', movement: 'Static', duration: 3 }],
+        3: [{ shot: 1, type: 'Over-the-shoulder', camera: 'Handheld', lens: '35mm', movement: 'Static', duration: 3 }, { shot: 2, type: 'Macro', camera: 'Handheld', lens: '85mm', movement: 'Push In', duration: 3 }],
+        4: [{ shot: 1, type: 'Wide', camera: 'Tripod', lens: '24mm', movement: 'Static', duration: 6 }],
+        5: [{ shot: 1, type: 'Medium', camera: 'Handheld', lens: '35mm', movement: 'Pull Out', duration: 6 }]
+      }
+    },
+    stage5: {
+      character_lock: true, product_lock: true,
+      negative_prompt: ['No character changes', 'No logo changes', 'No extra people']
+    },
+    stage6: { status: 'Draft' }
+  };
+
+  // sync product/brand across stages once, non-destructively
+  if (!state.stage2.product.brand) state.stage2.product.brand = state.stage1.product;
+
+  function status(n) {
+    if (n === 1) return isRequestLinked ? 'ready' : (state.stage1.product ? 'editing' : 'not_started');
+    if (n === 2) return state.stage2.character.gender ? 'editing' : 'not_started';
+    if (n === 3) return state.stage3.scenes.some(s => s.dialogue.trim()) ? 'editing' : 'not_started';
+    if (n === 4) return Object.values(state.stage4.shots).some(list => list.length) ? 'editing' : 'not_started';
+    if (n === 5) return 'editing';
+    if (n === 6) return state.stage6.status === 'Approved' ? 'ready' : 'not_started';
+    return 'not_started';
+  }
+  const STATUS_LABEL = { not_started: 'Not started', editing: 'Editing', ready: 'Ready' };
+
+  // ---------- Small render helpers ----------
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  function resolveHexColor(value) {
+    if (!value) return null;
+    let s = value.trim().replace(/^#/, '');
+    if (/^[0-9a-fA-F]{3}$/.test(s)) s = s.split('').map(c => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return '#' + s.toLowerCase();
+  }
+
+  function textField(label, value, onInput, opts) {
+    opts = opts || {};
+    const id = 'f' + Math.random().toString(36).slice(2, 9);
+    const tag = opts.multiline ? 'textarea' : 'input';
+    const typeAttr = opts.multiline ? '' : ` type="${opts.number ? 'number' : 'text'}"`;
+    const valAttr = opts.multiline ? '' : ` value="${esc(value)}"`;
+    const inner = opts.multiline ? esc(value) : '';
+    const style = opts.style ? ` style="${opts.style}"` : '';
+    const maxAttr = opts.counter ? ` maxlength="${opts.counter}"` : '';
+    const labelText = (opts.num ? opts.num + ' ' : '') + label + (opts.required ? ' *' : '');
+    const counterHtml = opts.counter ? `<span class="char-counter" data-max="${opts.counter}">${(value || '').length}/${opts.counter}</span>` : '';
+    return `<div class="field"><label for="${id}">${esc(labelText)}</label>
+      ${opts.hint ? `<p class="hint" style="margin:0 0 8px">${esc(opts.hint)}</p>` : ''}
+      <${tag} id="${id}"${typeAttr}${valAttr}${style}${maxAttr} data-bind="${onInput}">${inner}</${tag}>
+      ${counterHtml}</div>`;
+  }
+
+  function selectField(label, value, options, onInput) {
+    const id = 'f' + Math.random().toString(36).slice(2, 9);
+    return `<div class="field"><label for="${id}">${esc(label)}</label>
+      <select id="${id}" data-bind="${onInput}">
+        ${options.map(o => `<option value="${esc(o)}" ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}
+      </select></div>`;
+  }
+
+  // Plain pill row — default single-choice control, matching the real app's pill()
+  function pillRow(label, value, options, onPick) {
+    return `<div class="field"><label>${esc(label)}</label><div class="pill-row">
+      ${options.map(o => `<button type="button" class="pill ${o === value ? 'selected' : ''}" data-pick="${onPick}" data-value="${esc(o)}">${esc(o)}</button>`).join('')}
+    </div></div>`;
+  }
+
+  // Icon tile grid — Goal / Audience style, and other fields with a clear glyph
+  function optionGrid(label, value, options, onPick, required) {
+    return `<div class="field"><label>${esc(label)}${required ? ' *' : ''}</label><div class="option-grid">
+      ${options.map(o => {
+        const v = typeof o === 'string' ? o : o.v;
+        const icon = typeof o === 'string' ? null : o.i;
+        return `<button type="button" class="option-tile ${v === value ? 'selected' : ''}" data-pick="${onPick}" data-value="${esc(v)}">
+          ${icon ? ICON[icon] : ''}<span>${esc(v)}</span></button>`;
+      }).join('')}
+    </div></div>`;
+  }
+
+  // Brand color swatch + hex pair, matches /new's color picker
+  function colorSwatch(label, value, path, required) {
+    return `<div class="swatch-field">
+      <div class="swatch-row">
+        <div class="swatch-box" style="background:${value || 'var(--surface-2)'}">
+          <input type="color" value="${value || '#ffffff'}" data-bind-color="${path}" class="swatch-native">
+          <span class="swatch-pencil">✎</span>
+        </div>
+        <input type="text" value="${esc(value || '')}" placeholder="#RRGGBB" data-bind-hex="${path}" class="swatch-hex">
+      </div>
+      <label>${esc(label)}${required ? ' *' : ''}</label>
+    </div>`;
+  }
+
+  // "+ Choose" file trigger — hidden native input + visible link, matches /new
+  function chooseFile(id, hint, multiple) {
+    return `<input type="file" id="${id}" class="hidden-file-input" accept="image/*"${multiple ? ' multiple' : ''}>
+      <button type="button" class="choose-link" data-trigger="${id}">+ Choose</button>
+      <p class="hint">${esc(hint)}</p>`;
+  }
+
+  // ---------- Stage 1 ----------
+  // Returns an array of cards, not one blob — /new itself is 11 separate
+  // numbered cards (Brand Details, Campaign Goal, Target Audience, Video
+  // Settings, Script Direction, ...), and Stage 1 covers the first 5 of
+  // those. Squashing them into a single card under-represents that and
+  // stops looking like the app it's supposed to mirror.
+  function renderStage1Fields() {
+    const s = state.stage1;
+    if (isRequestLinked) {
+      return [{
+        title: 'Creative Brief', desc: "Locked from the customer's request — to change it, use Update Brief on the request page.",
+        body: `
+          <div class="row2">
+            <div class="field"><label>Product</label><p>${esc(s.product)}</p></div>
+            <div class="field"><label>Audience</label><p>${esc(s.audience)}</p></div>
+          </div>
+          <div class="row3">
+            <div class="field"><label>Platform</label><p>${esc(s.platform)}</p></div>
+            <div class="field"><label>Duration</label><p>${s.duration}s</p></div>
+            <div class="field"><label>Language</label><p>${esc(s.language)}</p></div>
+          </div>
+          <div class="field"><label>Storyboard</label><p style="white-space:pre-wrap">${esc(s.storyboard)}</p></div>
+          <div class="field"><label>Call to action</label><p>${esc(s.cta)}</p></div>
+        `
+      }];
+    }
+    return [
+      {
+        title: 'Brand Details',
+        desc: 'Your product or brand name, description, logo, product photos, and brand colors — the basics your designer starts from.',
+        body: `
+          <div class="row2">
+            <div style="display:flex;flex-direction:column;gap:18px">
+              ${textField('Product or brand name', s.product, 'stage1.product', { num: '1.1', required: true, counter: 100 })}
+              ${textField('Product description', s.productDescription, 'stage1.productDescription', {
+                num: '1.2', required: true, multiline: true, counter: 1000, style: 'min-height:130px',
+                hint: 'This gets used to write your video\'s actual script — the more real detail here, the better. Include: the customer\'s pain point this solves, your product\'s key features, who it\'s for (age group, demographics), and the value or benefit they get. A vague description here means a generic, less useful script later.'
+              })}
+              <div class="field">
+                <label>1.5 Product photos / footage *</label>
+                ${chooseFile('productPhotosInput', 'PNG, JPG, or MP4 — up to 50MB each, max 5 files', true)}
+                <div class="asset-grid">
+                  ${state.assets.productPhotoFiles.map((f, i) => `<div class="asset-thumb"><img src="${state.assets.productPhotoPreviewUrls[i]}" alt=""><button type="button" class="thumb-remove" data-action="removePhoto" data-i="${i}">×</button></div>`).join('')}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:18px">
+              <div class="field">
+                <label>1.3 Logo *</label>
+                ${chooseFile('logoInput', 'PNG, JPG, or SVG — up to 10MB', false)}
+                ${state.assets.logoFile ? `<div class="asset-preview"><img src="${state.assets.logoPreviewUrl}" alt="Logo"><span>${esc(state.assets.logoFile.name)}</span><button type="button" class="asset-remove" data-action="removeLogo">Remove</button></div>` : ''}
+              </div>
+              <div class="field">
+                <label>1.4 Brand colors *</label>
+                <div class="row2" style="gap:14px">
+                  ${colorSwatch('Primary', s.brandColorPrimary, 'stage1.brandColorPrimary', true)}
+                  ${colorSwatch('Secondary', s.brandColorSecondary, 'stage1.brandColorSecondary', true)}
+                </div>
+                <div style="margin-top:14px; max-width:calc(50% - 7px)">
+                  ${colorSwatch('Accent', s.brandColorAccent, 'stage1.brandColorAccent', false)}
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      { title: 'Campaign Goal', desc: 'What this video needs to achieve.', body: optionGrid('Goal', s.goal, GOALS, 'stage1.goal', true) },
+      { title: 'Target Audience', desc: 'Who this video is speaking to.', body: optionGrid('Audience', s.audience, TARGET_AUDIENCES, 'stage1.audience', true) },
+      { title: 'Video Style', desc: 'The UGC format this video should follow — shapes the whole scene structure.', body: optionGrid('Style', s.videoStyle, VIDEO_STYLES, 'stage1.videoStyle', true) },
+      {
+        title: 'Video Settings', desc: 'Platform, duration, and language for this video.',
+        body: `
+          ${pillRow('Platform', s.platform, PLATFORMS, 'stage1.platform')}
+          <div class="row3">
+            ${selectField('Duration (sec)', String(s.duration), DURATIONS.map(String), 'stage1.duration')}
+            ${selectField('Language', s.language, LANGUAGES, 'stage1.language')}
+          </div>
+        `
+      },
+      {
+        title: 'Script Direction', desc: 'The hook, the full storyboard/dialogue, and the call to action.',
+        body: `
+          ${textField('Hook (opening line)', s.hook, 'stage1.hook')}
+          ${textField('Storyboard / dialogue', s.storyboard, 'stage1.storyboard', { multiline: true, style: 'min-height:150px' })}
+          ${textField('Call to action', s.cta, 'stage1.cta')}
+        `
+      }
+    ];
+  }
+  function stage1Json() {
+    const s = state.stage1;
+    return {
+      product: s.product, product_description: s.productDescription, audience: s.audience, goal: s.goal,
+      video_style: s.videoStyle,
+      platform: s.platform, duration: Number(s.duration), language: s.language, hook: s.hook, cta: s.cta,
+      brand_color_primary: s.brandColorPrimary || null, brand_color_secondary: s.brandColorSecondary || null, brand_color_accent: s.brandColorAccent || null,
+      logo_file: state.assets.logoFile ? state.assets.logoFile.name : null,
+      product_photo_files: state.assets.productPhotoFiles.map(f => f.name)
+    };
+  }
+  function stage1Prompt() {
+    const s = state.stage1;
+    const styleAngle = VIDEO_STYLES.find(v => v.v === s.videoStyle);
+    const angleLine = styleAngle ? ` ${styleAngle.angle}` : '';
+    return [{ h: 'Concept summary', p: `A ${s.duration}-second ${s.platform} UGC ad for ${s.product || '(product)'}, targeting ${s.audience || '(audience)'}. Goal: ${s.goal}. Format: ${s.videoStyle}.${angleLine} Opens with "${s.hook || '(hook)'}" and closes on "${s.cta || '(CTA)'}". Dialogue in ${s.language}.` }];
+  }
+
+  // ---------- Stage 2 ----------
+  // Same reasoning as Stage 1 — Character / Background / Product / Global
+  // Style are four distinct topics, so they get four separate cards.
+  function renderStage2Fields() {
+    const c = state.stage2.character, b = state.stage2.background, p = state.stage2.product, g = state.stage2.global_style;
+    return [
+      {
+        title: 'Character', desc: 'The avatar who appears on camera — locked across every scene.',
+        body: `
+          <div class="row2">
+            ${textField('Character ID', c.id, 'stage2.character.id')}
+            ${textField('Age', c.age, 'stage2.character.age', { number: true })}
+          </div>
+          ${pillRow('Gender', c.gender, GENDERS, 'stage2.character.gender')}
+          ${pillRow('Skin tone', c.skin_tone, SKIN_TONES, 'stage2.character.skin_tone')}
+          <div class="row2">
+            ${textField('Hair', c.hair, 'stage2.character.hair')}
+            ${textField('Outfit', c.outfit, 'stage2.character.outfit')}
+          </div>
+          <div class="field">
+            <label>Avatar reference photo</label>
+            ${chooseFile('avatarInput', 'A real photo of this person locks their face/identity far more reliably than a text description alone.', false)}
+            ${state.assets.avatarFile ? `<div class="asset-preview"><img src="${state.assets.avatarPreviewUrl}" alt="Avatar"><span>${esc(state.assets.avatarFile.name)}</span><button type="button" class="asset-remove" data-action="removeAvatar">Remove</button></div>` : ''}
+          </div>
+        `
+      },
+      {
+        title: 'Background', desc: 'The setting and lighting the character is filmed in.',
+        body: `
+          ${textField('Location', b.location, 'stage2.background.location')}
+          ${optionGrid('Lighting', b.lighting, LIGHTING, 'stage2.background.lighting')}
+          ${pillRow('Style', b.style, BG_STYLES, 'stage2.background.style')}
+          <div class="field">
+            <label>Background reference photo</label>
+            ${chooseFile('backgroundInput', 'Optional — a real photo of the setting keeps every generated scene in the same place.', false)}
+            ${state.assets.backgroundFile ? `<div class="asset-preview"><img src="${state.assets.backgroundPreviewUrl}" alt="Background"><span>${esc(state.assets.backgroundFile.name)}</span><button type="button" class="asset-remove" data-action="removeBackground">Remove</button></div>` : ''}
+          </div>
+        `
+      },
+      {
+        title: 'Product in Frame', desc: 'How the real product should look on camera.',
+        body: `
+          <div class="row2">
+            ${textField('Brand', p.brand, 'stage2.product.brand')}
+            ${textField('Packaging', p.packaging, 'stage2.product.packaging')}
+          </div>
+        `
+      },
+      {
+        title: 'Global Style', desc: 'Aspect ratio, camera, and color grade applied to every scene.',
+        body: `
+          ${pillRow('Aspect ratio', g.aspect_ratio, ASPECTS, 'stage2.global_style.aspect_ratio')}
+          ${optionGrid('Camera', g.camera, CAMERAS, 'stage2.global_style.camera')}
+          ${pillRow('Color grade', g.color_grade, COLOR_GRADES, 'stage2.global_style.color_grade')}
+        `
+      },
+      {
+        title: 'Mood & Music', desc: 'The emotional tone and soundtrack style for the whole video.',
+        body: `
+          ${optionGrid('Mood', state.stage2.mood, MOODS, 'stage2.mood', true)}
+          ${pillRow('Music', state.stage2.music, MUSIC_STYLES, 'stage2.music')}
+        `
+      }
+    ];
+  }
+  function stage2Json() {
+    const s = JSON.parse(JSON.stringify(state.stage2));
+    s.character.reference_image = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    s.background.reference_image = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
+    s.product.reference_image = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
+    s.product.logo_file = state.assets.logoFile ? state.assets.logoFile.name : null;
+    return s;
+  }
+  function stage2Prompt() {
+    const c = state.stage2.character, b = state.stage2.background, p = state.stage2.product, g = state.stage2.global_style;
+    const avatarPhoto = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    const bgPhoto = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
+    const refPhoto = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
+    const logo = state.assets.logoFile ? state.assets.logoFile.name : null;
+    const avatarLine = avatarPhoto ? ` Face identity consistency is critical — match the uploaded reference photo "${avatarPhoto}" exactly in every scene; the same person's face must appear throughout, no substitutions.` : '';
+    const bgLine = bgPhoto ? ` Match the uploaded background reference photo "${bgPhoto}" for the setting.` : '';
+    const refLine = refPhoto ? ` Match the uploaded reference photo "${refPhoto}" exactly — do not invent a different product look.` : '';
+    const logoLine = logo ? ` Use the uploaded logo file "${logo}" as-is, unaltered.` : '';
+    return [
+      { h: 'Character', p: `${c.gender || '(gender)'}, around ${c.age || '(age)'} years old, ${c.skin_tone ? c.skin_tone.toLowerCase() + ' skin tone, ' : ''}${c.hair ? c.hair + ', ' : ''}wearing ${c.outfit || '(outfit)'}. Reference ID: ${c.id}.${avatarLine}` },
+      { h: 'Background', p: `${b.location || '(location)'}, lit with ${b.lighting || '(lighting)'} lighting, ${b.style || '(style)'} styling.${bgLine}` },
+      { h: 'Product', p: `${p.brand || '(brand)'} in ${p.packaging || '(packaging)'} packaging, kept clearly visible and unaltered throughout.${refLine}${logoLine}` },
+      { h: 'Global look', p: `${g.aspect_ratio} aspect ratio, shot ${g.camera ? g.camera.toLowerCase() : '(camera)'}-style, ${g.color_grade ? g.color_grade.toLowerCase() : '(color grade)'} color grade.` },
+      { h: 'Mood & music', p: `${state.stage2.mood || '(mood)'} mood throughout, with ${state.stage2.music || '(music style)'} background music.` }
+    ];
+  }
+
+  // ---------- Stage 3 ----------
+  function parseStoryboardIntoScenes() {
+    const text = state.stage1.storyboard || '';
+    const matches = [...text.matchAll(/Scene\s+(\d+)\s*\((\d+)-(\d+)\s*sec\)\s*\n?Visual:\s*([^\n]*)\n?Dialogue:\s*"?([^\n"]*)"?/gi)];
+    if (!matches.length) { toast('No "Scene N (X-Y sec)" pattern found in the Stage 1 storyboard.'); return; }
+    state.stage3.scenes = matches.map((m, i) => ({
+      scene: i + 1,
+      objective: OBJECTIVES[Math.min(i, OBJECTIVES.length - 1)],
+      location: state.stage2.background.location || '',
+      action: m[4].trim(),
+      dialogue: m[5].trim(),
+      emotion: state.stage3.scenes[i] ? state.stage3.scenes[i].emotion : EMOTIONS[0],
+      duration: Number(m[3]) - Number(m[2]),
+      broll: state.stage3.scenes[i] ? state.stage3.scenes[i].broll : BROLL_TYPES[0],
+      transition: state.stage3.scenes[i] ? state.stage3.scenes[i].transition : TRANSITIONS[0]
+    }));
+    render();
+  }
+  function renderStage3Fields() {
+    const scenes = state.stage3.scenes;
+    const total = scenes.reduce((a, s) => a + Number(s.duration || 0), 0);
+    const target = Number(state.stage1.duration);
+    const okDuration = total === target;
+    return [{
+      title: 'Scene Blueprint', desc: 'Approve the story flow, scene by scene.',
+      body: `
+        <div class="add-row"><button type="button" class="btn btn-primary btn-sm" data-action="parseStoryboard">${ICON.wand} Parse from Storyboard</button></div>
+        <div class="scene-stack">
+          ${scenes.map((sc, i) => `
+            <div class="list-item">
+              <div class="list-item-head"><span class="tag">Scene ${sc.scene}</span>
+                <button type="button" class="btn btn-sm btn-danger" data-action="removeScene" data-i="${i}">Remove</button>
+              </div>
+              <div class="row2">
+                ${selectField('Objective', sc.objective, OBJECTIVES, `stage3.scenes.${i}.objective`)}
+                ${textField('Duration (sec)', sc.duration, `stage3.scenes.${i}.duration`, { number: true })}
+              </div>
+              ${textField('Location', sc.location, `stage3.scenes.${i}.location`)}
+              ${textField('Action', sc.action, `stage3.scenes.${i}.action`)}
+              ${textField('Dialogue', sc.dialogue, `stage3.scenes.${i}.dialogue`, { multiline: true })}
+              ${pillRow('Emotion', sc.emotion, EMOTIONS, `stage3.scenes.${i}.emotion`)}
+              <div class="row2">
+                ${pillRow('B-roll', sc.broll, BROLL_TYPES, `stage3.scenes.${i}.broll`)}
+                ${pillRow('Transition', sc.transition, TRANSITIONS, `stage3.scenes.${i}.transition`)}
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="add-row"><button type="button" class="btn btn-sm" data-action="addScene">${ICON.circle} Add scene</button></div>
+        <div class="duration-check ${okDuration ? 'ok' : 'off'}" id="durationCheck">${ICON.clock} ${total}s of ${target}s planned ${okDuration ? '— matches Stage 1 duration' : '— adjust to match Stage 1'}</div>
+      `
+    }];
+  }
+  function stage3Json() { return { scenes: state.stage3.scenes.map(s => ({ ...s, duration: Number(s.duration) })) }; }
+  function stage3Prompt() {
+    return state.stage3.scenes.map(s => ({
+      h: `Scene ${s.scene} — ${s.objective}`,
+      p: `${s.location || '(location)'}. ${s.action || '(action)'} Emotion: ${s.emotion}. Dialogue: "${s.dialogue || '(no dialogue)'}" (${s.duration}s).${s.broll && s.broll !== 'None' ? ` B-roll: ${s.broll}.` : ''} Transition to next scene: ${s.transition}.`
+    }));
+  }
+
+  // ---------- Stage 4 ----------
+  function renderStage4Fields() {
+    const scenes = state.stage3.scenes;
+    if (!scenes.length) {
+      return [{ title: 'Director Shot List', desc: 'Approve the cinematography for every scene.', body: `<p class="empty-note">Add scenes in Stage 3 first — shots are planned per scene.</p>` }];
+    }
+    // One card per scene — mirrors Stage 3's one-topic-per-card scenes, just at shot granularity.
+    return scenes.map(sc => {
+      const shots = state.stage4.shots[sc.scene] || [];
+      return {
+        title: `Scene ${sc.scene} Shots`, desc: `Objective: ${sc.objective}.`,
+        body: `
+          <div class="scene-stack">
+            ${shots.map((sh, i) => `
+              <div class="list-item">
+                <div class="list-item-head"><span class="tag">Shot ${sh.shot}</span>
+                  <button type="button" class="btn btn-sm btn-danger" data-action="removeShot" data-scene="${sc.scene}" data-i="${i}">Remove</button>
+                </div>
+                <div class="row2">
+                  ${selectField('Type', sh.type, SHOT_TYPES, `stage4.shots.${sc.scene}.${i}.type`)}
+                  ${textField('Duration (sec)', sh.duration, `stage4.shots.${sc.scene}.${i}.duration`, { number: true })}
+                </div>
+                ${optionGrid('Camera', sh.camera, SHOT_CAMERAS, `stage4.shots.${sc.scene}.${i}.camera`)}
+                <div class="row2">
+                  ${selectField('Lens', sh.lens, LENSES, `stage4.shots.${sc.scene}.${i}.lens`)}
+                  ${optionGrid('Movement', sh.movement, MOVEMENTS, `stage4.shots.${sc.scene}.${i}.movement`)}
+                </div>
+              </div>`).join('')}
+          </div>
+          <div class="add-row" style="margin-top:10px"><button type="button" class="btn btn-sm" data-action="addShot" data-scene="${sc.scene}">${ICON.circle} Add shot</button></div>
+        `
+      };
+    });
+  }
+  function stage4Json() {
+    const out = [];
+    state.stage3.scenes.forEach(sc => {
+      out.push({ scene: sc.scene, shots: (state.stage4.shots[sc.scene] || []).map(s => ({ ...s, duration: Number(s.duration) })) });
+    });
+    return out;
+  }
+  function stage4Prompt() {
+    return stage4Json().map(sc => ({
+      h: `Scene ${sc.scene} shots`,
+      p: sc.shots.length ? sc.shots.map(sh => `${sh.type} on ${sh.camera}, ${sh.lens} lens, ${sh.movement} (${sh.duration}s)`).join(' → ') : '(no shots planned)'
+    }));
+  }
+
+  // ---------- Stage 5 ----------
+  function renderStage5Fields() {
+    const g = state.stage5;
+    return [{
+      title: 'Google Flow Package', desc: 'Compile approved assets into Flow-ready prompts.',
+      body: `
+        <p class="subhead">${ICON.lock} Continuity rules</p>
+        <div class="checkbox-stack">
+          <label class="checkbox-row"><input type="checkbox" ${g.character_lock ? 'checked' : ''} data-bind-check="stage5.character_lock"> Lock character across all scenes</label>
+          <label class="checkbox-row"><input type="checkbox" ${g.product_lock ? 'checked' : ''} data-bind-check="stage5.product_lock"> Lock product/packaging across all scenes</label>
+        </div>
+        <p class="subhead" style="margin-top:4px">${ICON.circle} Negative prompt</p>
+        <div class="tiny-list">
+          ${g.negative_prompt.map((n, i) => `<div class="tiny-row">
+            <input type="text" value="${esc(n)}" data-bind="stage5.negative_prompt.${i}">
+            <button type="button" class="btn btn-sm btn-danger" data-action="removeNegative" data-i="${i}">Remove</button>
+          </div>`).join('')}
+        </div>
+        <div class="add-row"><button type="button" class="btn btn-sm" data-action="addNegative">${ICON.circle} Add rule</button></div>
+        <p class="empty-note">This stage's output below is the actual text to paste into Google Flow — Global Prompt, one prompt per scene, then the negative prompt and continuity rules.</p>
+      `
+    }];
+  }
+  function stage5Json() {
+    return { global_rules: { character_lock: state.stage5.character_lock, product_lock: state.stage5.product_lock, negative_prompt: state.stage5.negative_prompt.slice() } };
+  }
+  function stage5Prompt() {
+    const g = state.stage2.global_style, c = state.stage2.character, b = state.stage2.background, p = state.stage2.product;
+    const avatarPhoto = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    const bgPhoto = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
+    const refPhoto = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
+    const logo = state.assets.logoFile ? state.assets.logoFile.name : null;
+    const avatarLine = avatarPhoto ? ` Face identity consistency is critical — the character MUST match the uploaded reference photo "${avatarPhoto}" exactly in every single scene, no substitutions, no drift.` : '';
+    const bgLine = bgPhoto ? ` Match the uploaded background reference photo "${bgPhoto}" for the setting in every scene.` : '';
+    const refLine = refPhoto ? ` The product MUST match the uploaded reference photo "${refPhoto}" exactly across every scene — same packaging, same colors, same logo placement, do not invent a different product look.` : '';
+    const logoLine = logo ? ` Use the uploaded logo file "${logo}" as-is, unaltered, wherever the logo appears.` : '';
+    const blocks = [];
+    blocks.push({
+      h: 'Global prompt',
+      p: `${g.aspect_ratio} UGC-style video. Character and product identity MUST remain 100% consistent across every scene.`
+        + ` Character: ${c.gender}, ${c.age}, ${c.hair}, wearing ${c.outfit}.${avatarLine}`
+        + ` Setting: ${b.location}, ${b.lighting} lighting, ${b.style} style.${bgLine}`
+        + ` Product: ${p.brand} in ${p.packaging}.${refLine}${logoLine}`
+        + ` Mood: ${state.stage2.mood || '(mood)'}. Music: ${state.stage2.music || '(music style)'}.`
+        + ` Camera: ${g.camera}. Color grade: ${g.color_grade}.`
+    });
+    stage3Prompt().forEach((sp, i) => {
+      const shots = stage4Prompt()[i];
+      blocks.push({ h: sp.h, p: `${sp.p} Shots: ${shots ? shots.p : '(none)'}` });
+    });
+    blocks.push({ h: 'Negative prompt', list: state.stage5.negative_prompt });
+    blocks.push({ h: 'Continuity rules', p: `Character lock: ${state.stage5.character_lock ? 'ON — the exact same person\'s face and identity must appear in every scene, no substitutions' : 'off'}. Product lock: ${state.stage5.product_lock ? 'ON — packaging, logo, and colors must exactly match the uploaded reference in every scene' : 'off'}.` });
+    return blocks;
+  }
+
+  // ---------- Stage 6 ----------
+  function renderStage6Fields() {
+    return [{
+      title: 'Production Package', desc: 'Package the entire project for generation and delivery.',
+      body: `
+        <p class="subhead">${ICON.box} Project status</p>
+        ${pillRow('Status', state.stage6.status, ['Draft', 'Approved'], 'stage6.status')}
+        <p class="hint">Marking this Approved is the signal to generate the AI videos from Stage 5's prompts.</p>
+        <p class="subhead" style="margin-top:4px">${ICON.layers} Bundled references</p>
+        <div class="tiny-list" style="font-size:13px">
+          <div>01 Creative Brief — ${state.stage1.product ? 'filled' : 'empty'}</div>
+          <div>02 Visual Lookbook — ${state.stage2.character.gender ? 'filled' : 'empty'}</div>
+          <div>03 Scene Blueprint — ${state.stage3.scenes.length} scene(s)</div>
+          <div>04 Director Shot List — ${Object.values(state.stage4.shots).reduce((a, l) => a + l.length, 0)} shot(s)</div>
+          <div>05 Google Flow Package — ${state.stage5.negative_prompt.length} negative rule(s)</div>
+          <div>Logo file — ${state.assets.logoFile ? esc(state.assets.logoFile.name) : 'not uploaded'}</div>
+          <div>Product photos — ${state.assets.productPhotoFiles.length} file(s)</div>
+          <div>Avatar reference — ${state.assets.avatarFile ? esc(state.assets.avatarFile.name) : 'not uploaded'}</div>
+          <div>Background reference — ${state.assets.backgroundFile ? esc(state.assets.backgroundFile.name) : 'not uploaded'}</div>
+          <div>Mood / Music — ${esc(state.stage2.mood)} / ${esc(state.stage2.music)}</div>
+        </div>
+      `
+    }];
+  }
+  function stage6Json() {
+    return {
+      project: `${state.stage1.product || 'Untitled'} Campaign`,
+      lookbook_ref: '02_Visual_Lookbook.json', scene_ref: '03_Scene_Blueprint.json',
+      shot_ref: '04_Director_Shot_List.json', flow_global: '05_GoogleFlow_Global.json',
+      flow_prompts: '05_GoogleFlow_Prompts.txt', status: state.stage6.status
+    };
+  }
+  function stage6ScenesJson() {
+    const prompts = stage5Prompt().filter(b => b.p && b.h.startsWith('Scene'));
+    return { scenes: state.stage3.scenes.map((sc, i) => ({ scene: sc.scene, prompt: prompts[i] ? prompts[i].p : '', duration: Number(sc.duration) })) };
+  }
+  function stage6Prompt() {
+    return [{ h: 'Production package summary', p: `${state.stage1.product || 'Untitled'} Campaign — status: ${state.stage6.status}. Bundles Stages 2 through 5 into one reference for regeneration and delivery.` }];
+  }
+
+  const STAGE_IMPL = {
+    1: { fields: renderStage1Fields, json: stage1Json, prompt: stage1Prompt, promptLabel: 'Summary' },
+    2: { fields: renderStage2Fields, json: stage2Json, prompt: stage2Prompt, promptLabel: 'Description' },
+    3: { fields: renderStage3Fields, json: stage3Json, prompt: stage3Prompt, promptLabel: 'Scene notes' },
+    4: { fields: renderStage4Fields, json: stage4Json, prompt: stage4Prompt, promptLabel: 'Shot notes' },
+    5: { fields: renderStage5Fields, json: stage5Json, prompt: stage5Prompt, promptLabel: 'Flow prompts' },
+    6: { fields: renderStage6Fields, json: () => ({ '06_Project_Master.json': stage6Json(), '06_GoogleFlow_Scenes.json': stage6ScenesJson() }), prompt: stage6Prompt, promptLabel: 'Summary' }
+  };
+
+  // ---------- Zip bundling (no CDN available in an Artifact, so this is a
+  // small hand-written store-only — i.e. uncompressed — ZIP writer) ----------
+  let crc32Table = null;
+  function crc32(bytes) {
+    if (!crc32Table) {
+      crc32Table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        crc32Table[n] = c >>> 0;
+      }
+    }
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ crc32Table[(crc ^ bytes[i]) & 0xFF];
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function dosDateTime(date) {
+    const time = ((date.getHours() & 0x1F) << 11) | ((date.getMinutes() & 0x3F) << 5) | ((date.getSeconds() >> 1) & 0x1F);
+    const dt = (((date.getFullYear() - 1980) & 0x7F) << 9) | (((date.getMonth() + 1) & 0xF) << 5) | (date.getDate() & 0x1F);
+    return { time, dt };
+  }
+  function buildZip(entries) {
+    const encoder = new TextEncoder();
+    const { time, dt } = dosDateTime(new Date());
+    const localParts = [], centralParts = [];
+    let offset = 0;
+    entries.forEach(entry => {
+      const nameBytes = encoder.encode(entry.name);
+      const data = entry.data;
+      const crc = crc32(data);
+
+      const local = new Uint8Array(30 + nameBytes.length);
+      const lv = new DataView(local.buffer);
+      lv.setUint32(0, 0x04034b50, true);
+      lv.setUint16(4, 20, true); lv.setUint16(6, 0, true); lv.setUint16(8, 0, true);
+      lv.setUint16(10, time, true); lv.setUint16(12, dt, true);
+      lv.setUint32(14, crc, true); lv.setUint32(18, data.length, true); lv.setUint32(22, data.length, true);
+      lv.setUint16(26, nameBytes.length, true); lv.setUint16(28, 0, true);
+      local.set(nameBytes, 30);
+      localParts.push(local, data);
+
+      const central = new Uint8Array(46 + nameBytes.length);
+      const cv = new DataView(central.buffer);
+      cv.setUint32(0, 0x02014b50, true);
+      cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0, true); cv.setUint16(10, 0, true);
+      cv.setUint16(12, time, true); cv.setUint16(14, dt, true);
+      cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+      cv.setUint16(28, nameBytes.length, true); cv.setUint16(30, 0, true); cv.setUint16(32, 0, true);
+      cv.setUint16(34, 0, true); cv.setUint16(36, 0, true); cv.setUint32(38, 0, true);
+      cv.setUint32(42, offset, true);
+      central.set(nameBytes, 46);
+      centralParts.push(central);
+
+      offset += local.length + data.length;
+    });
+    const centralSize = centralParts.reduce((a, p) => a + p.length, 0);
+    const centralOffset = offset;
+    const eocd = new Uint8Array(22);
+    const ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+    ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+    ev.setUint32(12, centralSize, true); ev.setUint32(16, centralOffset, true);
+    ev.setUint16(20, 0, true);
+    return new Blob([...localParts, ...centralParts, eocd], { type: 'application/zip' });
+  }
+
+  // Matches the spec's actual output filenames (01_Creative_Brief.json, etc.)
+  const STAGE_JSON_FILENAMES = {
+    1: '01_Creative_Brief.json', 2: '02_Visual_Lookbook.json',
+    3: '03_Scene_Blueprint.json', 4: '04_Director_Shot_List.json', 5: '05_GoogleFlow_Global.json'
+  };
+  function bundleJsonEntries(n, impl, jsonStr, promptBlocks) {
+    if (n === 6) {
+      const j = impl.json();
+      return Object.entries(j).map(([name, obj]) => ({ name, text: JSON.stringify(obj, null, 2) }));
+    }
+    const entries = [{ name: STAGE_JSON_FILENAMES[n], text: jsonStr }];
+    if (n === 5) {
+      entries.push({ name: '05_GoogleFlow_Prompts.txt', text: promptBlocks.map(b => `${b.h}\n${b.list ? b.list.map(x => '- ' + x).join('\n') : b.p}`).join('\n\n') });
+    }
+    return entries;
+  }
+  async function handleDownloadBundle() {
+    const btn = document.getElementById('downloadBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.innerHTML = `${ICON.box} Zipping…`;
+    try {
+      const n = state.active;
+      const impl = STAGE_IMPL[n];
+      const jsonStr = JSON.stringify(impl.json(), null, 2);
+      const promptBlocks = impl.prompt();
+      const encoder = new TextEncoder();
+      const zipEntries = bundleJsonEntries(n, impl, jsonStr, promptBlocks)
+        .map(e => ({ name: e.name, data: encoder.encode(e.text) }));
+
+      if (state.assets.logoFile) {
+        zipEntries.push({ name: state.assets.logoFile.name, data: new Uint8Array(await state.assets.logoFile.arrayBuffer()) });
+      }
+      for (const f of state.assets.productPhotoFiles) {
+        zipEntries.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
+      }
+      if (state.assets.avatarFile) {
+        zipEntries.push({ name: state.assets.avatarFile.name, data: new Uint8Array(await state.assets.avatarFile.arrayBuffer()) });
+      }
+      if (state.assets.backgroundFile) {
+        zipEntries.push({ name: state.assets.backgroundFile.name, data: new Uint8Array(await state.assets.backgroundFile.arrayBuffer()) });
+      }
+
+      const blob = buildZip(zipEntries);
+      const url = URL.createObjectURL(blob);
+      const filename = `stage${n}_bundle.zip`;
+
+      // Artifacts run inside a sandboxed iframe, which silently swallows a
+      // *synthetic* a.click() download trigger — no error, nothing happens.
+      // Swapping the button for a real anchor means the download fires from
+      // the user's own click, which sandboxes don't block the same way.
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.className = 'btn btn-sm btn-primary';
+      a.textContent = `⬇ Save ${filename}`;
+      a.addEventListener('click', () => setTimeout(() => URL.revokeObjectURL(url), 4000));
+      btn.replaceWith(a);
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = `${ICON.box} Download bundle`;
+      toast('Could not build the zip — please try again.');
+    }
+  }
+
+  // Concrete "what to do with this output, and what you should get back" —
+  // written per stage since Stages 1/3/4 are internal approval documents
+  // (nothing pasted anywhere), while Stages 2/5 actually get pasted into
+  // Google Flow alongside the real uploaded reference files.
+  const STAGE_USAGE = {
+    1: {
+      steps: [
+        'Copy the JSON (or read the summary above) and share it with the customer.',
+        'Get their sign-off on the story, hook, CTA, and audience — nothing downstream should change without re-approving this.'
+      ],
+      outcome: 'A written, approved creative brief. Nothing is generated yet — this only locks the concept.'
+    },
+    2: {
+      steps: [
+        'Copy the Description (Prompt tab).',
+        'Open Google Flow. Paste the description, and attach the real logo + product photo (Stage 1) plus the avatar and background reference photos (if uploaded above) as reference images.',
+        'Generate a single still image of the character + product + background together.'
+      ],
+      outcome: 'One preview image showing the avatar, product, and background in the chosen mood/style. Send this to the customer for approval before generating any video.'
+    },
+    3: {
+      steps: [
+        'Review the scene list — order, dialogue, and actions — with the customer.',
+        'Nothing to paste anywhere yet; this is a planning document, not a generation prompt.'
+      ],
+      outcome: 'An approved scene-by-scene script — what happens and what is said in each scene — locked before shot planning starts.'
+    },
+    4: {
+      steps: [
+        'Review the shot list — camera, lens, movement per shot — with whoever is directing the generation.',
+        'Nothing to paste anywhere yet; this feeds directly into Stage 5\'s compiled prompts.'
+      ],
+      outcome: 'A locked cinematography plan for every scene, ready to be compiled into actual Google Flow prompts.'
+    },
+    5: {
+      steps: [
+        'Copy the Flow Prompts (Prompt tab) — Global Prompt, then each Scene, then the Negative Prompt.',
+        'Open Google Flow. Paste the Global Prompt and attach all uploaded reference images — logo, product photo, avatar, and background.',
+        'Generate each Scene\'s prompt separately (one clip per scene), reusing the same reference images and Negative Prompt each time.'
+      ],
+      outcome: '5 short video clips — one per scene — each matching the locked character/product/style, ready to stitch into the final ad.'
+    },
+    6: {
+      steps: [
+        'Once every scene clip is generated and approved, set Status to Approved above.',
+        'Copy or download the JSON — it bundles references to every prior stage\'s file into one record.'
+      ],
+      outcome: 'A single master record of the finished project — what to reopen for a revision, or hand off for final editing and delivery.'
+    }
+  };
+
+  // ---------- Stage tabs (top pipeline strip) ----------
+  function renderStageTabs() {
+    document.getElementById('stageTabs').innerHTML = STAGES.map(s => {
+      const st = status(s.n);
+      return `<button type="button" class="stage-tab ${s.n === state.active ? 'active' : ''} status-${st}" data-goto="${s.n}">
+        <span class="stage-num">${s.n}</span>
+        <span class="name">${esc(s.name)}</span>
+      </button>`;
+    }).join('');
+  }
+
+  // ---------- Single main column: one card per topic, then output ----------
+  // /new itself is composed of many separate numbered cards (Brand Details,
+  // Campaign Goal, Target Audience, ...), not one big card holding
+  // everything — so each stage's fields() returns an array of {title, desc,
+  // body} cards, numbered locally within the stage, and we render one
+  // <section class="card"> per entry instead of forcing it all into one.
+  // Fields and output are rebuilt separately: typing in a field must only
+  // refresh the output panel (refreshOutput), never rebuild the fields
+  // themselves — replacing a focused input's DOM node on every keystroke is
+  // what caused focus loss and the page to visibly jump/shake.
+  function renderMain() {
+    const n = state.active;
+    const impl = STAGE_IMPL[n];
+    const cards = impl.fields();
+
+    const cardsHtml = cards.map((c, i) => `
+      <section class="card section-card">
+        <div class="section-head">
+          <div class="section-head-row">
+            <span class="section-num">${i + 1}</span>
+            <h2>${esc(c.title)}</h2>
+          </div>
+          ${c.desc ? `<p class="section-desc">${esc(c.desc)}</p>` : ''}
+        </div>
+        <div class="section-body">${c.body}</div>
+      </section>
+    `).join('');
+
+    document.getElementById('colMain').innerHTML = cardsHtml + `
+      <section class="card">
+        <div id="outputArea"></div>
+      </section>
+    `;
+    refreshOutput();
+    wireForm();
+  }
+
+  function refreshOutput() {
+    const n = state.active;
+    const impl = STAGE_IMPL[n];
+    const tab = state.outTab[n];
+    const jsonStr = JSON.stringify(impl.json(), null, 2);
+    const promptBlocks = impl.prompt();
+    const area = document.getElementById('outputArea');
+    if (!area) return;
+    area.innerHTML = `
+      <div class="out-head">
+        <div class="out-tabs">
+          <button type="button" class="out-tab ${tab === 'json' ? 'active' : ''}" data-outtab="json">JSON</button>
+          <button type="button" class="out-tab ${tab === 'prompt' ? 'active' : ''}" data-outtab="prompt">${esc(impl.promptLabel)}</button>
+        </div>
+        <button type="button" class="copy-btn" id="copyBtn">${ICON.layers} Copy ${tab === 'json' ? 'JSON' : 'text'}</button>
+        <button type="button" class="btn btn-sm" id="downloadBtn">${ICON.box} Download bundle</button>
+      </div>
+      <div class="out-panel ${tab === 'json' ? 'active' : ''}"><pre class="code">${esc(jsonStr)}</pre></div>
+      <div class="out-panel ${tab === 'prompt' ? 'active' : ''}">
+        ${promptBlocks.map(b => `<div class="prompt-block ${b.list ? 'negative' : ''}"><h4>${esc(b.h)}</h4>
+          ${b.list ? `<ul>${b.list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p>${esc(b.p)}</p>`}</div>`).join('')}
+      </div>
+      <p class="empty-note" style="margin-top:10px">Download bundle zips this stage's JSON (and prompt .txt, where the spec calls for one) together with the real logo/product photo files, under their original filenames.</p>
+      <p class="empty-note" style="margin-top:4px">Note: this preview runs inside a sandboxed Artifact, which blocks all file downloads regardless of how they're triggered — the zip-building code itself is correct (verified separately) and will download normally once this is ported into the real app.</p>
+      ${STAGE_USAGE[n] ? `
+        <div class="usage-box">
+          <h4>${ICON.check} What to do with this</h4>
+          <ol>${STAGE_USAGE[n].steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+          <p class="outcome"><b>Outcome:</b> ${esc(STAGE_USAGE[n].outcome)}</p>
+        </div>
+      ` : ''}
+    `;
+    document.getElementById('copyBtn').addEventListener('click', function () {
+      const text = tab === 'json' ? jsonStr : promptBlocks.map(b => `${b.h}\n${b.list ? b.list.map(x => '- ' + x).join('\n') : b.p}`).join('\n\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.classList.add('copied'); btn.innerHTML = `${ICON.check} Copied`;
+        setTimeout(() => { btn.classList.remove('copied'); refreshOutput(); }, 1400);
+      });
+    });
+    document.getElementById('downloadBtn').addEventListener('click', handleDownloadBundle);
+  }
+
+  // Lightweight, non-destructive updates for things that depend on typed
+  // values but must not rebuild the input elements the user is typing into.
+  function refreshStageTabStatus() {
+    STAGES.forEach(s => {
+      const tabEl = document.querySelector('.stage-tab[data-goto="' + s.n + '"]');
+      if (!tabEl) return;
+      tabEl.classList.remove('status-not_started', 'status-editing', 'status-ready');
+      tabEl.classList.add('status-' + status(s.n));
+    });
+  }
+  function refreshDurationCheck() {
+    if (state.active !== 3) return;
+    const el = document.getElementById('durationCheck');
+    if (!el) return;
+    const total = state.stage3.scenes.reduce((a, s) => a + Number(s.duration || 0), 0);
+    const target = Number(state.stage1.duration);
+    const ok = total === target;
+    el.className = 'duration-check ' + (ok ? 'ok' : 'off');
+    el.innerHTML = `${ICON.clock} ${total}s of ${target}s planned ${ok ? '— matches Stage 1 duration' : '— adjust to match Stage 1'}`;
+  }
+
+  function getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj); }
+  function setPath(obj, path, value) {
+    const keys = path.split('.'); let o = obj;
+    for (let i = 0; i < keys.length - 1; i++) o = o[keys[i]];
+    o[keys[keys.length - 1]] = value;
+  }
+
+  function wireForm() {
+    document.querySelectorAll('[data-bind]').forEach(el => {
+      el.addEventListener('input', function () {
+        const path = el.getAttribute('data-bind');
+        const val = el.type === 'number' ? Number(el.value) : el.value;
+        setPath(state, path, val);
+        // Never rebuild the fields themselves here — this fires on every
+        // keystroke, and replacing a focused input's DOM node mid-typing is
+        // what causes focus loss / the page jumping. Only refresh output
+        // and the small derived indicators that live outside the field.
+        const counterEl = el.closest('.field') ? el.closest('.field').querySelector('.char-counter') : null;
+        if (counterEl) counterEl.textContent = `${el.value.length}/${counterEl.getAttribute('data-max')}`;
+        refreshOutput();
+        refreshStageTabStatus();
+        refreshDurationCheck();
+      });
+    });
+    document.querySelectorAll('[data-bind-check]').forEach(el => {
+      el.addEventListener('change', function () {
+        setPath(state, el.getAttribute('data-bind-check'), el.checked);
+        renderMain();
+      });
+    });
+    document.querySelectorAll('[data-pick]').forEach(el => {
+      el.addEventListener('click', function () {
+        setPath(state, el.getAttribute('data-pick'), el.getAttribute('data-value'));
+        renderStageTabs(); renderMain();
+      });
+    });
+    document.querySelectorAll('[data-bind-color]').forEach(el => {
+      el.addEventListener('input', function () {
+        const path = el.getAttribute('data-bind-color');
+        setPath(state, path, el.value);
+        const box = el.parentElement;
+        if (box) box.style.background = el.value;
+        const row = box ? box.parentElement : null;
+        const hexInput = row ? row.querySelector('.swatch-hex') : null;
+        if (hexInput) hexInput.value = el.value;
+        refreshOutput();
+      });
+    });
+    document.querySelectorAll('[data-bind-hex]').forEach(el => {
+      el.addEventListener('input', function () {
+        setPath(state, el.getAttribute('data-bind-hex'), el.value);
+        refreshOutput();
+      });
+      el.addEventListener('blur', function () {
+        const resolved = resolveHexColor(el.value);
+        if (resolved) {
+          setPath(state, el.getAttribute('data-bind-hex'), resolved);
+          el.value = resolved;
+          const row = el.closest('.swatch-row');
+          const box = row ? row.querySelector('.swatch-box') : null;
+          if (box) box.style.background = resolved;
+          const native = box ? box.querySelector('.swatch-native') : null;
+          if (native) native.value = resolved;
+        }
+        refreshOutput();
+      });
+    });
+    document.querySelectorAll('[data-trigger]').forEach(el => {
+      el.addEventListener('click', function () {
+        const target = document.getElementById(el.getAttribute('data-trigger'));
+        if (target) target.click();
+      });
+    });
+    const parseBtn = document.querySelector('[data-action="parseStoryboard"]');
+    if (parseBtn) parseBtn.addEventListener('click', parseStoryboardIntoScenes);
+
+    const logoInput = document.getElementById('logoInput');
+    if (logoInput) logoInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) return;
+      if (state.assets.logoPreviewUrl) URL.revokeObjectURL(state.assets.logoPreviewUrl);
+      state.assets.logoFile = file;
+      state.assets.logoPreviewUrl = URL.createObjectURL(file);
+      render();
+    });
+    document.querySelectorAll('[data-action="removeLogo"]').forEach(el => el.addEventListener('click', function () {
+      if (state.assets.logoPreviewUrl) URL.revokeObjectURL(state.assets.logoPreviewUrl);
+      state.assets.logoFile = null;
+      state.assets.logoPreviewUrl = null;
+      render();
+    }));
+    const photosInput = document.getElementById('productPhotosInput');
+    if (photosInput) photosInput.addEventListener('change', function () {
+      Array.from(this.files).forEach(file => {
+        state.assets.productPhotoFiles.push(file);
+        state.assets.productPhotoPreviewUrls.push(URL.createObjectURL(file));
+      });
+      this.value = '';
+      render();
+    });
+    document.querySelectorAll('[data-action="removePhoto"]').forEach(el => el.addEventListener('click', function () {
+      const i = Number(el.getAttribute('data-i'));
+      URL.revokeObjectURL(state.assets.productPhotoPreviewUrls[i]);
+      state.assets.productPhotoFiles.splice(i, 1);
+      state.assets.productPhotoPreviewUrls.splice(i, 1);
+      render();
+    }));
+    const avatarInput = document.getElementById('avatarInput');
+    if (avatarInput) avatarInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) return;
+      if (state.assets.avatarPreviewUrl) URL.revokeObjectURL(state.assets.avatarPreviewUrl);
+      state.assets.avatarFile = file;
+      state.assets.avatarPreviewUrl = URL.createObjectURL(file);
+      render();
+    });
+    document.querySelectorAll('[data-action="removeAvatar"]').forEach(el => el.addEventListener('click', function () {
+      if (state.assets.avatarPreviewUrl) URL.revokeObjectURL(state.assets.avatarPreviewUrl);
+      state.assets.avatarFile = null;
+      state.assets.avatarPreviewUrl = null;
+      render();
+    }));
+    const backgroundInput = document.getElementById('backgroundInput');
+    if (backgroundInput) backgroundInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) return;
+      if (state.assets.backgroundPreviewUrl) URL.revokeObjectURL(state.assets.backgroundPreviewUrl);
+      state.assets.backgroundFile = file;
+      state.assets.backgroundPreviewUrl = URL.createObjectURL(file);
+      render();
+    });
+    document.querySelectorAll('[data-action="removeBackground"]').forEach(el => el.addEventListener('click', function () {
+      if (state.assets.backgroundPreviewUrl) URL.revokeObjectURL(state.assets.backgroundPreviewUrl);
+      state.assets.backgroundFile = null;
+      state.assets.backgroundPreviewUrl = null;
+      render();
+    }));
+
+    document.querySelectorAll('[data-action="addScene"]').forEach(el => el.addEventListener('click', function () {
+      const n = state.stage3.scenes.length + 1;
+      state.stage3.scenes.push({ scene: n, objective: OBJECTIVES[0], location: '', action: '', dialogue: '', emotion: EMOTIONS[0], duration: 6, broll: BROLL_TYPES[0], transition: TRANSITIONS[0] });
+      state.stage4.shots[n] = [];
+      render();
+    }));
+    document.querySelectorAll('[data-action="removeScene"]').forEach(el => el.addEventListener('click', function () {
+      const i = Number(el.getAttribute('data-i'));
+      state.stage3.scenes.splice(i, 1);
+      // Shots are keyed by scene number, which is about to shift for every
+      // scene after the removed one — rebuild the map from each scene's old
+      // number before renumbering, so shots stay attached to the right scene.
+      const oldShots = state.stage4.shots;
+      const newShots = {};
+      state.stage3.scenes.forEach((s, idx) => { newShots[idx + 1] = oldShots[s.scene] || []; });
+      state.stage3.scenes.forEach((s, idx) => { s.scene = idx + 1; });
+      state.stage4.shots = newShots;
+      render();
+    }));
+    document.querySelectorAll('[data-action="addShot"]').forEach(el => el.addEventListener('click', function () {
+      const scene = Number(el.getAttribute('data-scene'));
+      const list = state.stage4.shots[scene] || (state.stage4.shots[scene] = []);
+      list.push({ shot: list.length + 1, type: SHOT_TYPES[0], camera: 'Handheld', lens: '35mm', movement: 'Static', duration: 3 });
+      render();
+    }));
+    document.querySelectorAll('[data-action="removeShot"]').forEach(el => el.addEventListener('click', function () {
+      const scene = Number(el.getAttribute('data-scene')), i = Number(el.getAttribute('data-i'));
+      state.stage4.shots[scene].splice(i, 1);
+      state.stage4.shots[scene].forEach((s, idx) => { s.shot = idx + 1; });
+      render();
+    }));
+    document.querySelectorAll('[data-action="addNegative"]').forEach(el => el.addEventListener('click', function () {
+      state.stage5.negative_prompt.push(''); render();
+    }));
+    document.querySelectorAll('[data-action="removeNegative"]').forEach(el => el.addEventListener('click', function () {
+      state.stage5.negative_prompt.splice(Number(el.getAttribute('data-i')), 1); render();
+    }));
+  }
+
+  function toast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:999px;font-size:12.5px;font-weight:600;z-index:999;box-shadow:var(--shadow-card)';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  function render() {
+    document.getElementById('topbarIcon').innerHTML = ICON.clapper.replace('class="icon"', 'class="icon" style="width:17px;height:17px"');
+    document.getElementById('modePill').innerHTML = isRequestLinked
+      ? `${ICON.lock} Request-linked` : `${ICON.wand} Standalone tool`;
+    document.getElementById('modeSubtitle').textContent = isRequestLinked
+      ? 'Stage 1 locked from the linked request — Stages 2-6 are the designer\'s planning work.'
+      : 'Standalone mode — Stage 1 entered manually, same as Stages 2-6.';
+    renderStageTabs(); renderMain();
+  }
+
+  document.getElementById('stageTabs').addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-goto]');
+    if (btn) { state.active = Number(btn.getAttribute('data-goto')); render(); }
+  });
+  document.getElementById('colMain').addEventListener('click', function (e) {
+    const tabBtn = e.target.closest('[data-outtab]');
+    if (tabBtn) { state.outTab[state.active] = tabBtn.getAttribute('data-outtab'); refreshOutput(); }
+  });
+
+  render();
+})();
+</script>
