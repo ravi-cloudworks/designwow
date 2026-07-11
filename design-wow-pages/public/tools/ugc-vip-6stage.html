@@ -199,6 +199,19 @@
   }
   .asset-remove { position: static; width: auto; height: auto; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; }
 
+  /* Named avatar pose slots — click or drag-and-drop, one image per pose */
+  .pose-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  .pose-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 96px; }
+  .pose-slot-box {
+    position: relative; width: 96px; height: 96px; border-radius: 10px; border: 1.5px dashed var(--line);
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;
+  }
+  .pose-slot-box.has-image { border-style: solid; }
+  .pose-slot-box.dragover { border-color: var(--teal); background: var(--teal-soft); }
+  .pose-slot-box img { width: 100%; height: 100%; object-fit: cover; }
+  .pose-plus { font-size: 22px; color: var(--text-faint); font-weight: 300; line-height: 1; }
+  .pose-slot-label { font-size: 11px; font-weight: 600; color: var(--text-soft); text-align: center; }
+
   .list-item {
     border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--surface-2);
     display: flex; flex-direction: column; gap: 14px;
@@ -387,6 +400,16 @@
     { v: 'Mashup', i: 'shuffle', angle: 'Blend multiple short moments/clips into one fast-paced compilation-style edit rather than one continuous scene.' },
     { v: 'Behind the Scenes', i: 'clapper', angle: 'Show the authentic, unpolished process behind making/using the product — candid, observational, less produced-feeling.' }
   ];
+  // A single avatar photo is a weak identity anchor — the video model has to
+  // improvise the rest of the face from one angle and drifts. Multiple poses
+  // of the same person give it enough coverage to hold identity consistent.
+  const AVATAR_POSE_SLOTS = [
+    { key: 'front', label: 'Front-facing', required: true },
+    { key: 'side', label: 'Side Profile' },
+    { key: 'threeQuarter', label: '3/4 Angle' },
+    { key: 'closeup', label: 'Close-up Face' },
+    { key: 'fullBody', label: 'Full Body' }
+  ];
   const MOODS = [
     { v: 'Energetic', i: 'bolt' }, { v: 'Calm', i: 'leaf' }, { v: 'Warm', i: 'sun' },
     { v: 'Playful', i: 'smile' }, { v: 'Luxurious', i: 'diamond' }, { v: 'Emotional', i: 'heart' }
@@ -442,7 +465,7 @@
     // bytes can be zipped up for download, not just described in prose.
     assets: {
       logoFile: null, logoPreviewUrl: null, productPhotoFiles: [], productPhotoPreviewUrls: [],
-      avatarFile: null, avatarPreviewUrl: null, backgroundFile: null, backgroundPreviewUrl: null
+      avatarPoses: {}, backgroundFile: null, backgroundPreviewUrl: null
     },
     stage1: {
       product: 'Fresh Ready-to-Go Seafood',
@@ -576,6 +599,41 @@
       <p class="hint">${esc(hint)}</p>`;
   }
 
+  // Named, drag-and-droppable pose slots for the avatar reference photos
+  function renderAvatarPoseGrid() {
+    return `<div class="pose-grid">
+      ${AVATAR_POSE_SLOTS.map(slot => {
+        const entry = state.assets.avatarPoses[slot.key];
+        return `<div class="pose-slot">
+          <input type="file" id="avatarPose-${slot.key}" class="hidden-file-input" accept="image/*">
+          <div class="pose-slot-box ${entry ? 'has-image' : ''}" data-pose-slot="${slot.key}" data-trigger="avatarPose-${slot.key}">
+            ${entry
+              ? `<img src="${entry.previewUrl}" alt=""><button type="button" class="thumb-remove" data-action="removeAvatarPose" data-slot="${slot.key}">×</button>`
+              : `<span class="pose-plus">+</span>`}
+          </div>
+          <span class="pose-slot-label">${esc(slot.label)}${slot.required ? ' *' : ''}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // A comma list of "Pose Label (filename.jpg)" for every pose actually
+  // uploaded — null if none yet, so callers can skip the whole sentence.
+  function poseListText() {
+    const filled = AVATAR_POSE_SLOTS.filter(slot => state.assets.avatarPoses[slot.key]);
+    if (!filled.length) return null;
+    return filled.map(slot => `${slot.label} ("${state.assets.avatarPoses[slot.key].file.name}")`).join(', ');
+  }
+
+  // Ready-to-paste prompt for generating the missing pose photos from a
+  // single source image, in an image tool (ChatGPT, Gemini, etc.) outside
+  // this app — covers both face angles (identity lock) and a full-body shot
+  // (outfit/physique continuity), since both matter for video consistency.
+  function buildPoseGenPrompt() {
+    const c = state.stage2.character;
+    return `Using the attached reference photo, generate 4 additional images of the exact same person shown in the photo — do not change their face, skin tone, hairstyle, or identity in any way, only the pose and framing changes:\n\n1. Side profile view, neutral expression, same lighting.\n2. 3/4 angle view, neutral expression, same lighting.\n3. Close-up of just the face and shoulders, neutral expression, clearly showing facial detail.\n4. Full-body shot wearing ${c.outfit || 'the same outfit'}, standing naturally, neutral pose.\n\nKeep the person instantly recognizable as the exact same individual across all 5 images (including the original). This is for maintaining character consistency across an AI-generated video.`;
+  }
+
   // ---------- Stage 1 ----------
   // Returns an array of cards, not one blob — /new itself is 11 separate
   // numbered cards (Brand Details, Campaign Goal, Target Audience, Video
@@ -703,9 +761,18 @@
             ${textField('Outfit', c.outfit, 'stage2.character.outfit')}
           </div>
           <div class="field">
-            <label>Avatar reference photo</label>
-            ${chooseFile('avatarInput', 'A real photo of this person locks their face/identity far more reliably than a text description alone.', false)}
-            ${state.assets.avatarFile ? `<div class="asset-preview"><img src="${state.assets.avatarPreviewUrl}" alt="Avatar"><span>${esc(state.assets.avatarFile.name)}</span><button type="button" class="asset-remove" data-action="removeAvatar">Remove</button></div>` : ''}
+            <label>Avatar reference photos</label>
+            <p class="hint" style="margin:0 0 8px">A single photo is a weak anchor — the video model has to improvise the rest of the face and drifts. Multiple poses of the same person let it hold identity consistent across every scene.</p>
+            ${renderAvatarPoseGrid()}
+          </div>
+          <div class="usage-box">
+            <h4>${ICON.wand} Need to generate these poses?</h4>
+            <p style="font-size:13px;line-height:1.6;margin:0 0 10px;color:var(--text)">If you only have one photo of this person, paste this into an image tool (ChatGPT, Gemini, etc.) with that photo attached — it'll generate the missing angles for you to download and drop into the slots above.</p>
+            <pre class="code" style="max-height:160px">${esc(buildPoseGenPrompt())}</pre>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button type="button" class="copy-btn" id="poseGenCopyBtn">${ICON.layers} Copy prompt</button>
+              <a class="btn btn-sm" href="https://chatgpt.com/?q=${encodeURIComponent(buildPoseGenPrompt())}" target="_blank" rel="noreferrer" style="text-decoration:none">Open ChatGPT</a>
+            </div>
           </div>
         `
       },
@@ -750,7 +817,9 @@
   }
   function stage2Json() {
     const s = JSON.parse(JSON.stringify(state.stage2));
-    s.character.reference_image = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    s.character.reference_images = AVATAR_POSE_SLOTS
+      .filter(slot => state.assets.avatarPoses[slot.key])
+      .map(slot => ({ pose: slot.label, file: state.assets.avatarPoses[slot.key].file.name }));
     s.background.reference_image = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
     s.product.reference_image = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
     s.product.logo_file = state.assets.logoFile ? state.assets.logoFile.name : null;
@@ -758,11 +827,11 @@
   }
   function stage2Prompt() {
     const c = state.stage2.character, b = state.stage2.background, p = state.stage2.product, g = state.stage2.global_style;
-    const avatarPhoto = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    const poseList = poseListText();
     const bgPhoto = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
     const refPhoto = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
     const logo = state.assets.logoFile ? state.assets.logoFile.name : null;
-    const avatarLine = avatarPhoto ? ` Face identity consistency is critical — match the uploaded reference photo "${avatarPhoto}" exactly in every scene; the same person's face must appear throughout, no substitutions.` : '';
+    const avatarLine = poseList ? ` Face identity consistency is critical — multiple reference photos of this exact person were provided: ${poseList}. Use all of them together to lock the same face/identity across every scene, no substitutions.` : '';
     const bgLine = bgPhoto ? ` Match the uploaded background reference photo "${bgPhoto}" for the setting.` : '';
     const refLine = refPhoto ? ` Match the uploaded reference photo "${refPhoto}" exactly — do not invent a different product look.` : '';
     const logoLine = logo ? ` Use the uploaded logo file "${logo}" as-is, unaltered.` : '';
@@ -911,11 +980,11 @@
   }
   function stage5Prompt() {
     const g = state.stage2.global_style, c = state.stage2.character, b = state.stage2.background, p = state.stage2.product;
-    const avatarPhoto = state.assets.avatarFile ? state.assets.avatarFile.name : null;
+    const poseList = poseListText();
     const bgPhoto = state.assets.backgroundFile ? state.assets.backgroundFile.name : null;
     const refPhoto = state.assets.productPhotoFiles[0] ? state.assets.productPhotoFiles[0].name : null;
     const logo = state.assets.logoFile ? state.assets.logoFile.name : null;
-    const avatarLine = avatarPhoto ? ` Face identity consistency is critical — the character MUST match the uploaded reference photo "${avatarPhoto}" exactly in every single scene, no substitutions, no drift.` : '';
+    const avatarLine = poseList ? ` Face identity consistency is critical — the character MUST match ALL of these reference photos of the same person in every single scene, no substitutions, no drift: ${poseList}.` : '';
     const bgLine = bgPhoto ? ` Match the uploaded background reference photo "${bgPhoto}" for the setting in every scene.` : '';
     const refLine = refPhoto ? ` The product MUST match the uploaded reference photo "${refPhoto}" exactly across every scene — same packaging, same colors, same logo placement, do not invent a different product look.` : '';
     const logoLine = logo ? ` Use the uploaded logo file "${logo}" as-is, unaltered, wherever the logo appears.` : '';
@@ -955,7 +1024,7 @@
           <div>05 Google Flow Package — ${state.stage5.negative_prompt.length} negative rule(s)</div>
           <div>Logo file — ${state.assets.logoFile ? esc(state.assets.logoFile.name) : 'not uploaded'}</div>
           <div>Product photos — ${state.assets.productPhotoFiles.length} file(s)</div>
-          <div>Avatar reference — ${state.assets.avatarFile ? esc(state.assets.avatarFile.name) : 'not uploaded'}</div>
+          <div>Avatar reference photos — ${AVATAR_POSE_SLOTS.filter(slot => state.assets.avatarPoses[slot.key]).length} of ${AVATAR_POSE_SLOTS.length} poses uploaded</div>
           <div>Background reference — ${state.assets.backgroundFile ? esc(state.assets.backgroundFile.name) : 'not uploaded'}</div>
           <div>Mood / Music — ${esc(state.stage2.mood)} / ${esc(state.stage2.music)}</div>
         </div>
@@ -1090,8 +1159,9 @@
       for (const f of state.assets.productPhotoFiles) {
         zipEntries.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
       }
-      if (state.assets.avatarFile) {
-        zipEntries.push({ name: state.assets.avatarFile.name, data: new Uint8Array(await state.assets.avatarFile.arrayBuffer()) });
+      for (const slot of AVATAR_POSE_SLOTS) {
+        const entry = state.assets.avatarPoses[slot.key];
+        if (entry) zipEntries.push({ name: entry.file.name, data: new Uint8Array(await entry.file.arrayBuffer()) });
       }
       if (state.assets.backgroundFile) {
         zipEntries.push({ name: state.assets.backgroundFile.name, data: new Uint8Array(await state.assets.backgroundFile.arrayBuffer()) });
@@ -1391,21 +1461,49 @@
       state.assets.productPhotoPreviewUrls.splice(i, 1);
       render();
     }));
-    const avatarInput = document.getElementById('avatarInput');
-    if (avatarInput) avatarInput.addEventListener('change', function () {
-      const file = this.files[0];
-      if (!file) return;
-      if (state.assets.avatarPreviewUrl) URL.revokeObjectURL(state.assets.avatarPreviewUrl);
-      state.assets.avatarFile = file;
-      state.assets.avatarPreviewUrl = URL.createObjectURL(file);
+    function setAvatarPose(key, file) {
+      const existing = state.assets.avatarPoses[key];
+      if (existing) URL.revokeObjectURL(existing.previewUrl);
+      state.assets.avatarPoses[key] = { file, previewUrl: URL.createObjectURL(file) };
       render();
+    }
+    AVATAR_POSE_SLOTS.forEach(slot => {
+      const input = document.getElementById('avatarPose-' + slot.key);
+      if (input) input.addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) setAvatarPose(slot.key, file);
+      });
     });
-    document.querySelectorAll('[data-action="removeAvatar"]').forEach(el => el.addEventListener('click', function () {
-      if (state.assets.avatarPreviewUrl) URL.revokeObjectURL(state.assets.avatarPreviewUrl);
-      state.assets.avatarFile = null;
-      state.assets.avatarPreviewUrl = null;
+    document.querySelectorAll('[data-pose-slot]').forEach(el => {
+      const key = el.getAttribute('data-pose-slot');
+      el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('dragover'); });
+      el.addEventListener('dragleave', function () { el.classList.remove('dragover'); });
+      el.addEventListener('drop', function (e) {
+        e.preventDefault();
+        el.classList.remove('dragover');
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) setAvatarPose(key, file);
+      });
+    });
+    document.querySelectorAll('[data-action="removeAvatarPose"]').forEach(el => el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const key = el.getAttribute('data-slot');
+      const existing = state.assets.avatarPoses[key];
+      if (existing) URL.revokeObjectURL(existing.previewUrl);
+      state.assets.avatarPoses[key] = null;
       render();
     }));
+    const poseGenCopyBtn = document.getElementById('poseGenCopyBtn');
+    if (poseGenCopyBtn) poseGenCopyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(buildPoseGenPrompt()).then(() => {
+        poseGenCopyBtn.classList.add('copied');
+        poseGenCopyBtn.innerHTML = `${ICON.check} Copied`;
+        setTimeout(() => {
+          poseGenCopyBtn.classList.remove('copied');
+          poseGenCopyBtn.innerHTML = `${ICON.layers} Copy prompt`;
+        }, 1400);
+      });
+    });
     const backgroundInput = document.getElementById('backgroundInput');
     if (backgroundInput) backgroundInput.addEventListener('change', function () {
       const file = this.files[0];
