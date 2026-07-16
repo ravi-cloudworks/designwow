@@ -1,0 +1,24 @@
+name = "stagepay-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "stagepay-db"
+database_id = "22a02b14-0c36-4606-8d84-fee8407f1094"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "stagepay-media"
+
+[vars]
+FRONTEND_ORIGIN = "https://stagepay.pages.dev"
+# Same OAuth client design-wow-api uses — just with this new redirect URI
+# added to its authorized-redirects list, and StagePay's own users table.
+GOOGLE_CLIENT_ID = "1090261704938-0oains3voanh0hjduj03v1pdcn1d3ld9.apps.googleusercontent.com"
+GOOGLE_REDIRECT_URI = "https://stagepay.pages.dev/api/auth/google/callback"
+
+# Secrets (set via `wrangler secret put`, not stored here):
+#   GEMINI_API_KEY
+#   GOOGLE_CLIENT_SECRET

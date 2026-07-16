@@ -1,0 +1,232 @@
+import { Hono } from 'hono';
+import type { Bindings } from '../lib/bindings';
+import { currentUserId } from '../lib/bindings';
+
+// Public portfolio page for a designer — ported from design-wow-api's
+// designer_showcase_items pattern (design-wow itself is untouched; this is
+// StagePay's own copy, adapted to its own schema/media bucket). "Eligible"
+// candidate = an item belonging to a stage that's actually been locked (paid
+// + approved by the customer) with real uploaded output — the equivalent of
+// design-wow's "delivered_at IS NOT NULL", expressed via stage_locks instead.
+const showcase = new Hono<{ Bindings: Bindings }>();
+
+type MediaFileEntry = { key: string; fileName: string; kind: string };
+
+// No plan/subscription tiers exist in the DB yet to gate this by — a single
+// fixed cap for now, easy to make plan-dependent later once that exists.
+const SHOWCASE_MAX_ITEMS = 20;
+
+showcase.get('/showcase/candidates', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const { results: rows } = await c.env.DB.prepare(
+    `SELECT i.id as item_id, i.name as item_name, i.stage, i.item_key, iv.media_files
+     FROM items i
+     JOIN item_versions iv ON iv.item_id = i.id AND iv.version_number = 1
+     JOIN projects p ON p.id = i.project_id
+     JOIN stage_locks sl ON sl.project_id = i.project_id AND sl.stage = i.stage
+     WHERE p.user_id = ? AND sl.locked = 1 AND iv.media_files != '[]'`
+  )
+    .bind(userId)
+    .all<{ item_id: string; item_name: string; stage: number; item_key: string; media_files: string }>();
+
+  const { results: showcased } = await c.env.DB.prepare('SELECT r2_key FROM showcase_items WHERE user_id = ?')
+    .bind(userId)
+    .all<{ r2_key: string }>();
+  const showcasedKeys = new Set(showcased.map((s) => s.r2_key));
+
+  const candidates: {
+    itemId: string; itemName: string; stage: number; itemKey: string;
+    key: string; fileName: string; kind: string; isShowcased: boolean;
+  }[] = [];
+  for (const row of rows) {
+    const files = JSON.parse(row.media_files || '[]') as MediaFileEntry[];
+    for (const f of files) {
+      candidates.push({
+        itemId: row.item_id, itemName: row.item_name, stage: row.stage, itemKey: row.item_key,
+        key: f.key, fileName: f.fileName, kind: f.kind, isShowcased: showcasedKeys.has(f.key),
+      });
+    }
+  }
+  return c.json({ candidates });
+});
+
+showcase.get('/showcase', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, file_name, mime_type, size_bytes, source_item_id, caption, thumbnail_r2_key, created_at
+     FROM showcase_items WHERE user_id = ? ORDER BY created_at ASC`
+  )
+    .bind(userId)
+    .all();
+  return c.json({ items: results });
+});
+
+showcase.post('/showcase', async (c) => {
+  // Add from an existing eligible item (see the module comment above).
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const { sourceItemId, key, fileName, caption } = await c.req
+    .json<{ sourceItemId?: string; key?: string; fileName?: string; caption?: string }>()
+    .catch(() => ({}) as { sourceItemId?: string; key?: string; fileName?: string; caption?: string });
+  if (!sourceItemId || !key || !fileName) return c.json({ error: 'source_item_and_key_required' }, 400);
+
+  const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM showcase_items WHERE user_id = ?').bind(userId).first<{ count: number }>();
+  if ((countRow?.count ?? 0) >= SHOWCASE_MAX_ITEMS) return c.json({ error: 'showcase_limit_reached', max: SHOWCASE_MAX_ITEMS }, 400);
+
+  // Only ever an item that's genuinely this designer's own, from a stage
+  // that's actually locked — never trust the client on ownership/eligibility.
+  const eligible = await c.env.DB.prepare(
+    `SELECT iv.media_files FROM items i
+     JOIN item_versions iv ON iv.item_id = i.id AND iv.version_number = 1
+     JOIN projects p ON p.id = i.project_id
+     JOIN stage_locks sl ON sl.project_id = i.project_id AND sl.stage = i.stage
+     WHERE i.id = ? AND p.user_id = ? AND sl.locked = 1`
+  )
+    .bind(sourceItemId, userId)
+    .first<{ media_files: string }>();
+  if (!eligible) return c.json({ error: 'not_eligible' }, 400);
+  const files = JSON.parse(eligible.media_files || '[]') as MediaFileEntry[];
+  if (!files.some((f) => f.key === key)) return c.json({ error: 'not_eligible' }, 400);
+
+  const obj = await c.env.MEDIA.get(key);
+  if (!obj) return c.json({ error: 'not_found' }, 404);
+  const mimeType = obj.httpMetadata?.contentType || 'application/octet-stream';
+
+  const id = crypto.randomUUID();
+  await c.env.DB.prepare(
+    `INSERT INTO showcase_items (id, user_id, r2_key, file_name, mime_type, size_bytes, source_item_id, caption)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(id, userId, key, fileName, mimeType, obj.size ?? 0, sourceItemId, caption?.trim() || null)
+    .run();
+
+  return c.json({ id }, 201);
+});
+
+const SHOWCASE_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+const SHOWCASE_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'video/mp4', 'video/quicktime'];
+
+showcase.put('/showcase/upload/:filename', async (c) => {
+  // Standalone promo upload — a demo reel, a personal intro — never tied to
+  // an actual StagePay item, so there's no source item to verify against.
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM showcase_items WHERE user_id = ?').bind(userId).first<{ count: number }>();
+  if ((countRow?.count ?? 0) >= SHOWCASE_MAX_ITEMS) return c.json({ error: 'showcase_limit_reached', max: SHOWCASE_MAX_ITEMS }, 400);
+
+  const contentType = c.req.header('Content-Type') ?? '';
+  if (!SHOWCASE_UPLOAD_ACCEPT.includes(contentType)) return c.json({ error: 'unsupported_type', allowed: SHOWCASE_UPLOAD_ACCEPT }, 415);
+  const contentLength = Number(c.req.header('Content-Length') ?? 0);
+  if (!contentLength || contentLength > SHOWCASE_UPLOAD_MAX_BYTES) return c.json({ error: 'file_too_large', maxBytes: SHOWCASE_UPLOAD_MAX_BYTES }, 413);
+
+  const filename = c.req.param('filename');
+  const id = crypto.randomUUID();
+  const key = `showcase/${userId}/${id}-${filename}`;
+  await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+
+  await c.env.DB.prepare(
+    `INSERT INTO showcase_items (id, user_id, r2_key, file_name, mime_type, size_bytes, source_item_id, caption)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)`
+  )
+    .bind(id, userId, key, filename, contentType, contentLength)
+    .run();
+
+  return c.json({ id }, 201);
+});
+
+showcase.put('/showcase/:itemId/thumbnail', async (c) => {
+  // A client-captured JPEG frame — mobile browsers often won't render a
+  // <video preload="metadata"> frame reliably, so a stored image is the only
+  // dependable preview. Always exclusively owned by this showcase item.
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const itemId = c.req.param('itemId');
+
+  const owns = await c.env.DB.prepare('SELECT id FROM showcase_items WHERE id = ? AND user_id = ?').bind(itemId, userId).first();
+  if (!owns) return c.json({ error: 'not_found' }, 404);
+
+  const contentType = c.req.header('Content-Type') ?? '';
+  if (contentType !== 'image/jpeg') return c.json({ error: 'unsupported_type' }, 415);
+  const contentLength = Number(c.req.header('Content-Length') ?? 0);
+  if (!contentLength || contentLength > 2 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413);
+
+  const key = `showcase/${userId}/${itemId}-thumb.jpg`;
+  await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+  await c.env.DB.prepare('UPDATE showcase_items SET thumbnail_r2_key = ? WHERE id = ?').bind(key, itemId).run();
+
+  return c.json({ ok: true });
+});
+
+showcase.delete('/showcase/:itemId', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const itemId = c.req.param('itemId');
+
+  const item = await c.env.DB.prepare('SELECT r2_key, source_item_id, thumbnail_r2_key FROM showcase_items WHERE id = ? AND user_id = ?')
+    .bind(itemId, userId)
+    .first<{ r2_key: string; source_item_id: string | null; thumbnail_r2_key: string | null }>();
+  if (!item) return c.json({ ok: true });
+
+  // Only delete the main R2 object for a standalone promo upload — an item
+  // sourced from a real StagePay deliverable shares its r2_key with that
+  // item's own media_files, which the item itself still owns.
+  if (!item.source_item_id) {
+    await c.env.MEDIA.delete(item.r2_key);
+  }
+  if (item.thumbnail_r2_key) {
+    await c.env.MEDIA.delete(item.thumbnail_r2_key);
+  }
+  await c.env.DB.prepare('DELETE FROM showcase_items WHERE id = ?').bind(itemId).run();
+  return c.json({ ok: true });
+});
+
+// ---------- Public, no-login ----------
+// Only ever exposes what the designer explicitly curated here — never their
+// raw project/payment history or contact details.
+showcase.get('/showcase/:userId/public', async (c) => {
+  const userId = c.req.param('userId');
+  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url FROM users WHERE id = ?').bind(userId).first();
+  if (!profile) return c.json({ error: 'not_found' }, 404);
+
+  const { results: items } = await c.env.DB.prepare(
+    `SELECT id, file_name, mime_type, caption FROM showcase_items WHERE user_id = ? ORDER BY created_at ASC`
+  )
+    .bind(userId)
+    .all();
+
+  return c.json({ profile, items });
+});
+
+showcase.get('/showcase-items/:itemId/file', async (c) => {
+  const item = await c.env.DB.prepare('SELECT r2_key, mime_type FROM showcase_items WHERE id = ?')
+    .bind(c.req.param('itemId'))
+    .first<{ r2_key: string; mime_type: string }>();
+  if (!item) return c.json({ error: 'not_found' }, 404);
+
+  const object = await c.env.MEDIA.get(item.r2_key);
+  if (!object) return c.json({ error: 'not_found' }, 404);
+
+  return new Response(object.body, {
+    headers: { 'Content-Type': item.mime_type || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' },
+  });
+});
+
+showcase.get('/showcase-items/:itemId/thumbnail', async (c) => {
+  const item = await c.env.DB.prepare('SELECT thumbnail_r2_key FROM showcase_items WHERE id = ?')
+    .bind(c.req.param('itemId'))
+    .first<{ thumbnail_r2_key: string | null }>();
+  if (!item?.thumbnail_r2_key) return c.json({ error: 'not_found' }, 404);
+
+  const object = await c.env.MEDIA.get(item.thumbnail_r2_key);
+  if (!object) return c.json({ error: 'not_found' }, 404);
+
+  return new Response(object.body, {
+    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' },
+  });
+});
+
+export default showcase;
