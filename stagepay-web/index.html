@@ -3257,7 +3257,10 @@ ${b.cta || '—'}
     })));
     const n = buckets.length;
     const maxStageValue = Math.max(1, ...buckets.flatMap(b => STAGE_ORDER.map(s => b.byStage[s] || 0)));
-    const W = 600, H = 210, PAD_L = 46, PAD_R = 14, PAD_T = 48, PAD_B = 22;
+    // Legend (2 rows) → breathing room → month total → breathing room → plot,
+    // each on its own clearly separated row instead of stacked tight.
+    const LEGEND_Y1 = 14, LEGEND_Y2 = 32, TOTAL_Y = 58;
+    const W = 600, H = 236, PAD_L = 46, PAD_R = 14, PAD_T = 74, PAD_B = 22;
     const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
     const { niceMax, ticks } = niceAxisScale(maxStageValue, 4);
     const grid = ticks.map(t => {
@@ -3287,13 +3290,13 @@ ${b.cta || '—'}
       // Total across all 4 stages that month — a fixed row above the plot
       // area (never near any individual bar's own label) so it never reads
       // as a duplicate of whichever stage happens to be tallest that month.
-      const totalLabel = `<text x="${(groupStart + groupSlot / 2).toFixed(1)}" y="${PAD_T - 8}" font-size="9.5" font-weight="700" fill="#565b66" text-anchor="middle">${esc(formatCompactRupees(b.total))}</text>`;
+      const totalLabel = `<text x="${(groupStart + groupSlot / 2).toFixed(1)}" y="${TOTAL_Y}" font-size="9.5" font-weight="700" fill="#565b66" text-anchor="middle">${esc(formatCompactRupees(b.total))}</text>`;
       return rects + monthLabel + totalLabel;
     }).join('');
     const legendCol = (s, x, y) => `<rect x="${x}" y="${y - 8}" width="8" height="8" rx="2" fill="${STAGE_COLORS[s]}"/><text x="${x + 12}" y="${y}" font-size="9" fill="#565b66">Stage ${s} — ${esc(STAGE_NAMES[s])}</text>`;
     const legend = `<g>
-      ${legendCol(2, PAD_L, 12)}${legendCol(3, PAD_L + plotW / 2, 12)}
-      ${legendCol(4, PAD_L, 26)}${legendCol(5, PAD_L + plotW / 2, 26)}
+      ${legendCol(2, PAD_L, LEGEND_Y1)}${legendCol(3, PAD_L + plotW / 2, LEGEND_Y1)}
+      ${legendCol(4, PAD_L, LEGEND_Y2)}${legendCol(5, PAD_L + plotW / 2, LEGEND_Y2)}
     </g>`;
     return `<svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="xMidYMid meet">${legend}${grid}${bars}</svg>`;
   }
@@ -3595,7 +3598,7 @@ ${b.cta || '—'}
         </div>
         <div class="goal-past-total">${formatRupees(pastTotal)}<span>earned</span></div>
         <div class="trend-chart-wrap">${renderTrendSvg(months, summary)}</div>
-        <div class="goal-alloc-title" style="margin-top:18px">By stage</div>
+        <div class="goal-alloc-title" style="margin-top:32px">By stage</div>
         <div class="trend-chart-wrap">${renderStageBreakdownSvg(months, summary)}</div>
       ` : `
         <div id="goalFutureVisual">${renderFutureVisual(summary, sliderValue)}</div>
