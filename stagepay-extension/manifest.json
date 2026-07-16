@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "StagePay Companion",
+  "version": "0.1.0",
+  "description": "Stage StagePay prompts and reference images for copying into Google Flow, and attach generated output straight to the right StagePay item.",
+  "action": {
+    "default_title": "Open StagePay Companion"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["sidePanel", "storage", "tabs", "clipboardWrite"],
+  "host_permissions": ["https://stagepay.pages.dev/*"]
+}

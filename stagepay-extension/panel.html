@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>StagePay Companion</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <strong>💸 StagePay Companion</strong>
+      <button id="refreshBtn" title="Re-check which project is open">🔄</button>
+    </div>
+    <p id="projectStatus" class="status">Looking for an open StagePay tab…</p>
+  </header>
+
+  <nav id="stageTabs" class="stage-tabs" hidden></nav>
+
+  <main id="itemList" class="item-list"></main>
+
+  <section id="lastCopiedSection" class="last-copied" hidden>
+    <h2>Recently copied</h2>
+    <p class="hint">This is what's on your clipboard right now — check here before you paste, since you may have copied something in a different tab.</p>
+    <div id="lastCopiedContent"></div>
+  </section>
+
+  <script src="panel.js"></script>
+</body>
+</html>
