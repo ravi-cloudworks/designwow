@@ -260,6 +260,22 @@
   .goal-progress-bar { height: 9px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 14px; }
   .goal-progress-fill { height: 100%; background: var(--moss); border-radius: 999px; transition: width 0.2s; }
   .goal-progress-note { font-size: 12px; color: var(--text-faint); margin-top: 7px; }
+  /* Goal strip — a glanceable reminder at the top of the projects list, not
+     a second dashboard. Clicking anywhere on it jumps to the full Goal
+     Tracker; the bar itself mirrors the reference: a soft green track with a
+     dark fill for progress, and the number pinned to the right. */
+  .goal-strip { display: block; text-decoration: none; color: inherit; cursor: pointer; margin-bottom: 16px; }
+  .goal-strip-title { font-size: 14.5px; font-weight: 800; }
+  .goal-strip-subtitle { font-size: 12px; font-weight: 700; color: var(--moss); margin: 2px 0 10px; }
+  .goal-strip-row { display: flex; align-items: center; gap: 12px; }
+  .goal-strip-track { position: relative; flex: 1; height: 34px; border-radius: 999px; background: var(--moss-soft); border: 1px solid var(--moss-line); overflow: hidden; }
+  .goal-strip-fill { position: absolute; inset: 0; width: 0%; background: var(--ink); border-radius: 999px; transition: width 0.2s; }
+  .goal-strip-value { flex-shrink: 0; font-size: 15px; font-weight: 800; min-width: 64px; text-align: right; }
+  .goal-strip-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 8px; }
+  .goal-strip-note { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; font-style: italic; }
+  .goal-strip-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--moss-soft); border: 1px solid var(--moss-line); }
+  .goal-strip-empty strong { display: block; font-size: 13.5px; }
+  .goal-strip-empty span { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
   .goal-alloc { border-top: 1px solid var(--line-soft); margin-top: 18px; padding-top: 18px; }
   .goal-alloc-title { font-size: 13px; font-weight: 800; margin-bottom: 10px; }
   .stage-alloc-row { margin-bottom: 12px; padding: 12px; border-radius: 10px; background: var(--surface-2); border-left: 3px solid var(--line); }
@@ -684,6 +700,7 @@ Rules:
     goalSliderDraft: null, // uncommitted slider value, until "Set Goal" is clicked
     stagePricesDraft: null, // {2:paise,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     stageCountsDraft: null, // {2:count,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
+    projectsTab: 'in-period', // 'in-period' | 'others' — only shown once a goal is set
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -2649,6 +2666,13 @@ ${b.cta || '—'}
     }
   }
 
+  function goToGoalsScreen() {
+    // ?screen=goals (not a bare pathname reset) so a refresh on this page
+    // reopens Goals instead of falling through boot()'s projects-list default.
+    history.replaceState(null, '', `${location.pathname}?screen=goals`);
+    state.screen = 'goals';
+    renderApp();
+  }
   function renderTopbar() {
     document.getElementById('topbar').innerHTML = `
       <div class="topbar-title">
@@ -2666,13 +2690,7 @@ ${b.cta || '—'}
         ${state.user ? `<button class="btn btn-sm" id="goalsNavBtn">🎯 Goals</button><button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>`;
     const goalsNavBtn = document.getElementById('goalsNavBtn');
-    if (goalsNavBtn) goalsNavBtn.addEventListener('click', () => {
-      // ?screen=goals (not a bare pathname reset) so a refresh on this page
-      // reopens Goals instead of falling through boot()'s projects-list default.
-      history.replaceState(null, '', `${location.pathname}?screen=goals`);
-      state.screen = 'goals';
-      renderApp();
-    });
+    if (goalsNavBtn) goalsNavBtn.addEventListener('click', goToGoalsScreen);
     if (state.project) {
       document.querySelectorAll('[data-set-mode]').forEach(el => el.addEventListener('click', async () => {
         const mode = el.getAttribute('data-set-mode');
@@ -3023,6 +3041,51 @@ ${b.cta || '—'}
     const daysLeft = Math.max(0, Math.ceil((deadline - new Date()) / (24 * 60 * 60 * 1000)));
     const pct = Math.min(100, Math.round((earnedSince / summary.goalAmountPaise) * 100));
     return { earnedSince, pct, daysLeft };
+  }
+  // The one goal-related thing shown outside the Goals screen itself — a
+  // glanceable strip at the top of the projects list, not a second
+  // dashboard. Whole thing is a link into the full Goal Tracker.
+  function renderGoalStrip(summary) {
+    const progress = goalProgress(summary);
+    if (!progress) {
+      return `<a class="goal-strip" href="#" id="goalStripLink">
+        <div class="goal-strip-empty">
+          <div><strong>🎯 Your Goal &amp; Progress</strong><span>Make your money — because you are worth it. →</span></div>
+          <span class="btn btn-sm btn-primary">Set a goal</span>
+        </div>
+      </a>`;
+    }
+    const setAt = parseUtc(summary.goalSetAt);
+    const deadline = new Date(setAt.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const dateFmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<a class="goal-strip" href="#" id="goalStripLink">
+      <div class="goal-strip-title">🎯 Your Goal &amp; Progress</div>
+      <div class="goal-strip-subtitle">Make your money — because you are worth it. →</div>
+      <div class="goal-strip-row">
+        <div class="goal-strip-track"><div class="goal-strip-fill" style="width:${progress.pct}%"></div></div>
+        <div class="goal-strip-value">${progress.pct}%</div>
+      </div>
+      <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
+      <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
+    </a>`;
+  }
+  // A project belongs in "In goal period" if it earned anything since the
+  // goal started, OR it's been created/touched since then (still-unpaid,
+  // actively-worked-on projects shouldn't feel exiled to "Others" just
+  // because they haven't been paid yet) — otherwise it's "Others". Only
+  // meaningful once a goal actually exists; callers should show a flat list
+  // when goalProgress(summary) is null.
+  function splitProjectsByGoalPeriod(projects, summary) {
+    const setAt = parseUtc(summary.goalSetAt);
+    const paidSinceProjectIds = new Set(
+      summary.entries.filter(e => parseUtc(e.paidAt) >= setAt).map(e => e.projectId)
+    );
+    const inPeriod = [], others = [];
+    for (const p of projects) {
+      const activeSince = parseUtc(p.created_at) >= setAt || parseUtc(p.updated_at) >= setAt;
+      (paidSinceProjectIds.has(p.id) || activeSince ? inPeriod : others).push(p);
+    }
+    return { inPeriod, others };
   }
   // Per-stage historical average and mix — the raw material both the "2
   // possibilities" comparison line and the month-by-month blueprint are
@@ -3701,25 +3764,9 @@ ${b.cta || '—'}
     renderTopbar();
     wireGoalTrackerCard();
   }
-  async function renderProjectsScreen() {
-    state.projects = await api.listProjects();
-    document.getElementById('app').innerHTML = `
-      <div id="topbar" class="topbar"></div>
-      <div class="container">
-        <div class="card">
-          <div class="section-head-row"><span class="section-title">Your projects</span></div>
-          <div style="display:flex;gap:8px;margin-bottom:16px">
-            <input type="text" id="newProjectName" placeholder="Customer Name - Project Name" style="flex:1">
-            <button class="btn btn-primary" id="createProjectBtn">+ Create</button>
-          </div>
-          <div id="projectList"></div>
-        </div>
-      </div>
-      <div id="modalRoot"></div>`;
-    renderTopbar();
-    const list = document.getElementById('projectList');
-    list.innerHTML = state.projects.length
-      ? state.projects.map(p => `<div class="project-list-item" data-open-project="${p.id}">
+  function renderProjectListHtml(projects) {
+    return projects.length
+      ? projects.map(p => `<div class="project-list-item" data-open-project="${p.id}">
           <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">${esc(p.mode)} mode · updated ${esc(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
             ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : ''}
@@ -3727,6 +3774,36 @@ ${b.cta || '—'}
           </div>
         </div>`).join('')
       : '<p class="empty-note">No projects yet — create your first one above.</p>';
+  }
+  // The In-goal-period/Others tabs only appear once a goal actually exists —
+  // with no goal set there's no period to split by, so it stays a flat list.
+  function renderProjectsListCard() {
+    const progress = goalProgress(state.earningsSummary);
+    const split = progress ? splitProjectsByGoalPeriod(state.projects, state.earningsSummary) : null;
+    const activeList = split ? (state.projectsTab === 'others' ? split.others : split.inPeriod) : state.projects;
+    return `
+      <div class="section-head-row"><span class="section-title">Your projects</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input type="text" id="newProjectName" placeholder="Customer Name - Project Name" style="flex:1">
+        <button class="btn btn-primary" id="createProjectBtn">+ Create</button>
+      </div>
+      ${split ? `<div class="goal-range-toggle">
+        <button data-projects-tab="in-period" class="${state.projectsTab === 'others' ? '' : 'active'}">In goal period (${split.inPeriod.length})</button>
+        <button data-projects-tab="others" class="${state.projectsTab === 'others' ? 'active' : ''}">Other projects (${split.others.length})</button>
+      </div>` : ''}
+      <div id="projectList">${renderProjectListHtml(activeList)}</div>`;
+  }
+  function renderProjectsListCardInto() {
+    const root = document.getElementById('projectsListCardRoot');
+    if (!root) return;
+    root.innerHTML = renderProjectsListCard();
+    wireProjectsListCard();
+  }
+  function wireProjectsListCard() {
+    document.querySelectorAll('[data-projects-tab]').forEach(btn => btn.addEventListener('click', () => {
+      state.projectsTab = btn.getAttribute('data-projects-tab');
+      renderProjectsListCardInto();
+    }));
     document.querySelectorAll('[data-open-project]').forEach(el => el.addEventListener('click', (e) => {
       if (e.target.closest('[data-delete-project]')) return;
       openProject(el.getAttribute('data-open-project'));
@@ -3738,13 +3815,29 @@ ${b.cta || '—'}
       await api.deleteProject(id);
       renderProjectsScreen();
     }));
-    document.getElementById('createProjectBtn').addEventListener('click', async () => {
+    const createBtn = document.getElementById('createProjectBtn');
+    if (createBtn) createBtn.addEventListener('click', async () => {
       const nameInput = document.getElementById('newProjectName');
       const name = nameInput.value.trim();
       if (!name) { toast('Enter Customer Name - Project Name'); nameInput.focus(); return; }
       const created = await api.createProject(name);
       openProject(created.id);
     });
+  }
+  async function renderProjectsScreen() {
+    state.projects = await api.listProjects();
+    state.earningsSummary = await api.getEarningsSummary();
+    document.getElementById('app').innerHTML = `
+      <div id="topbar" class="topbar"></div>
+      <div class="container">
+        ${renderGoalStrip(state.earningsSummary)}
+        <div class="card" id="projectsListCardRoot">${renderProjectsListCard()}</div>
+      </div>
+      <div id="modalRoot"></div>`;
+    renderTopbar();
+    const goalStripLink = document.getElementById('goalStripLink');
+    if (goalStripLink) goalStripLink.addEventListener('click', (e) => { e.preventDefault(); goToGoalsScreen(); });
+    wireProjectsListCard();
   }
 
   async function openProject(id) {
