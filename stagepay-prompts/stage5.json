@@ -1,0 +1,32 @@
+{
+  "stage": 5,
+  "laneTitle": "Final Movie",
+  "note": "Kept per-scene, as confirmed — each scene generates its own clip independently; stitching all scene clips into one finished commercial happens externally, outside this tool. The source doc describes a single whole-project 'Final Production Render' assembling every approved stage at once — adapted below to per-scene scope: 'this scene's Blueprint/Character/Prop/Background Sheets + Music Brief' instead of the whole project's. Cross-scene concerns (adding new scenes, transitions between scenes) trimmed out since they don't apply to a single clip.",
+  "assemblyOrder": ["masterSheetPrompt", "yourDescription", "universalStyle"],
+  "universalStyle": {
+    "key": "production_bible_universal",
+    "label": "Universal Production Bible Style",
+    "text": "Maintain one consistent visual identity.\n\n• Apple keynote presentation quality\n• Cannes Lions commercial quality\n• Netflix production consistency\n• Weta Workshop attention to detail\n\nThe final video must feel like it was directed by an award-winning commercial director and produced by a premium production house."
+  },
+  "items": {
+    "movie": {
+      "label": "Final Movie Clip",
+      "note": "content.geminiInstruction is new — there was no specific backend guidance for 'movie' before this (it only got the generic instruction).",
+      "content": {
+        "geminiInstruction": "Draft the animation direction (camera movement, pacing, duration) for turning this scene's approved key-frame into a short video clip, maintaining continuity with the scene's established characters, wardrobe, props, lighting, and the approved Music Brief.",
+        "fieldsSchema": [
+          { "key": "direction", "label": "Animation direction", "type": "textarea" },
+          { "key": "duration", "label": "Duration (sec)", "type": "number" }
+        ]
+      },
+      "outputInstructions": [
+        {
+          "key": "master_final_production_render_prompt",
+          "label": "Master Final Production Render Prompt (per scene)",
+          "default": true,
+          "text": "Create this scene's final commercial-quality clip exactly from its approved Scene Blueprint.\n\nOBJECTIVE\n\nExecute this scene's approved Scene Blueprint without inventing new story elements.\nMaintain complete continuity with the Character Sheets, Prop Sheets, Background Sheet, and Music Brief referenced for this scene.\n\nFOLLOW EXACTLY\n\n• This scene's Blueprint\n• The Character Sheets featured in this scene\n• The Prop Sheets featured in this scene\n• This scene's Background Sheet\n• The Music Brief\n\nCONTINUITY\n\n• Character identity\n• Hair & wardrobe\n• Props\n• Backgrounds\n• Time of day\n• Weather\n• Lighting\n• Camera direction\n• Screen direction\n• Dialogue timing\n• Emotion progression\n• Branding\n\nCINEMATOGRAPHY\n\n• Hollywood commercial quality\n• Premium advertising cinematography\n• Natural human motion\n• Realistic facial animation\n• Accurate lip sync (if dialogue exists)\n• Correct eye-line\n• Natural hand interactions\n• Realistic physics\n• Smooth camera movement\n• Consistent color grading\n• Feature-film lighting\n• Premium depth of field\n\nEDITING\n\n• Respect the planned shot duration\n• Preserve pacing\n• Match music cues\n• Match sound effects\n• Broadcast-ready finish\n\nDO NOT\n\n• Change story\n• Add characters\n• Change wardrobe\n• Change props\n• Redesign locations\n• Change branding\n\nOUTPUT\n\nGenerate ONE polished, commercial-quality video clip for this scene, faithful to its approved Scene Blueprint and the Production Bible."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "stage": 2,
+  "laneTitle": "Story Board",
+  "assemblyOrder": ["masterSheetPrompt", "yourDescription", "universalStyle"],
+  "universalStyle": {
+    "key": "production_bible_universal",
+    "label": "Universal Production Bible Style",
+    "text": "GLOBAL ART DIRECTION\n\nEvery generated storyboard belongs to the same Production Bible.\n\nVisual Identity\n• Apple keynote quality\n• A24 cinematic minimalism\n• Pixar pre-production documentation\n• Weta Workshop production bible\n• Netflix concept art presentation\n• Cannes Lions advertising pitch deck\n\nGraphic Language\n• White premium presentation layout\n• Thin black divider lines\n• Spacious negative space\n• Editorial typography hierarchy\n• Soft paper texture\n• Production asset numbering\n• Revision labels\n• Version numbers\n• Project title placeholder\n• Copyright footer\n\nEvery storyboard should feel like it was created by an elite commercial art department."
+  },
+  "items": {
+    "story": {
+      "label": "Story",
+      "note": "No editable fields — the customer already decided the story, dialogue, and tone in the (now-locked) Stage 1 brief. The designer's job here is compiling that into a Flow-ready storyboard prompt, not re-authoring a concept/tone.",
+      "content": {
+        "geminiInstruction": "There is nothing to fill in beyond the \"prompt\" field — the brief's \"storyboard\" field is the customer's own already-written script and the brief's \"tone\" field is the already-decided mood; both are locked and must be used exactly as given, never re-interpreted or summarized into a new concept. Preserve the storyboard's actual dialogue lines, character names, and scene beats, in the same language/script they were written in — never translate them to English. Structure the \"prompt\" field as a numbered list of scenes/panels, one per beat from the script, so a designer can review and edit each individually — the number should match however many real beats the script has (do not force it to a fixed count). Carry the actual dialogue as an on-screen caption or spoken line wherever the script already has one.",
+        "fieldsSchema": [],
+        "autoPopulate": {
+          "note": "One Story generation drafts the skeleton of every downstream stage instead of the designer re-typing every cast member/prop/scene by hand. Each array item becomes a real item in that stage, pre-filled with this description — the designer still reviews/edits/regenerates each one individually at its own stage afterward. This is new — nothing in the app reads these fields yet; wiring it up is a 'clean the code' task.",
+          "geminiResponseFields": [
+            { "key": "characters", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "character" } },
+            { "key": "properties", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "property" } },
+            { "key": "backgrounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "background" } },
+            { "key": "sounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "sound" } },
+            { "key": "scenes", "shape": "array of {name, summary}", "createsItemsIn": { "stage": 4, "itemKey": "scene" } }
+          ]
+        }
+      },
+      "outputInstructions": [
+        {
+          "key": "master_storyboard_prompt",
+          "label": "Master Storyboard Prompt",
+          "default": true,
+          "text": "Create a premium cinematic storyboard SHEET containing ONE PANEL PER NUMBERED SCENE/BEAT in the description below — never merge multiple beats into a single panel, and never stop after only the first panel. If the description lists 4 numbered beats, render exactly 4 panels, laid out in sequence order on the same sheet.\n\nOBJECTIVE\nVisualize every numbered scene/beat exactly as written, each as its own separate panel.\nDo not invent additional story elements.\nDo not skip, merge, or truncate any beat — every numbered beat in the description gets its own panel.\nMaintain the described characters, props, environment, emotion and action, panel by panel.\n\nGenerate a production-ready multi-panel storyboard suitable for a world-class advertising campaign, clean enough to hand to a client with no further edits.\n\nSTYLE\n• Hollywood commercial storyboard\n• Cannes Lions presentation quality\n• Director's storyboard\n• Hand-drawn pencil illustration\n• Marker rendering\n• Loose confident sketch lines\n• Grayscale shading\n• Slight blue storyboard pencil accents\n• Premium beige storyboard paper\n• Elegant editorial graphic design\n\nFRAME DESIGN (repeat this layout for every panel, incrementing the numbering each time) — ONLY these fields, nothing else:\n• Scene Number (increments per panel, matching the beat number)\n• Location\n• Time of Day\n• Dialogue / On-Screen Text\n\nFIELD DISCIPLINE (critical — this is what keeps the sheet client-ready)\n• Only draw a frame-design field above if this specific scene's description actually gives you a real value for it. Never draw an empty, blank, or placeholder labeled box.\n• If this scene has dialogue or on-screen text, render it as one clean line INSIDE its own labeled Dialogue field at the bottom of that panel — never float it elsewhere on the panel (not as a floating caption, not overlapping the illustration), and never leave the Dialogue field blank when a line exists.\n• If this scene has no dialogue or on-screen text, omit the Dialogue field for that panel entirely instead of showing it empty.\n• Do not invent a Camera Angle, Shot Size, Lens, or Camera Movement field for any panel — that level of detail isn't part of this sheet.\n\nANNOTATIONS (per panel, only where the scene description actually supports it)\n• Character movement\n• Key prop callouts\n• Performance notes\n• Emotional beat\n• Composition notes\n• Blocking\n• Screen direction\n\nCINEMATIC QUALITY\n• Rule of thirds\n• Leading lines\n• Dynamic perspective\n• Strong silhouettes\n• Foreground / Midground / Background separation\n• Dramatic lighting\n• Motivated light source\n• Shadow direction\n• Premium production presentation\n\nCOLOR\nMostly grayscale with subtle blue storyboard pencil and light beige paper.\n\nDO NOT\n• Change the story\n• Add characters\n• Change wardrobe\n• Change props\n• Cartoonize\n• Anime\n• Comic book style\n• Photorealistic painting\n• Over-render\n• Collapse multiple numbered beats into a single panel\n• Stop after the first panel — every numbered beat needs its own panel on the sheet\n• Draw an empty or placeholder labeled box for any field without real data\n\nOUTPUT\nGenerate a multi-panel storyboard SHEET with exactly as many panels as there are numbered scenes/beats in the description below, arranged in sequence order on one sheet, each panel looking like it belongs inside the production bible of a multi-million-dollar commercial, and clean enough to send straight to the client with no touch-ups needed."
+        }
+      ]
+    }
+  }
+}
