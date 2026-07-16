@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Workflow Builder</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; background: #0f1117; }
+        #root { height: 100%; }
+
+        /* ── Node styles ── */
+        .mcp-node { border-radius: 10px; min-width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border: 1.5px solid transparent; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+        .mcp-node:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.6); }
+        .mcp-node.selected { border-color: #f59e0b !important; box-shadow: 0 0 0 2px rgba(245,158,11,0.4); }
+
+        .node-llm   { background: #1e1b4b; border-color: #6366f1; }
+        .node-code  { background: #052e16; border-color: #22c55e; }
+        .node-web   { background: #0c1a2e; border-color: #38bdf8; }
+        .node-data  { background: #1c0a00; border-color: #f97316; }
+        .node-io    { background: #1a1a1a; border-color: #71717a; }
+        .node-math  { background: #170d2a; border-color: #a855f7; }
+
+        .node-header { padding: 8px 12px 6px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .node-icon { font-size: 14px; }
+        .node-title { font-weight: 700; font-size: 12px; letter-spacing: 0.3px; }
+        .node-category { font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; opacity: 0.6; margin-left: auto; }
+
+        .node-llm .node-title   { color: #a5b4fc; }
+        .node-code .node-title  { color: #86efac; }
+        .node-web .node-title   { color: #7dd3fc; }
+        .node-data .node-title  { color: #fdba74; }
+        .node-io .node-title    { color: #a1a1aa; }
+        .node-math .node-title  { color: #d8b4fe; }
+
+        .node-body { padding: 8px 12px 10px; }
+        .port-row { display: flex; align-items: center; font-size: 10px; margin: 2px 0; }
+        .port-label { opacity: 0.75; }
+        .port-in  { color: #60a5fa; }
+        .port-out { color: #34d399; }
+        .port-dot { width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; }
+        .port-in  .port-dot { background: #60a5fa; }
+        .port-out .port-dot { background: #34d399; }
+        .port-section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; opacity: 0.4; margin-top: 4px; margin-bottom: 2px; }
+
+        /* React Flow handle overrides */
+        .react-flow__handle { width: 10px !important; height: 10px !important; border-radius: 50% !important; border: 2px solid #1e1e1e !important; }
+        .react-flow__handle-left  { background: #60a5fa !important; left: -6px !important; }
+        .react-flow__handle-right { background: #34d399 !important; right: -6px !important; }
+        .react-flow__node { padding: 0 !important; background: none !important; border: none !important; }
+
+        /* ── Sidebar (library) ── */
+        .sidebar { background: #16181f; border-right: 1px solid #2a2d3a; overflow-y: auto; display: flex; flex-direction: column; }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 2px; }
+        .category-header { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; padding: 10px 12px 4px; opacity: 0.5; color: white; }
+        .tool-item { margin: 3px 8px; border-radius: 6px; padding: 7px 10px; cursor: grab; border: 1px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 8px; }
+        .tool-item:hover { filter: brightness(1.2); border-color: rgba(255,255,255,0.15); }
+        .tool-item:active { cursor: grabbing; transform: scale(0.97); }
+        .tool-item-icon { font-size: 14px; flex-shrink: 0; }
+        .tool-item-name { font-size: 11px; font-weight: 600; }
+        .tool-item-desc { font-size: 9px; opacity: 0.55; margin-top: 1px; }
+        .tool-llm  { background: rgba(99,102,241,0.12); }
+        .tool-code { background: rgba(34,197,94,0.1); }
+        .tool-web  { background: rgba(56,189,248,0.1); }
+        .tool-data { background: rgba(249,115,22,0.1); }
+        .tool-io   { background: rgba(113,113,122,0.1); }
+        .tool-math { background: rgba(168,85,247,0.1); }
+
+        /* ── Properties panel ── */
+        .props-panel { background: #16181f; border-left: 1px solid #2a2d3a; overflow-y: auto; display: flex; flex-direction: column; }
+        .props-panel::-webkit-scrollbar { width: 4px; }
+        .props-panel::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 2px; }
+        .props-header { padding: 12px 14px; border-bottom: 1px solid #2a2d3a; font-size: 12px; font-weight: 700; color: #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+        .props-section { padding: 10px 14px; border-bottom: 1px solid #1e2030; }
+        .props-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 5px; }
+        .props-input { width: 100%; background: #0f1117; border: 1px solid #2a2d3a; border-radius: 5px; padding: 6px 8px; font-size: 11px; color: #e5e7eb; outline: none; transition: border-color 0.15s; }
+        .props-input:focus { border-color: #6366f1; }
+        .props-input::placeholder { color: #4b5563; }
+        .port-edit-row { display: flex; align-items: center; gap-6px; margin-bottom: 4px; }
+        .port-tag { display: inline-flex; align-items: center; gap: 4px; background: #1e2030; border: 1px solid #2a2d3a; border-radius: 4px; padding: 3px 6px; font-size: 10px; color: #9ca3af; margin: 2px; }
+        .port-tag-remove { cursor: pointer; opacity: 0.5; font-size: 11px; line-height: 1; }
+        .port-tag-remove:hover { opacity: 1; color: #f87171; }
+        .add-port-row { display: flex; gap: 4px; margin-top: 4px; }
+        .btn-sm { border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+        .btn-add  { background: #1d4ed8; color: white; }
+        .btn-add:hover { background: #2563eb; }
+        .btn-danger { background: #7f1d1d; color: #fca5a5; }
+        .btn-danger:hover { background: #991b1b; }
+
+        /* ── Top bar ── */
+        .topbar { background: #16181f; border-bottom: 1px solid #2a2d3a; height: 46px; display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; }
+        .topbar-title { font-size: 14px; font-weight: 700; color: #e5e7eb; letter-spacing: 0.3px; margin-right: 12px; }
+        .topbar-title span { color: #6366f1; }
+        .btn-top { border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+        .btn-export { background: #166534; color: #86efac; }
+        .btn-export:hover { background: #15803d; }
+        .btn-import { background: #1e3a5f; color: #7dd3fc; }
+        .btn-import:hover { background: #1e40af; }
+        .btn-clear  { background: #3f0a0a; color: #fca5a5; }
+        .btn-clear:hover  { background: #7f1d1d; }
+
+        /* ── Canvas wrapper ── */
+        .canvas-wrap { flex: 1; position: relative; }
+        .react-flow__background { background: #0f1117; }
+        .react-flow__edge-path { stroke: #4b5563; stroke-width: 2; }
+        .react-flow__edge.animated .react-flow__edge-path { stroke: #6366f1; }
+        .react-flow__controls { background: #16181f; border: 1px solid #2a2d3a; border-radius: 6px; }
+        .react-flow__controls button { background: #16181f; border: none; color: #9ca3af; }
+        .react-flow__controls button:hover { background: #1e2030; color: white; }
+        .react-flow__minimap { background: #16181f; border: 1px solid #2a2d3a; border-radius: 6px; }
+
+        /* ── Drop hint ── */
+        .drop-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
+        .drop-hint-icon { font-size: 48px; opacity: 0.08; }
+        .drop-hint-text { font-size: 13px; opacity: 0.15; color: white; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/javascript">
+const { useState, useCallback, useRef, useEffect } = React;
+const {
+    ReactFlow, addEdge, Background, Controls, MiniMap,
+    applyEdgeChanges, applyNodeChanges, Handle, Position, useReactFlow,
+    ReactFlowProvider
+} = window.ReactFlow;
+
+// ═══════════════════════════════════════════════
+//  TOOL LIBRARY DEFINITION
+// ═══════════════════════════════════════════════
+const TOOL_LIBRARY = [
+    {
+        category: 'LLM',
+        color: 'llm',
+        icon: '🤖',
+        tools: [
+            { id: 'llm_claude', name: 'Claude', icon: '🧠', desc: 'Anthropic Claude model call', inputs: ['prompt', 'context'], outputs: ['response', 'usage'], params: { model: 'claude-opus-4-7', temperature: 0.7, max_tokens: 2048 } },
+            { id: 'llm_openai', name: 'OpenAI GPT', icon: '💬', desc: 'OpenAI GPT model call', inputs: ['prompt', 'context'], outputs: ['response', 'usage'], params: { model: 'gpt-4o', temperature: 0.7, max_tokens: 2048 } },
+            { id: 'llm_embed', name: 'Embeddings', icon: '📐', desc: 'Generate vector embeddings', inputs: ['text'], outputs: ['vector'], params: { model: 'text-embedding-3-small', dimensions: 1536 } },
+            { id: 'llm_classify', name: 'Classifier', icon: '🏷️', desc: 'LLM-based text classifier', inputs: ['text', 'labels'], outputs: ['label', 'confidence'], params: { model: 'claude-haiku-4-5-20251001' } },
+        ]
+    },
+    {
+        category: 'Code',
+        color: 'code',
+        icon: '⚙️',
+        tools: [
+            { id: 'code_python', name: 'Python', icon: '🐍', desc: 'Execute Python code', inputs: ['code', 'env'], outputs: ['stdout', 'result', 'error'], params: { timeout_s: 30 } },
+            { id: 'code_js', name: 'JavaScript', icon: '📜', desc: 'Execute JavaScript (Node)', inputs: ['code', 'env'], outputs: ['stdout', 'result', 'error'], params: { timeout_s: 30 } },
+            { id: 'code_bash', name: 'Shell / Bash', icon: '🖥️', desc: 'Run shell commands', inputs: ['command'], outputs: ['stdout', 'stderr', 'exit_code'], params: { cwd: '/tmp' } },
+            { id: 'code_test', name: 'Unit Tests', icon: '✅', desc: 'Run pytest / jest tests', inputs: ['code', 'tests'], outputs: ['passed', 'failed', 'report'], params: { framework: 'pytest' } },
+        ]
+    },
+    {
+        category: 'Web',
+        color: 'web',
+        icon: '🌐',
+        tools: [
+            { id: 'web_fetch', name: 'HTTP Fetch', icon: '📡', desc: 'HTTP GET/POST request', inputs: ['url', 'headers', 'body'], outputs: ['response', 'status', 'headers'], params: { method: 'GET', timeout_s: 10 } },
+            { id: 'web_search', name: 'Web Search', icon: '🔍', desc: 'Search the web (Brave/SerpAPI)', inputs: ['query'], outputs: ['results', 'urls'], params: { engine: 'brave', num_results: 5 } },
+            { id: 'web_scrape', name: 'Web Scraper', icon: '🕷️', desc: 'Extract content from a URL', inputs: ['url'], outputs: ['text', 'html', 'links'], params: { extract: 'text' } },
+            { id: 'web_api', name: 'REST API', icon: '🔗', desc: 'Generic REST API call', inputs: ['endpoint', 'payload'], outputs: ['data', 'status'], params: { auth: 'bearer' } },
+        ]
+    },
+    {
+        category: 'Data',
+        color: 'data',
+        icon: '📁',
+        tools: [
+            { id: 'data_read', name: 'Read File', icon: '📖', desc: 'Read text / JSON / CSV file', inputs: ['path'], outputs: ['content', 'rows'], params: { encoding: 'utf-8' } },
+            { id: 'data_write', name: 'Write File', icon: '💾', desc: 'Write content to a file', inputs: ['path', 'content'], outputs: ['bytes_written'], params: { mode: 'w' } },
+            { id: 'data_sql', name: 'SQL Query', icon: '🗄️', desc: 'Run SQL on a database', inputs: ['query', 'params'], outputs: ['rows', 'count'], params: { db: 'postgres', limit: 1000 } },
+            { id: 'data_transform', name: 'Transform', icon: '🔄', desc: 'Map / filter / reshape data', inputs: ['data', 'schema'], outputs: ['result'], params: { format: 'json' } },
+        ]
+    },
+];
+
+const COLOR_MAP = {
+    llm:  { bg: 'node-llm',  tool: 'tool-llm'  },
+    code: { bg: 'node-code', tool: 'tool-code' },
+    web:  { bg: 'node-web',  tool: 'tool-web'  },
+    data: { bg: 'node-data', tool: 'tool-data' },
+    io:   { bg: 'node-io',   tool: 'tool-io'   },
+    math: { bg: 'node-math', tool: 'tool-math' },
+};
+
+// ═══════════════════════════════════════════════
+//  CUSTOM NODE COMPONENT
+// ═══════════════════════════════════════════════
+const McpNode = ({ data, selected }) => {
+    const color = data.color || 'io';
+    const cls = COLOR_MAP[color]?.bg || 'node-io';
+    return React.createElement('div', { className: `mcp-node ${cls} ${selected ? 'selected' : ''}` },
+        React.createElement('div', { className: 'node-header' },
+            React.createElement('span', { className: 'node-icon' }, data.icon || '⚙️'),
+            React.createElement('span', { className: 'node-title' }, data.label || data.tool),
+            React.createElement('span', { className: 'node-category' }, data.category || '')
+        ),
+        React.createElement('div', { className: 'node-body' },
+            data.inputs?.length > 0 && React.createElement('div', null,
+                React.createElement('div', { className: 'port-section-label', style: { color: '#60a5fa' } }, 'inputs'),
+                data.inputs.map((inp, i) =>
+                    React.createElement('div', { key: i, className: 'port-row port-in' },
+                        React.createElement(Handle, { type: 'target', position: Position.Left, id: inp, style: { top: `${52 + i * 18}px`, background: '#60a5fa', border: '2px solid #0f1117', width: 8, height: 8 } }),
+                        React.createElement('div', { className: 'port-dot' }),
+                        React.createElement('span', { className: 'port-label' }, inp)
+                    )
+                )
+            ),
+            data.outputs?.length > 0 && React.createElement('div', { style: { marginTop: 6 } },
+                React.createElement('div', { className: 'port-section-label', style: { color: '#34d399' } }, 'outputs'),
+                data.outputs.map((out, i) =>
+                    React.createElement('div', { key: i, className: 'port-row port-out', style: { justifyContent: 'flex-end' } },
+                        React.createElement('span', { className: 'port-label' }, out),
+                        React.createElement('div', { className: 'port-dot' }),
+                        React.createElement(Handle, { type: 'source', position: Position.Right, id: out, style: { top: `${52 + (data.inputs?.length || 0) * 18 + 22 + i * 18}px`, background: '#34d399', border: '2px solid #0f1117', width: 8, height: 8 } })
+                    )
+                )
+            )
+        )
+    );
+};
+
+const nodeTypes = { mcpNode: McpNode };
+
+// ═══════════════════════════════════════════════
+//  TOOL LIBRARY SIDEBAR
+// ═══════════════════════════════════════════════
+const LibrarySidebar = ({ onDragStart }) => {
+    return React.createElement('div', { className: 'sidebar', style: { width: 210 } },
+        React.createElement('div', { style: { padding: '12px 14px 4px', borderBottom: '1px solid #2a2d3a' } },
+            React.createElement('div', { style: { fontSize: 12, fontWeight: 700, color: '#e5e7eb' } }, 'Tool Library'),
+            React.createElement('div', { style: { fontSize: 9, color: '#6b7280', marginTop: 2 } }, 'Drag onto canvas')
+        ),
+        TOOL_LIBRARY.map(group =>
+            React.createElement('div', { key: group.category },
+                React.createElement('div', { className: 'category-header' },
+                    `${group.icon}  ${group.category}`
+                ),
+                group.tools.map(tool =>
+                    React.createElement('div', {
+                        key: tool.id,
+                        className: `tool-item tool-${group.color}`,
+                        draggable: true,
+                        onDragStart: (e) => onDragStart(e, tool, group.color, group.category)
+                    },
+                        React.createElement('div', null,
+                            React.createElement('div', { className: 'tool-item-name', style: { color: 'white' } },
+                                `${tool.icon}  ${tool.name}`
+                            ),
+                            React.createElement('div', { className: 'tool-item-desc' }, tool.desc)
+                        )
+                    )
+                )
+            )
+        )
+    );
+};
+
+// ═══════════════════════════════════════════════
+//  PROPERTIES PANEL
+// ═══════════════════════════════════════════════
+const PropsPanel = ({ node, onChange, onDelete }) => {
+    const [newInput, setNewInput] = useState('');
+    const [newOutput, setNewOutput] = useState('');
+
+    if (!node) {
+        return React.createElement('div', { className: 'props-panel', style: { width: 240 } },
+            React.createElement('div', { className: 'props-header' }, 'Properties'),
+            React.createElement('div', { style: { padding: 16, color: '#6b7280', fontSize: 11, textAlign: 'center', marginTop: 40 } },
+                React.createElement('div', { style: { fontSize: 28, marginBottom: 8 } }, '👆'),
+                'Click a node to edit its properties'
+            )
+        );
+    }
+
+    const data = node.data;
+    const update = (field, value) => onChange(node.id, { ...data, [field]: value });
+    const addPort = (field, val, setter) => {
+        const v = val.trim();
+        if (!v) return;
+        update(field, [...(data[field] || []), v]);
+        setter('');
+    };
+    const removePort = (field, idx) => update(field, (data[field] || []).filter((_, i) => i !== idx));
+
+    const colorLabel = { llm: '🤖 LLM', code: '⚙️ Code', web: '🌐 Web', data: '📁 Data', io: '⬛ I/O', math: '🔢 Math' };
+
+    return React.createElement('div', { className: 'props-panel', style: { width: 240 } },
+        React.createElement('div', { className: 'props-header' },
+            React.createElement('span', null, `${data.icon || '⚙️'} ${data.label}`),
+            React.createElement('button', {
+                className: 'btn-sm btn-danger',
+                onClick: () => onDelete(node.id)
+            }, '✕ Delete')
+        ),
+
+        React.createElement('div', { className: 'props-section' },
+            React.createElement('div', { className: 'props-label' }, 'Tool Name'),
+            React.createElement('input', {
+                className: 'props-input',
+                value: data.tool || '',
+                placeholder: 'e.g. my_tool',
+                onChange: e => update('tool', e.target.value)
+            }),
+            React.createElement('div', { className: 'props-label', style: { marginTop: 8 } }, 'Display Label'),
+            React.createElement('input', {
+                className: 'props-input',
+                value: data.label || '',
+                placeholder: 'Display name',
+                onChange: e => update('label', e.target.value)
+            }),
+            React.createElement('div', { className: 'props-label', style: { marginTop: 8 } }, 'Category'),
+            React.createElement('select', {
+                className: 'props-input',
+                value: data.color || 'io',
+                style: { cursor: 'pointer' },
+                onChange: e => update('color', e.target.value)
+            },
+                Object.entries(colorLabel).map(([k, v]) =>
+                    React.createElement('option', { key: k, value: k }, v)
+                )
+            )
+        ),
+
+        React.createElement('div', { className: 'props-section' },
+            React.createElement('div', { className: 'props-label' }, 'Description'),
+            React.createElement('input', {
+                className: 'props-input',
+                value: data.description || '',
+                placeholder: 'What this tool does',
+                onChange: e => update('description', e.target.value)
+            })
+        ),
+
+        React.createElement('div', { className: 'props-section' },
+            React.createElement('div', { className: 'props-label', style: { color: '#60a5fa' } }, 'Input Ports'),
+            React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 2 } },
+                (data.inputs || []).map((inp, i) =>
+                    React.createElement('span', { key: i, className: 'port-tag' },
+                        inp,
+                        React.createElement('span', { className: 'port-tag-remove', onClick: () => removePort('inputs', i) }, '×')
+                    )
+                )
+            ),
+            React.createElement('div', { className: 'add-port-row' },
+                React.createElement('input', {
+                    className: 'props-input',
+                    style: { flex: 1 },
+                    value: newInput,
+                    placeholder: 'port name',
+                    onChange: e => setNewInput(e.target.value),
+                    onKeyDown: e => e.key === 'Enter' && addPort('inputs', newInput, setNewInput)
+                }),
+                React.createElement('button', {
+                    className: 'btn-sm btn-add',
+                    onClick: () => addPort('inputs', newInput, setNewInput)
+                }, '+')
+            )
+        ),
+
+        React.createElement('div', { className: 'props-section' },
+            React.createElement('div', { className: 'props-label', style: { color: '#34d399' } }, 'Output Ports'),
+            React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 2 } },
+                (data.outputs || []).map((out, i) =>
+                    React.createElement('span', { key: i, className: 'port-tag' },
+                        out,
+                        React.createElement('span', { className: 'port-tag-remove', onClick: () => removePort('outputs', i) }, '×')
+                    )
+                )
+            ),
+            React.createElement('div', { className: 'add-port-row' },
+                React.createElement('input', {
+                    className: 'props-input',
+                    style: { flex: 1 },
+                    value: newOutput,
+                    placeholder: 'port name',
+                    onChange: e => setNewOutput(e.target.value),
+                    onKeyDown: e => e.key === 'Enter' && addPort('outputs', newOutput, setNewOutput)
+                }),
+                React.createElement('button', {
+                    className: 'btn-sm btn-add',
+                    onClick: () => addPort('outputs', newOutput, setNewOutput)
+                }, '+')
+            )
+        ),
+
+        data.params && React.createElement('div', { className: 'props-section' },
+            React.createElement('div', { className: 'props-label' }, 'Parameters'),
+            Object.entries(data.params).map(([k, v]) =>
+                React.createElement('div', { key: k, style: { marginBottom: 5 } },
+                    React.createElement('div', { style: { fontSize: 9, color: '#9ca3af', marginBottom: 2 } }, k),
+                    React.createElement('input', {
+                        className: 'props-input',
+                        value: String(v),
+                        onChange: e => update('params', { ...data.params, [k]: e.target.value })
+                    })
+                )
+            )
+        )
+    );
+};
+
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
+const topoSort = (nodes, edges) => {
+    const inDeg = {};
+    const adj = {};
+    nodes.forEach(n => { inDeg[n.id] = 0; adj[n.id] = []; });
+    edges.forEach(e => { adj[e.source].push(e.target); inDeg[e.target]++; });
+    const queue = nodes.filter(n => inDeg[n.id] === 0);
+    const result = [];
+    while (queue.length) {
+        const node = queue.shift();
+        result.push(node);
+        adj[node.id].forEach(tid => {
+            inDeg[tid]--;
+            if (inDeg[tid] === 0) queue.push(nodes.find(n => n.id === tid));
+        });
+    }
+    // append any nodes not reached (cycles / disconnected)
+    nodes.forEach(n => { if (!result.find(r => r.id === n.id)) result.push(n); });
+    return result;
+};
+
+// ═══════════════════════════════════════════════
+//  MAIN APP
+// ═══════════════════════════════════════════════
+const AppInner = () => {
+    const [nodes, setNodes] = useState([]);
+    const [edges, setEdges] = useState([]);
+    const [selectedNode, setSelectedNode] = useState(null);
+    const [workflowName, setWorkflowName] = useState('my_workflow');
+    const reactFlowWrapper = useRef(null);
+    const { project } = useReactFlow();
+
+    const onNodesChange = useCallback(changes => {
+        setNodes(nds => applyNodeChanges(changes, nds));
+    }, []);
+    const onEdgesChange = useCallback(changes => {
+        setEdges(eds => applyEdgeChanges(changes, eds));
+    }, []);
+    const onConnect = useCallback(params => {
+        setEdges(eds => addEdge({ ...params, animated: true, style: { stroke: '#6366f1', strokeWidth: 2 } }, eds));
+    }, []);
+
+    const onNodeClick = useCallback((_, node) => setSelectedNode(node), []);
+    const onPaneClick = useCallback(() => setSelectedNode(null), []);
+
+    const updateNodeData = useCallback((id, newData) => {
+        setNodes(nds => nds.map(n => n.id === id ? { ...n, data: newData } : n));
+        setSelectedNode(prev => prev?.id === id ? { ...prev, data: newData } : prev);
+    }, []);
+
+    const deleteNode = useCallback(id => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+        setSelectedNode(null);
+    }, []);
+
+    // Drag from library
+    const dragToolRef = useRef(null);
+    const onDragStart = useCallback((e, tool, color, category) => {
+        dragToolRef.current = { tool, color, category };
+        e.dataTransfer.effectAllowed = 'move';
+    }, []);
+
+    const onDrop = useCallback(e => {
+        e.preventDefault();
+        if (!dragToolRef.current) return;
+        const { tool, color, category } = dragToolRef.current;
+        const bounds = reactFlowWrapper.current.getBoundingClientRect();
+        const position = project({ x: e.clientX - bounds.left, y: e.clientY - bounds.top });
+        const id = `n_${Date.now()}`;
+        const newNode = {
+            id,
+            type: 'mcpNode',
+            position,
+            data: {
+                id,
+                tool: tool.id,
+                label: tool.name,
+                icon: tool.icon,
+                color,
+                category,
+                description: tool.desc,
+                inputs: [...tool.inputs],
+                outputs: [...tool.outputs],
+                params: { ...tool.params }
+            }
+        };
+        setNodes(nds => [...nds, newNode]);
+        dragToolRef.current = null;
+    }, [project]);
+
+    const onDragOver = useCallback(e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, []);
+
+    // Export — DSTT format
+    const exportDSTT = () => {
+        if (nodes.length === 0) { alert('Add at least one node first.'); return; }
+        const name = workflowName.trim() || 'my_workflow';
+        const sorted = topoSort(nodes, edges);
+
+        const transitions = sorted.map((node, idx) => {
+            const incomingEdges = edges.filter(e => e.target === node.id);
+            // For each declared input port, resolve: if wired use the source output handle name, else keep as-is
+            const resolvedInputs = (node.data.inputs || []).map(inputPort => {
+                const edge = incomingEdges.find(e => e.targetHandle === inputPort || (!e.targetHandle && idx === 0));
+                return edge ? (edge.sourceHandle || edge.source) : inputPort;
+            });
+
+            return {
+                id: `t${idx + 1}`,
+                tool: node.data.tool || node.data.label || 'unknown',
+                inputs: resolvedInputs,
+                outputs: node.data.outputs || []
+            };
+        });
+
+        const lastNode = sorted[sorted.length - 1];
+        const milestone = lastNode?.data.outputs || [];
+
+        const dstt = {
+            [name]: {
+                segments: [{
+                    transitions,
+                    milestone
+                }]
+            }
+        };
+
+        const blob = new Blob([JSON.stringify(dstt, null, 4)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${name}.json`; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // Import — DSTT format
+    const importDSTT = () => {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = '.json';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const raw = JSON.parse(ev.target.result);
+                    // Accept both DSTT format (named keys) and legacy mcp_workflow
+                    let wfName, transitions;
+                    if (raw.mcp_workflow) {
+                        wfName = 'my_workflow';
+                        transitions = raw.mcp_workflow.segments?.[0]?.transitions || raw.mcp_workflow.tools || [];
+                    } else {
+                        wfName = Object.keys(raw)[0];
+                        transitions = raw[wfName]?.segments?.[0]?.transitions || [];
+                    }
+                    if (!transitions.length) { alert('No transitions found in file.'); return; }
+
+                    setWorkflowName(wfName);
+
+                    const importedNodes = transitions.map((t, idx) => ({
+                        id: t.id || `t${idx + 1}`,
+                        type: 'mcpNode',
+                        position: { x: 120 + idx * 280, y: 180 },
+                        data: {
+                            id: t.id || `t${idx + 1}`,
+                            tool: t.tool || '',
+                            label: t.tool || `Step ${idx + 1}`,
+                            icon: '⚙️',
+                            color: 'io',
+                            category: '',
+                            description: '',
+                            inputs: t.inputs || [],
+                            outputs: t.outputs || [],
+                            params: {}
+                        }
+                    }));
+
+                    // Infer edges: if transition B's input matches a transition A's output, wire them
+                    const importedEdges = [];
+                    let edgeIdx = 0;
+                    importedNodes.forEach((target, ti) => {
+                        (target.data.inputs || []).forEach(inputPort => {
+                            importedNodes.forEach((source, si) => {
+                                if (si >= ti) return;
+                                if ((source.data.outputs || []).includes(inputPort)) {
+                                    importedEdges.push({
+                                        id: `e${edgeIdx++}`,
+                                        source: source.id,
+                                        sourceHandle: inputPort,
+                                        target: target.id,
+                                        targetHandle: inputPort,
+                                        animated: true,
+                                        style: { stroke: '#6366f1', strokeWidth: 2 }
+                                    });
+                                }
+                            });
+                        });
+                    });
+
+                    setNodes(importedNodes);
+                    setEdges(importedEdges);
+                    setSelectedNode(null);
+                } catch (err) { alert('Failed to parse JSON: ' + err.message); }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    };
+
+    const clearAll = () => { if (confirm('Clear all nodes?')) { setNodes([]); setEdges([]); setSelectedNode(null); } };
+
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100vh' } },
+        // Top bar
+        React.createElement('div', { className: 'topbar' },
+            React.createElement('span', { className: 'topbar-title' },
+                React.createElement('span', null, 'MCP'), ' Workflow Builder'
+            ),
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 4, background: '#0f1117', border: '1px solid #2a2d3a', borderRadius: 5, padding: '2px 8px' } },
+                React.createElement('span', { style: { fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px' } }, 'Name:'),
+                React.createElement('input', {
+                    style: { background: 'none', border: 'none', outline: 'none', color: '#e5e7eb', fontSize: 11, fontWeight: 600, width: 140 },
+                    value: workflowName,
+                    placeholder: 'workflow_name',
+                    onChange: e => setWorkflowName(e.target.value)
+                })
+            ),
+            React.createElement('button', { className: 'btn-top btn-import', onClick: importDSTT }, '📂 Import DSTT'),
+            React.createElement('button', { className: 'btn-top btn-export', onClick: exportDSTT }, '📤 Export DSTT'),
+            React.createElement('div', { style: { flex: 1 } }),
+            React.createElement('span', { style: { fontSize: 10, color: '#4b5563' } },
+                `${nodes.length} nodes · ${edges.length} edges`
+            ),
+            React.createElement('button', { className: 'btn-top btn-clear', onClick: clearAll }, '🗑 Clear')
+        ),
+        // Main area
+        React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden' } },
+            React.createElement(LibrarySidebar, { onDragStart }),
+            React.createElement('div', { className: 'canvas-wrap', ref: reactFlowWrapper, onDrop, onDragOver },
+                nodes.length === 0 && React.createElement('div', { className: 'drop-hint' },
+                    React.createElement('div', { className: 'drop-hint-icon' }, '🔧'),
+                    React.createElement('div', { className: 'drop-hint-text' }, 'Drag tools from the left panel to build your workflow')
+                ),
+                React.createElement(ReactFlow, {
+                    nodes,
+                    edges,
+                    onNodesChange,
+                    onEdgesChange,
+                    onConnect,
+                    onNodeClick,
+                    onPaneClick,
+                    nodeTypes,
+                    fitView: true,
+                    snapToGrid: true,
+                    snapGrid: [16, 16],
+                    deleteKeyCode: 'Delete',
+                    style: { background: '#0f1117' }
+                },
+                    React.createElement(Background, { color: '#1e2030', gap: 24, size: 1 }),
+                    React.createElement(Controls, { style: { bottom: 16, left: 16 } }),
+                    React.createElement(MiniMap, {
+                        style: { bottom: 16, right: 16 },
+                        nodeColor: n => ({ llm:'#6366f1', code:'#22c55e', web:'#38bdf8', data:'#f97316' }[n.data?.color] || '#71717a'),
+                        maskColor: 'rgba(15,17,23,0.85)'
+                    })
+                )
+            ),
+            React.createElement(PropsPanel, {
+                node: selectedNode,
+                onChange: updateNodeData,
+                onDelete: deleteNode
+            })
+        )
+    );
+};
+
+const App = () =>
+    React.createElement(ReactFlowProvider, null,
+        React.createElement(AppInner)
+    );
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
