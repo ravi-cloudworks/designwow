@@ -110,6 +110,7 @@
   .section-head-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
   .section-num { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; flex-shrink: 0; font-family: var(--display); }
   .section-title { font-size: 15px; font-weight: 700; }
+  .section-subtitle { font-size: 12px; color: var(--text-faint); margin: 2px 0 12px; }
   .section-desc { margin: 0 0 14px 38px; font-size: 11.5px; color: var(--text-faint); max-width: 60ch; }
 
   .field { margin-bottom: 12px; }
@@ -271,6 +272,10 @@
   .goal-strip-track { position: relative; flex: 1; height: 34px; border-radius: 999px; background: var(--moss-soft); border: 1px solid var(--moss-line); overflow: hidden; }
   .goal-strip-fill { position: absolute; inset: 0; width: 0%; background: var(--ink); border-radius: 999px; transition: width 0.2s; }
   .goal-strip-value { flex-shrink: 0; font-size: 15px; font-weight: 800; min-width: 64px; text-align: right; }
+  .goal-strip-stages { margin-top: 9px; }
+  .goal-strip-stages-sentence { font-size: 11.5px; color: var(--text-faint); margin-bottom: 6px; }
+  .goal-strip-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .goal-strip-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
   .goal-strip-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 8px; }
   .goal-strip-note { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; font-style: italic; }
   .goal-strip-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--moss-soft); border: 1px solid var(--moss-line); }
@@ -2673,9 +2678,20 @@ ${b.cta || '—'}
     state.screen = 'goals';
     renderApp();
   }
+  function goToProjectsScreen() {
+    history.replaceState(null, '', location.pathname);
+    state.screen = 'projects';
+    renderApp();
+  }
   function renderTopbar() {
+    // Contextual: show "🎯 Goals" everywhere EXCEPT on the Goals screen
+    // itself, where it'd be a no-op link back to the page you're already
+    // on — show "All Projects" there instead, same as the in-project view.
+    const goalsOrHomeBtn = state.screen === 'goals'
+      ? `<button class="btn btn-sm" id="goalsHomeBtn">All Projects</button>`
+      : `<button class="btn btn-sm" id="goalsNavBtn">🎯 Goals</button>`;
     document.getElementById('topbar').innerHTML = `
-      <div class="topbar-title">
+      <div class="topbar-title" id="topbarHomeLink" style="cursor:pointer">
         <span class="mark">💸</span>
         <div><h1>StagePay</h1><p>Get paid every stage. Never waste AI credits.</p></div>
       </div>
@@ -2687,10 +2703,14 @@ ${b.cta || '—'}
           </div>
           <button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>
         ` : ''}
-        ${state.user ? `<button class="btn btn-sm" id="goalsNavBtn">🎯 Goals</button><button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
+        ${state.user ? `${goalsOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>`;
+    const topbarHomeLink = document.getElementById('topbarHomeLink');
+    if (topbarHomeLink && state.user) topbarHomeLink.addEventListener('click', goToProjectsScreen);
     const goalsNavBtn = document.getElementById('goalsNavBtn');
     if (goalsNavBtn) goalsNavBtn.addEventListener('click', goToGoalsScreen);
+    const goalsHomeBtn = document.getElementById('goalsHomeBtn');
+    if (goalsHomeBtn) goalsHomeBtn.addEventListener('click', goToProjectsScreen);
     if (state.project) {
       document.querySelectorAll('[data-set-mode]').forEach(el => el.addEventListener('click', async () => {
         const mode = el.getAttribute('data-set-mode');
@@ -2698,10 +2718,7 @@ ${b.cta || '—'}
         await api.updateProject(state.project.id, { mode });
         renderTopbar(); renderTool();
       }));
-      document.getElementById('backToProjectsBtn').addEventListener('click', () => {
-        history.replaceState(null, '', location.pathname);
-        state.screen = 'projects'; renderApp();
-      });
+      document.getElementById('backToProjectsBtn').addEventListener('click', goToProjectsScreen);
     }
     if (state.user) {
       document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -3058,6 +3075,7 @@ ${b.cta || '—'}
     const setAt = parseUtc(summary.goalSetAt);
     const deadline = new Date(setAt.getTime() + 90 * 24 * 60 * 60 * 1000);
     const dateFmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const stagePending = stagePendingSummary(summary);
     return `<a class="goal-strip" href="#" id="goalStripLink">
       <div class="goal-strip-title">🎯 Your Goal &amp; Progress</div>
       <div class="goal-strip-subtitle">Make your money — because you are worth it. →</div>
@@ -3065,9 +3083,31 @@ ${b.cta || '—'}
         <div class="goal-strip-track"><div class="goal-strip-fill" style="width:${progress.pct}%"></div></div>
         <div class="goal-strip-value">${progress.pct}%</div>
       </div>
+      ${stagePending.length ? `<div class="goal-strip-stages">
+        <div class="goal-strip-stages-sentence">Here's what's still pending to hit your goal:</div>
+        <div class="goal-strip-pills">
+          ${stagePending.map(x => `<span class="goal-strip-pill" style="background:${x.pending > 0 ? STAGE_COLORS[x.stage] : 'var(--moss)'}">Stage ${x.stage} — ${esc(x.name)}: ${x.pending > 0 ? `${x.pending} pending` : 'Done 🎉'} (${x.done}/${x.target})</span>`).join('')}
+        </div>
+      </div>` : ''}
       <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
       <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
     </a>`;
+  }
+  // How many of each planned stage are still needed to hit the goal —
+  // target comes from the "Plan it yourself" allocation (stageTargetCounts),
+  // done is how many of that stage actually got paid since the goal
+  // started. Only listed for stages the designer has actually set a target
+  // for — an unplanned stage has nothing meaningful to compare against.
+  function stagePendingSummary(summary) {
+    const setAt = parseUtc(summary.goalSetAt);
+    const targets = summary.stageTargetCounts || {};
+    const done = { 2: 0, 3: 0, 4: 0, 5: 0 };
+    summary.entries.forEach(e => {
+      if (done[e.stage] !== undefined && parseUtc(e.paidAt) >= setAt) done[e.stage]++;
+    });
+    return STAGE_ORDER
+      .filter(s => (targets[s] || 0) > 0)
+      .map(s => ({ stage: s, name: STAGE_NAMES[s], target: targets[s], done: done[s], pending: Math.max(0, targets[s] - done[s]) }));
   }
   // A project belongs in "In goal period" if it earned anything since the
   // goal started, OR it's been created/touched since then (still-unpaid,
@@ -3650,6 +3690,7 @@ ${b.cta || '—'}
         <span class="section-title">🎯 Goal Tracker</span>
         <button class="icon-btn" id="goalShareBtn" title="Download a shareable image">⬇ Share</button>
       </div>
+      <p class="section-subtitle">Set your goals — plan how you'll get there.</p>
       <div class="goal-range-toggle">
         <button data-goal-tab="past" class="${tab === 'past' ? 'active' : ''}">Past</button>
         <button data-goal-tab="future" class="${tab === 'future' ? 'active' : ''}">Future</button>
