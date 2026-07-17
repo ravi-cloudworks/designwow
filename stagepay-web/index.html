@@ -272,11 +272,11 @@
   .goal-strip-track { position: relative; flex: 1; height: 34px; border-radius: 999px; background: var(--moss-soft); border: 1px solid var(--moss-line); overflow: hidden; }
   .goal-strip-fill { position: absolute; inset: 0; width: 0%; background: var(--ink); border-radius: 999px; transition: width 0.2s; }
   .goal-strip-value { flex-shrink: 0; font-size: 15px; font-weight: 800; min-width: 64px; text-align: right; }
-  .goal-strip-stages { margin-top: 9px; }
+  .goal-strip-stages { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--moss-line); }
   .goal-strip-stages-sentence { font-size: 11.5px; color: var(--text-faint); margin-bottom: 6px; }
   .goal-strip-pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .goal-strip-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .goal-strip-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 8px; }
+  .goal-strip-sub { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 8px; }
   .goal-strip-note { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; font-style: italic; }
   .goal-strip-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--moss-soft); border: 1px solid var(--moss-line); }
   .goal-strip-empty strong { display: block; font-size: 13.5px; }
@@ -3083,14 +3083,14 @@ ${b.cta || '—'}
         <div class="goal-strip-track"><div class="goal-strip-fill" style="width:${progress.pct}%"></div></div>
         <div class="goal-strip-value">${progress.pct}%</div>
       </div>
+      <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
+      <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
       ${stagePending.length ? `<div class="goal-strip-stages">
         <div class="goal-strip-stages-sentence">Here's what's still pending to hit your goal:</div>
         <div class="goal-strip-pills">
-          ${stagePending.map(x => `<span class="goal-strip-pill" style="background:${x.pending > 0 ? STAGE_COLORS[x.stage] : 'var(--moss)'}">Stage ${x.stage} — ${esc(x.name)}: ${x.pending > 0 ? `${x.pending} pending` : 'Done 🎉'} (${x.done}/${x.target})</span>`).join('')}
+          ${stagePending.map(x => `<span class="goal-strip-pill" style="background:${STAGE_COLORS[x.stage]}">Stage ${x.stage} — ${esc(x.name)}: ${x.pending > 0 ? `${x.pending} pending` : '✓ Done'} (${x.done}/${x.target})</span>`).join('')}
         </div>
       </div>` : ''}
-      <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
-      <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
     </a>`;
   }
   // How many of each planned stage are still needed to hit the goal —
@@ -3419,7 +3419,10 @@ ${b.cta || '—'}
   // — every project that pays anything starts by paying Stage 2, so it's
   // not a separate slider or a ratio, it's a direct mirror.
   const STAGE_ORDER = [2, 3, 4, 5];
-  const STAGE_COLORS = { 2: '#176b5e', 3: '#a05f10', 4: '#8b5fbf', 5: '#2f7a4f' };
+  // Stage 5 was '#2f7a4f' — a green close enough to Stage 2's teal-green
+  // that the two read as the same color at pill/bar size. Blue keeps all
+  // four stages (and the waterfall's red "Goal" bar) perceptually distinct.
+  const STAGE_COLORS = { 2: '#176b5e', 3: '#a05f10', 4: '#8b5fbf', 5: '#2464b4' };
   // Same names as each lane's own header in the swimlane (renderLane1-5) —
   // "Stage 2" alone doesn't mean anything to the designer day-to-day.
   const STAGE_NAMES = { 1: 'Client Brief', 2: 'Story Board', 3: 'Visual & Music', 4: 'Scene Blueprint', 5: 'Final Movie' };
