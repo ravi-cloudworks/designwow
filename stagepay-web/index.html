@@ -83,6 +83,7 @@
   .project-info-name-input { font-size: 16px; font-weight: 800; padding: 2px 8px; width: 280px; }
   .project-info-meta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-faint); }
   .project-info-meta strong { color: var(--text-soft); font-weight: 700; }
+  .project-stage-pill { font-size: 10.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; color: #fff; white-space: nowrap; }
   .project-earned-pill { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
   .project-earned-pill.lg { font-size: 16px; padding: 7px 16px; }
   .lane-tamil { font-size: 11px; color: var(--text-faint); margin: 3px 0 0 38px; }
@@ -3422,7 +3423,10 @@ ${b.cta || '—'}
   // Stage 5 was '#2f7a4f' — a green close enough to Stage 2's teal-green
   // that the two read as the same color at pill/bar size. Blue keeps all
   // four stages (and the waterfall's red "Goal" bar) perceptually distinct.
-  const STAGE_COLORS = { 2: '#176b5e', 3: '#a05f10', 4: '#8b5fbf', 5: '#2464b4' };
+  // Stage 1 has no earnings of its own (see STAGE_NAMES) so it never needed
+  // a chart color until the per-project "current stage" pill did — a
+  // neutral gray, distinct from all 4 paid-stage colors.
+  const STAGE_COLORS = { 1: '#9aa0ab', 2: '#176b5e', 3: '#a05f10', 4: '#8b5fbf', 5: '#2464b4' };
   // Same names as each lane's own header in the swimlane (renderLane1-5) —
   // "Stage 2" alone doesn't mean anything to the designer day-to-day.
   const STAGE_NAMES = { 1: 'Client Brief', 2: 'Story Board', 3: 'Visual & Music', 4: 'Scene Blueprint', 5: 'Final Movie' };
@@ -3600,7 +3604,7 @@ ${b.cta || '—'}
       <div class="goal-alloc-title">🎚 Plan it yourself</div>
       <div class="trend-chart-wrap" id="waterfallChartWrap">${renderWaterfallSvg(prices, counts, goalPaise)}</div>
       <div class="goal-alloc-total" id="stageAllocTotal">${allocationStatusText(total, goalPaise)}</div>
-      <div class="stage-alloc-row" style="border-left-color:#9aa0ab">
+      <div class="stage-alloc-row" style="border-left-color:${STAGE_COLORS[1]}">
         <div class="stage-alloc-name">Stage 1 — ${esc(STAGE_NAMES[1])}</div>
         <div class="stage-alloc-section-label">Your price — always ₹0, never billed</div>
         <div class="stage-alloc-section-label">Number of deliverables <span class="stage-alloc-calc">— <b id="stage1DerivedCount">${stage1Count}</b> <span class="stage-alloc-derived-note">(same as Stage 2)</span></span></div>
@@ -3810,13 +3814,17 @@ ${b.cta || '—'}
   }
   function renderProjectListHtml(projects) {
     return projects.length
-      ? projects.map(p => `<div class="project-list-item" data-open-project="${p.id}">
+      ? projects.map(p => {
+          const stage = p.current_stage || 1;
+          return `<div class="project-list-item" data-open-project="${p.id}">
           <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">${esc(p.mode)} mode · updated ${esc(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
+            <span class="project-stage-pill" style="background:${STAGE_COLORS[stage]}" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>
             ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : ''}
             <button class="btn btn-sm btn-danger" data-delete-project="${p.id}">Delete</button>
           </div>
-        </div>`).join('')
+        </div>`;
+        }).join('')
       : '<p class="empty-note">No projects yet — create your first one above.</p>';
   }
   // The In-goal-period/Others tabs only appear once a goal actually exists —
