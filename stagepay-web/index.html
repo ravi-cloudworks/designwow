@@ -76,7 +76,7 @@
   .lane-title-row { display: flex; align-items: center; gap: 10px; }
   .lane-badge { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0; font-family: var(--display); }
   .lane-title { font-size: 15px; font-weight: 700; }
-  .earned-pill { margin-left: auto; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
+  .earned-pill { margin-left: auto; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; cursor: pointer; }
   .project-info-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface-2); flex-shrink: 0; }
   .project-info-bar:empty { display: none; }
   .project-info-name { font-size: 16px; font-weight: 800; cursor: pointer; }
@@ -411,6 +411,8 @@
   .pay-qr-hint { font-size: 11px; color: var(--text-faint); line-height: 1.5; margin: 0 0 10px; }
   .pay-confirm-check { display: flex; align-items: center; gap: 7px; justify-content: center; font-size: 12.5px; font-weight: 600; color: var(--text-soft); margin-top: 16px; cursor: pointer; }
   .pay-confirm-check input { width: 16px; height: 16px; cursor: pointer; }
+  .pay-prior-payments { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .pay-prior-payment { font-size: 12px; font-weight: 600; color: var(--moss); background: var(--moss-soft); border: 1px solid var(--moss-line); border-radius: 8px; padding: 8px 10px; }
   .pay-paid-banner { margin-top: 4px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); border-radius: 8px; padding: 12px; font-weight: 700; font-size: 13.5px; }
 </style>
 
@@ -755,9 +757,23 @@ Rules:
 
   // ---------- Stage config lookups (D1-backed, replaces hardcoded schemas) ----------
   function stageConfigFor(stage) { return state.stageConfigs[stage] || null; }
+  // totalPaidPaise (from earnings_log, via the payment-link API), not
+  // link.amountPaise — the latter is just the CURRENT round's amount, and
+  // resets to 0/unpaid whenever the stage gets repriced, which used to make
+  // this pill drop every earlier payment for the same stage.
   function stageEarnedPaise(stage) {
     const link = state.paymentLinks.find(l => l.stage === stage);
-    return link && link.paid ? link.amountPaise : 0;
+    return link ? (link.totalPaidPaise || 0) : 0;
+  }
+  // Keeps the local totalPaidPaise/payments in sync with a just-confirmed
+  // payment, without needing a full refetch of the payment-link endpoint.
+  function markPaymentLinkPaid(stage, paidAt) {
+    const entry = state.paymentLinks.find(l => l.stage === stage);
+    if (!entry) return;
+    entry.paid = true;
+    entry.paidAt = paidAt;
+    entry.totalPaidPaise = (entry.totalPaidPaise || 0) + entry.amountPaise;
+    entry.payments = [...(entry.payments || []), { amountPaise: entry.amountPaise, paidAt }];
   }
   function stageLockFor(stage) { return state.stageLocks.find(l => l.stage === stage) || null; }
   // Guard rail: a designer can't start real work on a stage — adding items,
@@ -779,7 +795,31 @@ Rules:
   function earnedPillHtml(stage) {
     const paise = stageEarnedPaise(stage);
     if (!paise) return '';
-    return `<span class="earned-pill">💰 ${formatRupees(paise)} earned</span>`;
+    return `<span class="earned-pill" data-stage-earned-pill="${stage}" title="Click to see payment history">💰 ${formatRupees(paise)} earned</span>`;
+  }
+  // The pill only ever shows a total — this is the one place a designer can
+  // actually see the individual rounds that add up to it (same idea as the
+  // "previously paid" note now shown on the customer's own public page).
+  function showStagePaymentHistoryModal(stage) {
+    const root = document.getElementById('modalRoot');
+    if (!root) return;
+    const link = state.paymentLinks.find(l => l.stage === stage);
+    const payments = (link && link.payments) || [];
+    root.innerHTML = `
+      <div class="modal-overlay" id="stageHistoryModalOverlay">
+        <div class="modal-card" style="max-width:400px">
+          <div class="modal-head"><strong>💰 Stage ${stage} — Payment History</strong><button class="modal-close" id="stageHistoryModalCloseBtn">×</button></div>
+          ${payments.length
+            ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                ${payments.map(p => `<div class="pay-prior-payment">✓ ${formatRupees(p.amountPaise)} on ${esc(formatIST(p.paidAt))}</div>`).join('')}
+                <div style="font-weight:800;font-size:13.5px;margin-top:4px">Total: ${formatRupees(payments.reduce((sum, p) => sum + p.amountPaise, 0))}</div>
+              </div>`
+            : `<p class="modal-sub">No payments recorded yet for this stage.</p>`}
+        </div>
+      </div>`;
+    const close = () => { root.innerHTML = ''; };
+    document.getElementById('stageHistoryModalCloseBtn').addEventListener('click', close);
+    document.getElementById('stageHistoryModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageHistoryModalOverlay') close(); });
   }
   function itemConfigFor(item) { const sc = stageConfigFor(item.stage); return (sc && sc.items[item.item_key]) || null; }
   function itemLabel(stage, itemKey) {
@@ -2029,8 +2069,7 @@ ${b.cta || '—'}
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, 2);
       if (res.ok) {
-        const entry = state.paymentLinks.find(l => l.stage === 2);
-        if (entry) { entry.paid = true; entry.paidAt = res.paidAt; }
+        markPaymentLinkPaid(2, res.paidAt);
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
@@ -2252,8 +2291,7 @@ ${b.cta || '—'}
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, stage);
       if (res.ok) {
-        const entry = state.paymentLinks.find(l => l.stage === stage);
-        if (entry) { entry.paid = true; entry.paidAt = res.paidAt; }
+        markPaymentLinkPaid(stage, res.paidAt);
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
@@ -2587,7 +2625,14 @@ ${b.cta || '—'}
       if (res.amountPaise === undefined) { toast('Could not save amount'); saveBtn.disabled = false; saveBtn.textContent = entry ? 'Update amount' : 'Set amount'; return; }
       const wasResetPaid = entry && entry.paid && !res.paid;
       const others = state.paymentLinks.filter(l => l.stage !== stage);
-      state.paymentLinks = [...others, { stage, amountPaise, paid: !!res.paid, paidAt: res.paidAt || null }];
+      // Repricing never touches earnings_log, so any earlier rounds for this
+      // stage are carried over untouched — only the current round's amount
+      // and paid-flag actually change.
+      state.paymentLinks = [...others, {
+        stage, amountPaise, paid: !!res.paid, paidAt: res.paidAt || null,
+        totalPaidPaise: entry ? (entry.totalPaidPaise || 0) : 0,
+        payments: entry ? (entry.payments || []) : [],
+      }];
       closeStageAmountModal();
       renderTool();
       renderProjectInfoBar();
@@ -2670,6 +2715,13 @@ ${b.cta || '—'}
       const el = document.getElementById('lane' + n);
       if (el && prevLaneScroll[n]) el.scrollTop = prevLaneScroll[n];
     }
+    // One delegated wiring for all 5 lanes' earned-pills, rather than
+    // repeating it inside each wireLaneN — the pill's own click just opens
+    // the payment history for whichever stage it's on.
+    document.querySelectorAll('[data-stage-earned-pill]').forEach(el => el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showStagePaymentHistoryModal(Number(el.getAttribute('data-stage-earned-pill')));
+    }));
   }
 
   function goToGoalsScreen() {
@@ -4015,6 +4067,9 @@ ${b.cta || '—'}
       </div>
       <div class="pay-stage-body">
         <a class="btn btn-primary pay-download" href="${API_BASE}/api/pay/${payPageDraft.token}/download/${s.stage}">⬇ Download deliverable</a>
+        ${s.priorPayments && s.priorPayments.length ? `<div class="pay-prior-payments">
+          ${s.priorPayments.map(p => `<div class="pay-prior-payment">✓ Previously paid ₹${(p.amountPaise / 100).toFixed(2)} on ${esc(formatIST(p.paidAt))}</div>`).join('')}
+        </div>` : ''}
         ${s.paid
           ? `<div class="pay-paid-banner">✅ Paid ₹${amountRupees.toFixed(2)}${s.paidAt ? ` on ${esc(formatIST(s.paidAt))}` : ''}</div>`
           : payStagePayHtml(s, isMobile)}
