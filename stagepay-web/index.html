@@ -821,6 +821,37 @@ Rules:
     document.getElementById('stageHistoryModalCloseBtn').addEventListener('click', close);
     document.getElementById('stageHistoryModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageHistoryModalOverlay') close(); });
   }
+  // A native confirm() said "Stage 3-5" but never named what's actually in
+  // them, and gave no chance to grab a download first — this replaces it
+  // with a real modal naming every stage about to be wiped (unlocking
+  // deletes everything strictly AFTER the unlocked stage, never the stage
+  // itself). Resolves true/false so call sites can `await` it like confirm().
+  function showUnlockWarningModal(stagesToDelete) {
+    return new Promise((resolve) => {
+      const root = document.getElementById('modalRoot');
+      if (!root) { resolve(true); return; }
+      if (!stagesToDelete.length) { resolve(true); return; } // nothing downstream — nothing to warn about
+      const stageList = stagesToDelete.map(s => `Stage ${s} — ${esc(STAGE_NAMES[s] || '')}`).join('<br>');
+      root.innerHTML = `
+        <div class="modal-overlay" id="unlockWarningOverlay">
+          <div class="modal-card" style="max-width:440px">
+            <div class="modal-head"><strong>⚠️ This deletes work</strong><button class="modal-close" id="unlockWarningCloseBtn">×</button></div>
+            <p class="modal-sub" style="margin-top:8px">Unlocking this stage permanently deletes everything already built in:</p>
+            <p style="font-weight:800;font-size:13.5px;margin:10px 0;line-height:1.6">${stageList}</p>
+            <p class="modal-sub">Download anything you need from ${stagesToDelete.length > 1 ? 'these stages' : 'this stage'} first — this cannot be undone.</p>
+            <div class="modal-footer confirm-actions" style="margin-top:16px">
+              <button class="btn btn-sm" id="unlockWarningCancelBtn">Cancel</button>
+              <button class="btn btn-sm btn-danger" id="unlockWarningConfirmBtn">Unlock and delete</button>
+            </div>
+          </div>
+        </div>`;
+      const close = (result) => { root.innerHTML = ''; resolve(result); };
+      document.getElementById('unlockWarningCloseBtn').addEventListener('click', () => close(false));
+      document.getElementById('unlockWarningCancelBtn').addEventListener('click', () => close(false));
+      document.getElementById('unlockWarningConfirmBtn').addEventListener('click', () => close(true));
+      document.getElementById('unlockWarningOverlay').addEventListener('click', (e) => { if (e.target.id === 'unlockWarningOverlay') close(false); });
+    });
+  }
   function itemConfigFor(item) { const sc = stageConfigFor(item.stage); return (sc && sc.items[item.item_key]) || null; }
   function itemLabel(stage, itemKey) {
     const sc = stageConfigFor(stage);
@@ -1219,9 +1250,16 @@ Rules:
     document.getElementById('apModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'apModalOverlay') closeAutoPopulateModal(); });
     document.getElementById('apModalCloseBtn').addEventListener('click', closeAutoPopulateModal);
     document.getElementById('apModalCancelBtn').addEventListener('click', closeAutoPopulateModal);
-    document.getElementById('apModalConfirmBtn').addEventListener('click', async () => {
+    const confirmBtn = document.getElementById('apModalConfirmBtn');
+    // The button's count was only ever computed once at render time — it
+    // never reflected unchecking an item, even though the create action
+    // itself already respected the checkbox correctly.
+    document.querySelectorAll('[data-ap-check]').forEach(cb => cb.addEventListener('change', () => {
+      const checkedCount = document.querySelectorAll('[data-ap-check]:checked').length;
+      confirmBtn.textContent = `Create ${checkedCount} item${checkedCount === 1 ? '' : 's'}`;
+    }));
+    confirmBtn.addEventListener('click', async () => {
       const { groups } = autoPopulateDraft;
-      const confirmBtn = document.getElementById('apModalConfirmBtn');
       const cancelBtn = document.getElementById('apModalCancelBtn');
       const closeBtn = document.getElementById('apModalCloseBtn');
       // Flatten the checked work up front so the button can show real
@@ -1871,7 +1909,7 @@ ${b.cta || '—'}
     });
     const unlockBtn = document.getElementById('unlockBriefBtn');
     if (unlockBtn) unlockBtn.addEventListener('click', async () => {
-      if (!confirm('This deletes all Stage 2-5 work for this project — you\'ll start over from Stage 2. Continue?')) return;
+      if (!(await showUnlockWarningModal([2, 3, 4, 5]))) return;
       await api.unlockBrief(state.project.id);
       state.brief.locked = false;
       const full = await api.getProject(state.project.id);
@@ -2101,7 +2139,7 @@ ${b.cta || '—'}
     });
     const unlockBtn = document.getElementById('storyUnlockBtn');
     if (unlockBtn) unlockBtn.addEventListener('click', async () => {
-      if (!confirm('This deletes all Stage 3-5 work for this project — you\'ll start over from Stage 3. Continue?')) return;
+      if (!(await showUnlockWarningModal([3, 4, 5]))) return;
       const res = await api.unlockStage(state.project.id, 2);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < 2);
@@ -2154,7 +2192,7 @@ ${b.cta || '—'}
   function renderAutoPopulateCardHtml() {
     const allowed = previousStageLocked(3);
     return `<div class="deliverable-card" style="margin-bottom:14px">
-      <div class="card-section-label">🎁 Customer Deliverable</div>
+      <div class="card-section-label">👥 Characters from the Story</div>
       <button type="button" class="btn btn-sm btn-primary${allowed ? '' : ' btn-guard-disabled'}" id="syncAutoPopulateBtn">🔄 Sync Characters/Props/Backgrounds/Sounds from Story</button>
       <p class="story-step-note" style="margin-top:6px">Re-reads Stage 1's locked storyboard/dialogue and drafts fresh matches here for you to review.</p>
       ${previousStageGuardNote(3)}
@@ -2324,8 +2362,11 @@ ${b.cta || '—'}
     });
     const unlockBtn = document.querySelector(`#${laneId} [data-stage-unlock-btn]`);
     if (unlockBtn) unlockBtn.addEventListener('click', async () => {
-      const downstream = stage + 1 >= 5 ? 'Stage 5' : `Stage ${stage + 1}-5`;
-      if (!confirm(`This deletes all ${downstream} work for this project — you'll start over from Stage ${stage + 1}. Continue?`)) return;
+      // Unlocking only ever deletes stages strictly AFTER this one (never
+      // this stage itself) — so unlocking Stage 5 deletes nothing at all
+      // (there's no Stage 6), and shouldn't warn as if it did.
+      const stagesToDelete = Array.from({ length: Math.max(0, 5 - stage) }, (_, i) => stage + 1 + i);
+      if (!(await showUnlockWarningModal(stagesToDelete))) return;
       const res = await api.unlockStage(state.project.id, stage);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < stage);
@@ -2334,7 +2375,7 @@ ${b.cta || '—'}
         state.items = full.items;
         renderTool();
         renderProjectInfoBar();
-        toast(`Stage ${stage} unlocked — ${downstream} cleared`);
+        toast(stagesToDelete.length ? `Stage ${stage} unlocked — Stage ${stagesToDelete[0]}-${stagesToDelete[stagesToDelete.length - 1]} cleared` : `Stage ${stage} unlocked`);
       }
     });
   }
