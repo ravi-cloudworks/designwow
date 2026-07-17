@@ -63,14 +63,28 @@ projects.get('/', async (c) => {
   // survives an earlier stage being unlocked and reset — money already
   // collected for completed work doesn't stop counting just because of a
   // later revision.
+  //
+  // top_stage/top_stage_locked: stage_locks only ever gets a row once a
+  // stage has been locked at least once (see PUT /:id/lock below) — a
+  // project still on Stage 1 has zero rows. The highest such row tells you
+  // where the project actually is: locked means that stage is done and
+  // work has moved on to the next one; unlocked means that's the stage
+  // being worked on right now.
   const { results } = await c.env.DB.prepare(
     `SELECT p.id, p.name, p.mode, p.created_at, p.updated_at,
-       COALESCE((SELECT SUM(amount_paise) FROM earnings_log WHERE project_id = p.id), 0) AS earned_paise
+       COALESCE((SELECT SUM(amount_paise) FROM earnings_log WHERE project_id = p.id), 0) AS earned_paise,
+       (SELECT stage FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage,
+       (SELECT locked FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage_locked
      FROM projects p WHERE p.user_id = ? ORDER BY p.updated_at DESC`
   )
     .bind(userId)
-    .all();
-  return c.json({ projects: results });
+    .all<{ id: string; name: string; mode: string; created_at: string; updated_at: string; earned_paise: number; top_stage: number | null; top_stage_locked: number | null }>();
+
+  const projectsWithStage = results.map(({ top_stage, top_stage_locked, ...rest }) => ({
+    ...rest,
+    current_stage: top_stage == null ? 1 : top_stage_locked ? Math.min(top_stage + 1, 5) : top_stage,
+  }));
+  return c.json({ projects: projectsWithStage });
 });
 
 projects.get('/:id', async (c) => {
