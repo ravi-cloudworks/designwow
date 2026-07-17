@@ -83,10 +83,30 @@ pay.get('/projects/:id/payment-link', async (c) => {
     .bind(projectId)
     .first<{ total: number }>();
 
+  // Same fix as the public /pay/:token page: payment_link_stages is a
+  // single overwritten row per stage, so a repriced-and-repaid stage
+  // otherwise only shows its latest round, silently dropping earlier
+  // payments for that same stage from what the swimlane pill displays.
+  const { results: history } = await c.env.DB.prepare(
+    'SELECT stage, amount_paise, paid_at FROM earnings_log WHERE project_id = ? ORDER BY paid_at ASC'
+  )
+    .bind(projectId)
+    .all<{ stage: number; amount_paise: number; paid_at: string }>();
+
   return c.json({
     token,
     url: `${c.env.FRONTEND_ORIGIN}/pay/${token}`,
-    stages: results.map((r) => ({ stage: r.stage, amountPaise: r.amount_paise, paid: !!r.paid, paidAt: r.paid_at })),
+    stages: results.map((r) => {
+      const payments = history.filter((h) => h.stage === r.stage);
+      return {
+        stage: r.stage,
+        amountPaise: r.amount_paise,
+        paid: !!r.paid,
+        paidAt: r.paid_at,
+        totalPaidPaise: payments.reduce((sum, h) => sum + h.amount_paise, 0),
+        payments: payments.map((h) => ({ amountPaise: h.amount_paise, paidAt: h.paid_at })),
+      };
+    }),
     totalEarnedPaise: totalRow?.total ?? 0,
   });
 });
@@ -191,11 +211,23 @@ pay.get('/pay/:token', async (c) => {
   const token = c.req.param('token');
   const loaded = await loadPublicLink(c.env.DB, token);
   if (!loaded) return c.json({ error: 'not_found' }, 404);
-  const { project, designer, brief } = loaded;
+  const { projectId, project, designer, brief } = loaded;
 
   const { results } = await c.env.DB.prepare('SELECT stage, amount_paise, paid, paid_at FROM payment_link_stages WHERE token = ? ORDER BY stage')
     .bind(token)
     .all<{ stage: number; amount_paise: number; paid: number; paid_at: string | null }>();
+
+  // Setting a new amount for an already-paid stage (more work, renegotiated
+  // price) overwrites this stage's one payment_link_stages row in place —
+  // otherwise the customer's page would show the new amount with no trace
+  // they'd already paid for this stage before, which reads as if their
+  // earlier payment just vanished. earnings_log still has it (append-only),
+  // so surface anything there that ISN'T the current row's own payment.
+  const { results: history } = await c.env.DB.prepare(
+    'SELECT stage, amount_paise, paid_at FROM earnings_log WHERE project_id = ? ORDER BY paid_at ASC'
+  )
+    .bind(projectId)
+    .all<{ stage: number; amount_paise: number; paid_at: string }>();
 
   const stages = await Promise.all(
     results.map(async (r) => ({
@@ -204,6 +236,9 @@ pay.get('/pay/:token', async (c) => {
       amountPaise: r.amount_paise,
       paid: !!r.paid,
       paidAt: r.paid_at,
+      priorPayments: history
+        .filter((h) => h.stage === r.stage && h.paid_at !== r.paid_at)
+        .map((h) => ({ amountPaise: h.amount_paise, paidAt: h.paid_at })),
     }))
   );
 
