@@ -214,8 +214,10 @@
   .media-slot-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-faint); margin-bottom: 7px; }
 
   .refs-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .refs-chip { display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--surface); color: var(--text-soft); font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+  .refs-chip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text-soft); font-size: 11.5px; font-weight: 600; padding: 4px 10px 4px 4px; border-radius: 999px; cursor: pointer; }
   .refs-chip.selected { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .refs-chip-thumb { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .refs-chip-thumb-fallback { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(10,11,14,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
   .modal-card { background: var(--surface); border-radius: 12px; width: 520px; max-width: 100%; max-height: 86vh; overflow-y: auto; padding: 22px; }
@@ -890,6 +892,12 @@ Rules:
         return rf.description || '';
       case 'background':
         return `${rf.location || '(location)'}, lit with ${rf.lighting || '(lighting)'} lighting, ${rf.style || '(style)'} styling`;
+      case 'story':
+        // Story has no Setup fields of its own (it's compiled straight from
+        // the locked Stage 1 brief) — so unlike the other types, there's no
+        // per-field fact to summarize. Used as a scene reference for overall
+        // visual continuity, not itemized details.
+        return 'the overall storyboard reference — follow its established visual style, sequence, and shot flow';
       default:
         return '';
     }
@@ -936,6 +944,37 @@ Rules:
     const files = mustAttachFiles(item, f);
     const refLine = files.length ? ` Reference images: ${files.map(x => x.fileName).join(', ')}.` : '';
     return `${base}${refLine}`;
+  }
+  // Manual mode's real on-ramp to ChatGPT — every item type, not just Story
+  // (which already had its own dedicated template). Reuses compilePrompt's
+  // per-type Setup-field description as the raw material, so it's always in
+  // sync with whatever schema that item type actually has, and bundles in
+  // the Stage 1 brief + attached reference file names + this item's own
+  // output template, so ChatGPT gets the same context Gemini's own
+  // "Generate with AI" call would — the whole point being that Manual mode
+  // (no Gemini cost) can still produce AI-agent-quality prompts by routing
+  // through a designer's own ChatGPT instead.
+  function buildItemChatGptPrompt(item, fields) {
+    const ic = itemConfigFor(item);
+    const master = ic && ic.outputInstructions && ic.outputInstructions.length
+      ? (ic.outputInstructions.find(o => o.default) || ic.outputInstructions[0]).text
+      : '';
+    const contentDescription = compilePrompt(item, fields);
+    const files = mustAttachFiles(item, fields);
+    const fileNames = files.length ? files.map(f => f.fileName).join(', ') : '(none attached yet)';
+    return `I'm producing a "${itemLabel(item.stage, item.item_key)}" reference image for a UGC-style product ad video. Use everything below — don't ask me for anything else, invent anything shown as a blank placeholder in parentheses like "(gender)" using good judgement for this brand:
+
+Campaign brief: ${briefSummaryPrompt()}
+
+This item's own details (from my Setup form):
+${contentDescription || '(nothing filled in yet)'}
+
+Reference files I already have attached, that Flow will see: ${fileNames}
+
+Base creative direction to follow:
+${master || '(no template for this item type — just write a clean, concrete visual description)'}
+
+Write the final, ready-to-use image-generation prompt for Google Flow — concrete and specific, no placeholders left unfilled, following the structure/overlays implied above if any are shown. Output ONLY the prompt text, nothing else before or after.`;
   }
   function briefSummaryPrompt() {
     const b = state.brief;
@@ -1003,10 +1042,21 @@ Rules:
     }
     // Scenes get an extra "featured items" picker driving the must-attach list.
     if (item.item_key === 'scene') {
-      const candidates = [...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background')];
+      // Storyboard included as a candidate too — it wasn't offered here at
+      // all before, even though a scene following its layout is a common case.
+      const candidates = [...itemsFor(2, 'story'), ...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background')];
       const refs = Array.isArray(fields.refs) ? fields.refs : [];
+      // Real thumbnails (not just a name in a text chip) so picking who/what
+      // is in a scene is a visual decision, not something easy to skip past.
+      const refChip = (it) => {
+        const thumbFile = itemMediaFiles(it)[0];
+        const thumb = thumbFile
+          ? `<img src="${esc(api.mediaUrl(thumbFile.key))}" alt="" class="refs-chip-thumb">`
+          : `<span class="refs-chip-thumb-fallback">${ITEM_THUMBS[it.item_key] || ''}</span>`;
+        return `<button type="button" class="refs-chip ${refs.includes(it.id) ? 'selected' : ''}" data-ref-toggle="${it.id}">${thumb}<span>${esc(it.name)}</span></button>`;
+      };
       html += `<div class="field"><label>Featured in this scene</label><div class="refs-picker">
-        ${candidates.length ? candidates.map(it => `<button type="button" class="refs-chip ${refs.includes(it.id) ? 'selected' : ''}" data-ref-toggle="${it.id}">${ITEM_THUMBS[it.item_key] || ''} ${esc(it.name)}</button>`).join('') : '<span class="empty-note">Add Characters/Properties/Backgrounds in Stage 3 first.</span>'}
+        ${candidates.length ? candidates.map(refChip).join('') : '<span class="empty-note">Add a Storyboard image or Characters/Properties/Backgrounds in Stage 3 first.</span>'}
       </div></div>`;
     }
     return html;
@@ -1055,6 +1105,12 @@ Rules:
     const genDisabled = isAgentMode && unchangedSinceAI;
     const genLabel = isAgentMode ? (unchangedSinceAI ? '✓ AI draft up to date' : '✨ Generate with AI') : '⚙ Generate';
     const refFiles = mustAttachFiles(item, genModalDraft.fields);
+    // Same idea as unchangedSinceAI above, but for the manual/ChatGPT path —
+    // _chatgpt_snapshot is stamped when "Open in ChatGPT" builds the meta-
+    // prompt; if Setup changes after that, the copied prompt no longer
+    // reflects the current fields, so warn (not block — they may have
+    // already re-pasted an updated result manually).
+    const chatgptStale = hasEditableFields && !!genModalDraft.fields._chatgpt_snapshot && genModalDraft.fields._chatgpt_snapshot !== fieldsSignature(genModalDraft.fields);
     root.innerHTML = `
       <div class="modal-overlay" id="genModalOverlay">
         <div class="modal-card generate-modal-card">
@@ -1072,6 +1128,7 @@ Rules:
                 <button class="btn btn-sm" id="genModalChatGptBtn">Open in ChatGPT</button>
               </div>
               ${item.item_key === 'story' ? `<p class="story-step-note" style="margin:0 0 6px">Read-only — this is generated from Stage 1's locked storyboard. To change it, edit Stage 1 and regenerate here, so the two stages never drift apart.</p>` : ''}
+              <div id="genModalChatGptStaleness">${chatgptStale ? `<p class="story-step-note" style="margin:0 0 6px;color:var(--crimson)">⚠ Setup changed since you built this ChatGPT prompt — click "Open in ChatGPT" again and paste its updated reply before saving.</p>` : ''}</div>
               <textarea id="genModalPromptArea" class="prompt-box generate-modal-textarea" placeholder="Click Generate, or write your own..." ${item.item_key === 'story' ? 'readonly' : ''}>${esc(prompt)}</textarea>
             </div>
           </div>
@@ -1130,6 +1187,11 @@ Rules:
       genBtn.disabled = isAgentMode && unchangedSinceAI;
       genBtn.textContent = isAgentMode ? (unchangedSinceAI ? '✓ AI draft up to date' : '✨ Generate with AI') : '⚙ Generate';
     }
+    const staleEl = document.getElementById('genModalChatGptStaleness');
+    if (staleEl) {
+      const chatgptStale = hasEditableFields && !!genModalDraft.fields._chatgpt_snapshot && genModalDraft.fields._chatgpt_snapshot !== fieldsSignature(genModalDraft.fields);
+      staleEl.innerHTML = chatgptStale ? `<p class="story-step-note" style="margin:0 0 6px;color:var(--crimson)">⚠ Setup changed since you built this ChatGPT prompt — click "Open in ChatGPT" again and paste its updated reply before saving.</p>` : '';
+    }
     wireGenModalFieldControls();
   }
   function wireGenerateModal() {
@@ -1175,13 +1237,30 @@ Rules:
       navigator.clipboard.writeText(document.getElementById('genModalPromptArea').value).then(() => toast('Copied'));
     });
     document.getElementById('genModalChatGptBtn').addEventListener('click', () => {
-      const text = document.getElementById('genModalPromptArea').value;
-      navigator.clipboard.writeText(text).then(() => toast('Copied — paste it into ChatGPT'));
-      window.open('https://chatgpt.com/', '_blank', 'noopener');
+      const item = genModalDraft.item;
+      // A rich, item-specific meta-prompt (Setup values + brief + attached
+      // file names + this item's own output template) — not just whatever
+      // happened to already be in the textarea, which is often still empty
+      // at this point. This is Manual mode's real substitute for the
+      // in-app "Generate with AI" call: no Gemini cost, same context.
+      const metaPrompt = buildItemChatGptPrompt(item, genModalDraft.fields);
+      navigator.clipboard.writeText(metaPrompt).catch(() => {}); // silent fallback copy, same as Stage 1's template button
+      window.open(`https://chatgpt.com/?q=${encodeURIComponent(metaPrompt)}`, '_blank', 'noopener');
+      toast('Opened in ChatGPT with this item\'s details already filled in — copy its reply back into the box here');
+      genModalDraft.fields._chatgpt_snapshot = fieldsSignature(genModalDraft.fields);
+      refreshGenModalFields();
     });
     document.getElementById('genModalSaveBtn').addEventListener('click', async () => {
       const item = genModalDraft.item;
       const promptVal = document.getElementById('genModalPromptArea').value;
+      // Generate mode has nothing to show downstream (Stage 4/5 references,
+      // your own review) without a real prompt — Upload mode is exempt,
+      // since that path deliberately never needs one (see itemCardMode).
+      const cardMode = state.itemCardMode[item.id] || (theVersion(item).fields || {})._uiMode || 'generate';
+      if (cardMode !== 'upload' && item.item_key !== 'story' && !promptVal.trim()) {
+        toast('Write or generate a prompt first — an empty one leaves nothing for Flow (or later stages referencing this) to use.');
+        return;
+      }
       const autoPopulate = genModalDraft.autoPopulate;
       const version = theVersion(item);
       version.fields = genModalDraft.fields;
@@ -1467,11 +1546,25 @@ Rules:
         <span class="story-step-num">4</span>
         <div class="story-step-body">${buildUploadWidget(true)}</div>
       </div>`;
+    // Uploading your own image only skips the Flow-generation steps
+    // (prompt/download/paste-into-Flow) — the Setup details (gender/age/
+    // outfit etc.) still matter regardless of where the image came from,
+    // since Stage 4/5 pull from those fields (not the image) to describe
+    // this character/prop/background consistently in later scene prompts.
+    // Setup lives in the same modal as Generate — reused as-is here rather
+    // than duplicated, so nothing new crowds the swimlane card itself.
     const uploadOnlyStep = `
       <div class="story-step">
         <span class="story-step-num">1</span>
         <div class="story-step-body">
-          <p class="story-step-note">Upload your own ${esc(mediaLabel.toLowerCase())} — no prompt or Flow generation needed.</p>
+          <button class="btn btn-sm" data-open-generate="${item.id}" ${dis}>📋 ${esc(itemLabel(item.stage, item.item_key))} Details</button>
+          <p class="story-step-note" style="margin-top:6px">Fill in the details above so later scenes can describe this consistently.</p>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">2</span>
+        <div class="story-step-body">
+          <p class="story-step-note">Upload your own ${esc(mediaLabel.toLowerCase())} — no Flow generation needed.</p>
           ${buildUploadWidget(false)}
         </div>
       </div>`;
