@@ -251,6 +251,9 @@
   .goal-switch { display: flex; gap: 2px; margin: 0 0 14px; background: var(--surface-2); border-radius: 999px; padding: 3px; width: fit-content; max-width: 100%; }
   .goal-switch button { flex: 1; min-width: 90px; padding: 6px 14px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: var(--text-soft); transition: background 0.15s, color 0.15s; }
   .goal-switch button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+  .item-mode-toggle { display: flex; gap: 2px; margin-bottom: 12px; background: var(--surface-2); border-radius: 999px; padding: 3px; width: fit-content; max-width: 100%; }
+  .item-mode-toggle button { padding: 6px 14px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: var(--text-soft); transition: background 0.15s, color 0.15s; white-space: nowrap; }
+  .item-mode-toggle button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
   .goal-past-total { font-size: 24px; font-weight: 800; margin: 2px 0 14px; }
   .goal-past-total span { font-size: 12px; font-weight: 700; color: var(--text-faint); margin-left: 6px; }
   .trend-chart-wrap { width: 100%; margin-bottom: 16px; }
@@ -702,6 +705,7 @@ Rules:
     briefOpenSection: 'brand', // Stage 1 accordion — one section open at a time
     renamingProject: false,
     renamingItemId: null,
+    itemCardMode: {}, // { [itemId]: 'generate' | 'upload' } — per-item choice between the Generate flow and uploading your own file; defaults to 'generate' when unset
     earningsSummary: null, // { entries, goalAmountPaise, goalSetAt, stagePricesPaise, stageTargetCounts, avgStagesPerProject, historicalProjectCount }
     goalTab: 'past', // Goal Tracker's Past/Future top-level tab
     goalPastRangeMonths: 3, // Goal Tracker's inner "3 / 6 months" toggle, shared by both tabs
@@ -1408,6 +1412,51 @@ Rules:
     const lock = stageLockFor(item.stage);
     const isLocked = !!(lock && lock.locked);
     const dis = isLocked ? 'disabled' : '';
+    // Upload already worked standalone (nothing required steps 1-3 first) —
+    // this toggle just makes that an explicit up-front choice instead of
+    // something you had to notice you were allowed to skip to.
+    const mode = state.itemCardMode[item.id] || 'generate';
+    const uploadWidget = `
+      <input type="file" accept="${mediaAccept}" multiple style="display:none" data-media-upload-input="${item.id}" ${dis}>
+      <button type="button" class="btn btn-sm" data-media-upload-btn="${item.id}" ${dis}>+ Upload file</button>
+      <div class="attach-chip-row" style="margin-top:7px">
+        ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+      </div>`;
+    const generateSteps = `
+      <div class="story-step">
+        <span class="story-step-num">1</span>
+        <div class="story-step-body">
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm btn-primary" data-open-generate="${item.id}" ${dis}>✨ Generate ${esc(itemLabel(item.stage, item.item_key))}</button>
+            <button type="button" class="icon-btn" data-copy-prompt="${item.id}" title="Copy prompt">📋</button>
+          </div>
+          <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">2</span>
+        <div class="story-step-body">
+          <button type="button" class="btn btn-sm" data-download-item="${item.id}" ${dis}>⬇ Download artifacts</button>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">3</span>
+        <div class="story-step-body">
+          <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the ${esc(mediaLabel.toLowerCase())}.</p>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">4</span>
+        <div class="story-step-body">${uploadWidget}</div>
+      </div>`;
+    const uploadOnlyStep = `
+      <div class="story-step">
+        <span class="story-step-num">1</span>
+        <div class="story-step-body">
+          <p class="story-step-note">Upload your own ${esc(mediaLabel.toLowerCase())} — no prompt or Flow generation needed.</p>
+          ${uploadWidget}
+        </div>
+      </div>`;
     return `
       <div class="item-row ${isExpanded ? 'expanded' : ''}" data-item-row="${item.id}">
         <div class="item-row-head" data-toggle-item="${item.id}">
@@ -1419,38 +1468,11 @@ Rules:
           <span class="chevron">›</span>
         </div>
         <div class="item-body">
-          <div class="story-step">
-            <span class="story-step-num">1</span>
-            <div class="story-step-body">
-              <div style="display:flex;gap:6px;align-items:center">
-                <button class="btn btn-sm btn-primary" data-open-generate="${item.id}" ${dis}>✨ Generate ${esc(itemLabel(item.stage, item.item_key))}</button>
-                <button type="button" class="icon-btn" data-copy-prompt="${item.id}" title="Copy prompt">📋</button>
-              </div>
-              <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
-            </div>
+          <div class="item-mode-toggle">
+            <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${item.id}">✨ Generate</button>
+            <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${item.id}">📤 Upload my own</button>
           </div>
-          <div class="story-step">
-            <span class="story-step-num">2</span>
-            <div class="story-step-body">
-              <button type="button" class="btn btn-sm" data-download-item="${item.id}" ${dis}>⬇ Download artifacts</button>
-            </div>
-          </div>
-          <div class="story-step">
-            <span class="story-step-num">3</span>
-            <div class="story-step-body">
-              <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the ${esc(mediaLabel.toLowerCase())}.</p>
-            </div>
-          </div>
-          <div class="story-step">
-            <span class="story-step-num">4</span>
-            <div class="story-step-body">
-              <input type="file" accept="${mediaAccept}" multiple style="display:none" data-media-upload-input="${item.id}" ${dis}>
-              <button type="button" class="btn btn-sm" data-media-upload-btn="${item.id}" ${dis}>+ Upload file</button>
-              <div class="attach-chip-row" style="margin-top:7px">
-                ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
-              </div>
-            </div>
-          </div>
+          ${mode === 'upload' ? uploadOnlyStep : generateSteps}
         </div>
       </div>`;
   }
@@ -1486,6 +1508,10 @@ Rules:
       renderTool();
     }));
     wireItemRename(item);
+    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', () => {
+      state.itemCardMode[item.id] = el.getAttribute('data-item-mode-btn');
+      renderTool();
+    }));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
     const downloadItemBtn = document.querySelector(`[data-download-item="${item.id}"]`);
@@ -2288,7 +2314,6 @@ ${b.cta || '—'}
     const guardClass = previousStageLocked(stage) ? '' : ' btn-guard-disabled';
     const amountEntry = state.paymentLinks.find(l => l.stage === stage) || null;
     return `<div class="deliverable-card" style="margin-top:14px">
-      <div class="card-section-label">🎁 Customer Deliverable</div>
       <div class="story-step">
         <span class="story-step-num">5</span>
         <div class="story-step-body">
@@ -2340,13 +2365,24 @@ ${b.cta || '—'}
     const lockBtn = document.querySelector(`#${laneId} [data-stage-lock-btn]`);
     if (lockBtn) lockBtn.addEventListener('click', async () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before locking this stage`); return; }
-      const hasUpload = state.items.some(i => i.stage === stage && (theVersion(i).media_files || []).length > 0);
-      const amountEntry = state.paymentLinks.find(l => l.stage === stage) || null;
+      const stageItems = state.items.filter(i => i.stage === stage);
       const missing = [];
-      if (!hasUpload) missing.push('upload a file');
+      // Stage 3 specifically needs at least one Character — Properties,
+      // Backgrounds, and Sounds stay fully optional (a project may
+      // legitimately have none of those), so no minimum-count check for them.
+      if (stage === 3 && !stageItems.some(i => i.item_key === 'character')) missing.push('add at least one Character');
+      // Every item that DOES exist needs its own upload — previously this
+      // only checked that SOME item in the stage had one, so locking with
+      // (say) 4 of 5 characters missing their reference image went
+      // unnoticed. Named explicitly so it's obvious which ones are missing.
+      const itemsMissingUpload = stageItems.filter(i => (theVersion(i).media_files || []).length === 0);
+      if (itemsMissingUpload.length) {
+        missing.push(`upload a file for ${itemsMissingUpload.map(i => `"${i.name || itemLabel(i.stage, i.item_key)}"`).join(', ')}`);
+      }
+      const amountEntry = state.paymentLinks.find(l => l.stage === stage) || null;
       if (!amountEntry) missing.push('set an amount');
       else if (!amountEntry.paid) missing.push('confirm payment received');
-      if (missing.length) { toast(`Before locking: ${missing.join(', ')}`); return; }
+      if (missing.length) { toast(`Before locking: ${missing.join('; ')}`); return; }
       lockBtn.disabled = true;
       const res = await api.lockStage(state.project.id, stage);
       if (res.ok) {
