@@ -1415,13 +1415,30 @@ Rules:
     // Upload already worked standalone (nothing required steps 1-3 first) —
     // this toggle just makes that an explicit up-front choice instead of
     // something you had to notice you were allowed to skip to.
-    const mode = state.itemCardMode[item.id] || 'generate';
-    const uploadWidget = `
-      <input type="file" accept="${mediaAccept}" multiple style="display:none" data-media-upload-input="${item.id}" ${dis}>
-      <button type="button" class="btn btn-sm" data-media-upload-btn="${item.id}" ${dis}>+ Upload file</button>
-      <div class="attach-chip-row" style="margin-top:7px">
-        ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
-      </div>`;
+    // state.itemCardMode is only ever populated by a click this session — a
+    // fresh page load falls through to fields._uiMode, the persisted choice
+    // (see wireItemCard's toggle handler), so the toggle survives a reload.
+    const mode = state.itemCardMode[item.id] || (version.fields || {})._uiMode || 'generate';
+    // Exactly one file per item (every label in MEDIA_LABELS is singular —
+    // "Character Reference", "Scene Video", never plural) — so no `multiple`,
+    // and the upload button itself hides once a file exists rather than
+    // silently accepting a second one to replace it.
+    const hasFile = mediaFiles.length > 0;
+    const hasPrompt = !!(version.prompt && version.prompt.trim());
+    // In Generate mode there's nothing to have generated a result FROM
+    // until step 1 has actually produced a prompt — soft-disabled (CSS
+    // only, like the rest of this app's guard rails) rather than a real
+    // [disabled] attribute, so the click still fires and can explain why.
+    const buildUploadWidget = (requirePrompt) => {
+      const blocked = requirePrompt && !hasPrompt && !hasFile;
+      return `
+        <input type="file" accept="${mediaAccept}" style="display:none" data-media-upload-input="${item.id}" ${dis}>
+        ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>+ Upload file</button>`}
+        ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : ''}
+        <div class="attach-chip-row" style="margin-top:7px">
+          ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+        </div>`;
+    };
     const generateSteps = `
       <div class="story-step">
         <span class="story-step-num">1</span>
@@ -1436,7 +1453,8 @@ Rules:
       <div class="story-step">
         <span class="story-step-num">2</span>
         <div class="story-step-body">
-          <button type="button" class="btn btn-sm" data-download-item="${item.id}" ${dis}>⬇ Download artifacts</button>
+          <button type="button" class="btn btn-sm${hasPrompt ? '' : ' btn-guard-disabled'}" data-download-item="${item.id}" data-requires-prompt="true" ${dis}>⬇ Download artifacts</button>
+          ${hasPrompt ? '' : `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to download yet.</p>`}
         </div>
       </div>
       <div class="story-step">
@@ -1447,14 +1465,14 @@ Rules:
       </div>
       <div class="story-step">
         <span class="story-step-num">4</span>
-        <div class="story-step-body">${uploadWidget}</div>
+        <div class="story-step-body">${buildUploadWidget(true)}</div>
       </div>`;
     const uploadOnlyStep = `
       <div class="story-step">
         <span class="story-step-num">1</span>
         <div class="story-step-body">
           <p class="story-step-note">Upload your own ${esc(mediaLabel.toLowerCase())} — no prompt or Flow generation needed.</p>
-          ${uploadWidget}
+          ${buildUploadWidget(false)}
         </div>
       </div>`;
     return `
@@ -1468,10 +1486,10 @@ Rules:
           <span class="chevron">›</span>
         </div>
         <div class="item-body">
-          <div class="item-mode-toggle">
+          ${hasFile ? '' : `<div class="item-mode-toggle">
             <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${item.id}">✨ Generate</button>
             <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${item.id}">📤 Upload my own</button>
-          </div>
+          </div>`}
           ${mode === 'upload' ? uploadOnlyStep : generateSteps}
         </div>
       </div>`;
@@ -1508,14 +1526,29 @@ Rules:
       renderTool();
     }));
     wireItemRename(item);
-    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', () => {
-      state.itemCardMode[item.id] = el.getAttribute('data-item-mode-btn');
+    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', async () => {
+      const mode = el.getAttribute('data-item-mode-btn');
+      state.itemCardMode[item.id] = mode;
+      const version = theVersion(item);
+      // Persisted to fields._uiMode (not just kept in memory) so the choice
+      // survives a reload — the backend replaces `fields` wholesale, so the
+      // existing fields have to be spread back in, not just this one key.
+      version.fields = { ...(version.fields || {}), _uiMode: mode };
       renderTool();
+      await api.updateVersion(item.id, { fields: version.fields });
     }));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
     const downloadItemBtn = document.querySelector(`[data-download-item="${item.id}"]`);
-    if (downloadItemBtn) downloadItemBtn.addEventListener('click', () => downloadItemPackage(item, downloadItemBtn));
+    if (downloadItemBtn) downloadItemBtn.addEventListener('click', () => {
+      const version = theVersion(item);
+      const requiresPrompt = downloadItemBtn.getAttribute('data-requires-prompt') === 'true';
+      if (requiresPrompt && !(version.prompt && version.prompt.trim())) {
+        toast('Generate a prompt first (step 1) — there\'s nothing to download yet.');
+        return;
+      }
+      downloadItemPackage(item, downloadItemBtn);
+    });
     const copyBtn = document.querySelector(`[data-copy-prompt="${item.id}"]`);
     if (copyBtn) copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(theVersion(item).prompt || '').then(() => toast('Copied'));
@@ -1523,25 +1556,48 @@ Rules:
     const uploadBtn = document.querySelector(`[data-media-upload-btn="${item.id}"]`);
     const uploadInput = document.querySelector(`[data-media-upload-input="${item.id}"]`);
     if (uploadBtn && uploadInput) {
-      uploadBtn.addEventListener('click', () => uploadInput.click());
+      uploadBtn.addEventListener('click', () => {
+        const version = theVersion(item);
+        const requiresPrompt = uploadBtn.getAttribute('data-requires-prompt') === 'true';
+        if (requiresPrompt && !(version.prompt && version.prompt.trim())) {
+          toast('Generate a prompt first (step 1) — there\'s nothing to upload a result for yet.');
+          return;
+        }
+        uploadInput.click();
+      });
       uploadInput.addEventListener('change', async () => {
         const files = Array.from(uploadInput.files);
         if (!files.length) return;
-        uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
         const version = theVersion(item);
-        const mediaFiles = version.media_files ? [...version.media_files] : [];
-        for (const file of files) {
-          const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
-          const cleanName = cleanUploadFileName(item, file.name, mediaFiles.length);
-          const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
-          mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
+        // The button itself already hides once a file exists, but guard
+        // here too — one file per item, no silent second upload.
+        if ((version.media_files || []).length > 0) {
+          toast(`This item already has a file — remove "${version.media_files[0].fileName}" first before uploading another.`);
+          uploadInput.value = '';
+          return;
         }
+        uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
+        const mediaFiles = [];
+        const file = files[0];
+        const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
+        const cleanName = cleanUploadFileName(item, file.name, 0);
+        const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
+        mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
         version.media_files = mediaFiles;
-        await api.updateVersion(item.id, { mediaFiles });
+        const patch = { mediaFiles };
+        // Uploading your own file replaces what a Generate-flow prompt would
+        // have produced — that old prompt is now stale/unrelated, so clear
+        // it (Setup field values are left alone, in case of switching back).
+        const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
+        if (currentMode === 'upload' && version.prompt) {
+          version.prompt = '';
+          patch.prompt = '';
+        }
+        await api.updateVersion(item.id, patch);
         uploadInput.value = '';
         uploadBtn.disabled = false; uploadBtn.textContent = '+ Choose file(s)';
         renderTool();
-        toast('Saved');
+        toast(patch.prompt !== undefined ? 'Cleared the previous prompt — this item now uses your uploaded file directly.' : 'Saved');
       });
     }
     document.querySelectorAll(`[data-remove-media="${item.id}"]`).forEach(el => el.addEventListener('click', async () => {
@@ -1549,7 +1605,18 @@ Rules:
       const version = theVersion(item);
       const mediaFiles = (version.media_files || []).filter((_, i) => i !== idx);
       version.media_files = mediaFiles;
-      await api.updateVersion(item.id, { mediaFiles });
+      const patch = { mediaFiles };
+      // Deleting the LAST upload while in "Upload my own" mode releases the
+      // persisted choice — otherwise the item would stay stuck showing an
+      // empty upload-only view with no obvious way back to Generate.
+      const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
+      if (currentMode === 'upload' && !mediaFiles.length) {
+        delete state.itemCardMode[item.id];
+        const { _uiMode, ...restFields } = version.fields || {};
+        version.fields = restFields;
+        patch.fields = restFields;
+      }
+      await api.updateVersion(item.id, patch);
       renderTool();
       toast('Saved');
     }));
