@@ -1129,7 +1129,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
               </div>
               ${item.item_key === 'story' ? `<p class="story-step-note" style="margin:0 0 6px">Read-only — this is generated from Stage 1's locked storyboard. To change it, edit Stage 1 and regenerate here, so the two stages never drift apart.</p>` : ''}
               <div id="genModalChatGptStaleness">${chatgptStale ? `<p class="story-step-note" style="margin:0 0 6px;color:var(--crimson)">⚠ Setup changed since you built this ChatGPT prompt — click "Open in ChatGPT" again and paste its updated reply before saving.</p>` : ''}</div>
-              <textarea id="genModalPromptArea" class="prompt-box generate-modal-textarea" placeholder="Click Generate, or write your own..." ${item.item_key === 'story' ? 'readonly' : ''}>${esc(prompt)}</textarea>
+              <textarea id="genModalPromptArea" class="prompt-box generate-modal-textarea" placeholder="Click Generate, or write your own..." maxlength="20000" ${item.item_key === 'story' ? 'readonly' : ''}>${esc(prompt)}</textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -1588,7 +1588,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           ${state.renamingItemId === item.id
             ? `<input type="text" class="item-name-input" data-rename-item="${item.id}" value="${esc(item.name || itemLabel(item.stage, item.item_key))}" maxlength="60">`
             : `<span class="item-name">${esc(item.name || itemLabel(item.stage, item.item_key))}</span><button type="button" class="item-rename-btn" data-rename-btn="${item.id}" title="Rename">✏️</button>`}
-          ${opts.deletable && !isLocked ? `<button class="btn btn-sm btn-danger" data-delete-item="${item.id}" title="Remove">−</button>` : ''}
+          ${opts.deletable && !isLocked ? `<button class="btn btn-sm btn-danger" data-delete-item="${item.id}" title="Remove">×</button>` : ''}
           <span class="chevron">›</span>
         </div>
         <div class="item-body">
