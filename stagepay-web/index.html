@@ -527,6 +527,18 @@ Rules:
   const MEDIA_ACCEPT = {
     sound: 'audio/*', movie: 'video/*,image/*',
   };
+  // Video clips are legitimately much bigger than reference images — every
+  // other item type (and Stage 1's logo/product photos) shares one default.
+  const DEFAULT_MEDIA_MAX_MB = 20;
+  const MEDIA_MAX_MB = { movie: 100 };
+  function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
+  function checkFileSize(file, maxMb) {
+    if (file.size > maxMb * 1024 * 1024) {
+      toast(`"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)}MB — max allowed is ${maxMb}MB.`);
+      return false;
+    }
+    return true;
+  }
 
   // ---------- API client ----------
   // Gemini calls are the only ones that can genuinely hang (backend itself
@@ -1520,9 +1532,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // [disabled] attribute, so the click still fires and can explain why.
     const buildUploadWidget = (requirePrompt) => {
       const blocked = requirePrompt && !hasPrompt && !hasFile;
+      const maxMb = maxUploadMb(item.item_key);
       const dimensionHint = item.item_key === 'sound'
-        ? ''
-        : `<p class="story-step-note" style="margin-top:4px">Recommended: match your video's aspect ratio (9:16 for Reels/Shorts, 16:9 for YouTube), at least 1024px on the shortest side.</p>`;
+        ? `<p class="story-step-note" style="margin-top:4px">Max file size: ${maxMb}MB.</p>`
+        : `<p class="story-step-note" style="margin-top:4px">Recommended: match your video's aspect ratio (9:16 for Reels/Shorts, 16:9 for YouTube), at least 1024px on the shortest side. Max file size: ${maxMb}MB.</p>`;
       return `
         <input type="file" accept="${mediaAccept}" style="display:none" data-media-upload-input="${item.id}" ${dis}>
         ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>+ Upload file</button>`}
@@ -1682,9 +1695,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           uploadInput.value = '';
           return;
         }
+        const file = files[0];
+        if (!checkFileSize(file, maxUploadMb(item.item_key))) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
         const mediaFiles = [];
-        const file = files[0];
         const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
         const cleanName = cleanUploadFileName(item, file.name, 0);
         const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
@@ -1957,12 +1971,12 @@ ${b.cta || '—'}
           <input type="file" id="logoFileInput" accept="image/*" style="display:none">
           <button type="button" class="btn btn-sm" id="chooseLogoBtn" ${locked ? 'disabled' : ''}>+ Choose file</button>
           ${b.logo_media && b.logo_media.fileName ? `<a href="${esc(api.mediaUrl(b.logo_media.key))}" target="_blank" rel="noopener" style="margin-left:8px;font-size:12px;color:var(--text-faint)">${esc(b.logo_media.fileName)}</a>` : ''}
-          <p class="story-step-note" style="margin-top:5px">Recommended: square, transparent PNG, at least 500×500px.</p>
+          <p class="story-step-note" style="margin-top:5px">Recommended: square, transparent PNG, at least 500×500px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB.</p>
         </div>
         <div class="field"><label>Product photos</label>
           <input type="file" id="productPhotosInput" accept="image/*" multiple style="display:none">
           <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose files</button>
-          <p class="story-step-note" style="margin-top:5px">Recommended: high-resolution, at least 1000×1000px.</p>
+          <p class="story-step-note" style="margin-top:5px">Recommended: high-resolution, at least 1000×1000px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
             ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
           </div>
@@ -2055,6 +2069,7 @@ ${b.cta || '—'}
     if (logoInput) logoInput.addEventListener('change', async () => {
       const file = logoInput.files[0];
       if (!file) return;
+      if (!checkFileSize(file, DEFAULT_MEDIA_MAX_MB)) { logoInput.value = ''; return; }
       chooseLogoBtn.disabled = true; chooseLogoBtn.textContent = 'Uploading…';
       const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
       state.brief.logo_media = { key: uploaded.key, fileName: uploaded.fileName };
@@ -2069,6 +2084,8 @@ ${b.cta || '—'}
     if (photosInput) photosInput.addEventListener('change', async () => {
       const files = Array.from(photosInput.files);
       if (!files.length) return;
+      const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
+      if (oversized) { photosInput.value = ''; return; }
       choosePhotosBtn.disabled = true; choosePhotosBtn.textContent = 'Uploading…';
       const photos = [...(state.brief.product_photos || [])];
       for (const file of files) {
@@ -2223,6 +2240,7 @@ ${b.cta || '—'}
           <div class="story-step-body">
             <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
             <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload file</button>
+            <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
             <div class="attach-chip-row" style="margin-top:7px">
               ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
             </div>
@@ -2275,6 +2293,8 @@ ${b.cta || '—'}
       uploadInput.addEventListener('change', async () => {
         const files = Array.from(uploadInput.files);
         if (!files.length) return;
+        const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
+        if (oversized) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
         const version = theVersion(story);
         const mediaFiles = version.media_files ? [...version.media_files] : [];
