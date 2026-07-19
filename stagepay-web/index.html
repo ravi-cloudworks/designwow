@@ -247,6 +247,14 @@
   .modal-head strong { font-size: 15.5px; }
   .modal-close { border: none; background: none; font-size: 19px; cursor: pointer; color: var(--text-faint); }
   .modal-sub { font-size: 12px; color: var(--text-faint); margin: 0 0 16px; }
+
+  .media-viewer-overlay { z-index: 1100; }
+  .media-viewer-card { background: var(--surface); border-radius: 12px; max-width: 92vw; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+  .media-viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 8px 10px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .media-viewer-head strong { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .media-viewer-body { display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--surface-2); overflow: auto; }
+  .media-viewer-body img, .media-viewer-body video { max-width: 86vw; max-height: 76vh; border-radius: 6px; display: block; object-fit: contain; }
+  .media-viewer-body audio { width: 360px; max-width: 80vw; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .affected-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
   .affected-list li { font-size: 12.5px; font-weight: 600; background: var(--amber-soft); border: 1px solid var(--amber-line); border-radius: 6px; padding: 7px 10px; }
@@ -1165,7 +1173,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         <div class="modal-card generate-modal-card">
           <div class="modal-head"><strong>Generate — ${esc(item.name || itemLabel(item.stage, item.item_key))}</strong>
             <button class="modal-close" id="genModalCloseBtn">×</button></div>
-          ${refFiles.length ? `<div class="attach-list"><div class="attach-list-label">🔴 Must attach these images</div><div class="attach-chip-row">${refFiles.map(f => attachChip(f.icon || '', f.fileName, f.key)).join('')}</div></div>` : ''}
+          ${refFiles.length ? `<div class="attach-list"><div class="attach-list-label">🔴 Must attach these images</div><div class="attach-chip-row">${refFiles.map(f => attachChip(f.icon || '', f.fileName, f.key, f.kind)).join('')}</div></div>` : ''}
           <div class="generate-modal-body">
             <div class="generate-modal-left">
               <div id="genModalFields">${renderFieldsForm(item, genModalDraft.fields)}</div>
@@ -1484,10 +1492,40 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   //   movie     -> its own Scene's approved image + every approved Sound (continuity into the final clip)
   // A clickable chip when a real file key exists (every attach source is a
   // real R2-backed upload now), plain text otherwise.
-  function attachChip(icon, name, key) {
+  function attachChip(icon, name, key, kind) {
     const label = `${icon} ${esc(name)}`;
-    return key ? `<a class="attach-chip" href="${esc(api.mediaUrl(key))}" target="_blank" rel="noopener">${label}</a>` : `<span class="attach-chip">${label}</span>`;
+    return key ? `<a class="attach-chip" href="${esc(api.mediaUrl(key))}" data-media-preview data-media-name="${esc(name)}" data-media-kind="${esc(kind || 'image')}" rel="noopener">${label}</a>` : `<span class="attach-chip">${label}</span>`;
   }
+  // Clicking an uploaded file used to just pop a plain browser tab — an
+  // in-app viewer feels more polished and keeps the designer in flow.
+  // Appended straight to <body> (not the shared #modalRoot every other
+  // modal uses) so it can stack on top of an already-open Generate/Setup
+  // modal without clobbering it.
+  function openMediaViewerModal(url, fileName, kind) {
+    closeMediaViewerModal();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay media-viewer-overlay';
+    overlay.id = 'mediaViewerOverlay';
+    const body = kind === 'video'
+      ? `<video src="${esc(url)}" controls autoplay></video>`
+      : kind === 'audio'
+        ? `<audio src="${esc(url)}" controls autoplay></audio>`
+        : `<img src="${esc(url)}" alt="${esc(fileName)}">`;
+    overlay.innerHTML = `<div class="media-viewer-card">
+      <div class="media-viewer-head"><strong>${esc(fileName)}</strong><button type="button" class="modal-close" id="mediaViewerCloseBtn">×</button></div>
+      <div class="media-viewer-body">${body}</div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMediaViewerModal(); });
+    document.getElementById('mediaViewerCloseBtn').addEventListener('click', closeMediaViewerModal);
+    document.addEventListener('keydown', mediaViewerEscHandler);
+  }
+  function closeMediaViewerModal() {
+    const el = document.getElementById('mediaViewerOverlay');
+    if (el) el.remove();
+    document.removeEventListener('keydown', mediaViewerEscHandler);
+  }
+  function mediaViewerEscHandler(e) { if (e.key === 'Escape') closeMediaViewerModal(); }
   // All of an item's own uploaded media files — an item can carry more than
   // one now (e.g. a Story's several storyboard frames).
   function itemMediaFiles(item) { return item ? (theVersion(item).media_files || []) : []; }
@@ -1593,7 +1631,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>+ Upload file</button>`}
         ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : (hasFile ? '' : dimensionHint)}
         <div class="attach-chip-row" style="margin-top:7px">
-          ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+          ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
         </div>`;
     };
     const generateSteps = `
@@ -1652,7 +1690,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <span class="item-thumb">${ITEM_THUMBS[item.item_key] || '📄'}</span>
           ${state.renamingItemId === item.id
             ? `<input type="text" class="item-name-input" data-rename-item="${item.id}" value="${esc(item.name || itemLabel(item.stage, item.item_key))}" maxlength="60">`
-            : `<span class="item-name">${esc(item.name || itemLabel(item.stage, item.item_key))}</span><button type="button" class="item-rename-btn" data-rename-btn="${item.id}" title="Rename">✏️</button>`}
+            : `<span class="item-name">${esc(item.name || itemLabel(item.stage, item.item_key))}</span>${isLocked ? '' : `<button type="button" class="item-rename-btn" data-rename-btn="${item.id}" title="Rename">✏️</button>`}`}
           ${opts.deletable && !isLocked ? `<button class="btn btn-sm btn-danger" data-delete-item="${item.id}" title="Remove">×</button>` : ''}
           <span class="chevron">›</span>
         </div>
@@ -1950,40 +1988,6 @@ ${e.rawResponse || '—'}`;
       brand_color_primary: '#8b5fbf', brand_color_secondary: '#f2d449', brand_color_accent: '#ffffff',
     },
   };
-  function briefMarkdown() {
-    const b = state.brief;
-    if (!b) return '';
-    return `# Client Brief — ${b.product || '(product)'}
-
-**Goal:** ${b.goal || '—'}
-**Video Style:** ${b.video_style || '—'}
-**Tone:** ${b.tone || '—'}
-**Target Audience:** ${b.audience || '—'}
-**Platform:** ${b.platform || '—'}
-**Duration:** ${b.duration || '—'} seconds
-**Language:** ${b.language || '—'}
-
-## Product Description
-${b.product_description || '—'}
-
-## Hook
-${b.hook || '—'}
-
-## Storyboard / Dialogue
-${b.storyboard || '—'}
-
-## Call to Action
-${b.cta || '—'}
-
-## Brand Colors
-- Primary: ${b.brand_color_primary || '—'}
-- Secondary: ${b.brand_color_secondary || '—'}
-
-## Assets
-- Logo: ${(b.logo_media && b.logo_media.fileName) || 'not uploaded yet'}
-- Product photos: ${(b.product_photos && b.product_photos.length) ? b.product_photos.map(p => p.fileName).join(', ') : 'none uploaded yet'}
-`;
-  }
 
   function briefSectionHtml(key, title, innerHtml) {
     const open = state.briefOpenSection === key;
@@ -2004,8 +2008,6 @@ ${b.cta || '—'}
         <p class="lane-tamil">திட்ட நோக்கம்</p>
         <p class="lane-desc">Given by the brand/customer. No versions — the raw input everything else builds from.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">
-          ${downloadBtnHtml()}
-          <button type="button" class="icon-btn" id="copyBriefMarkdownBtn" title="Copy as Markdown">📋</button>
           ${!locked ? `<select id="sampleBriefSelect" class="icon-select" title="Load sample data">
             <option value="">🎲</option>
             <option value="food">Food &amp; Beverage — TangyBite Pickles</option>
@@ -2022,7 +2024,7 @@ ${b.cta || '—'}
         <div class="field"><label>Logo</label>
           <input type="file" id="logoFileInput" accept="image/*" style="display:none">
           <button type="button" class="btn btn-sm" id="chooseLogoBtn" ${locked ? 'disabled' : ''}>+ Choose file</button>
-          ${b.logo_media && b.logo_media.fileName ? `<a href="${esc(api.mediaUrl(b.logo_media.key))}" target="_blank" rel="noopener" style="margin-left:8px;font-size:12px;color:var(--text-faint)">${esc(b.logo_media.fileName)}</a>` : ''}
+          ${b.logo_media && b.logo_media.fileName ? `<a href="${esc(api.mediaUrl(b.logo_media.key))}" data-media-preview data-media-name="${esc(b.logo_media.fileName)}" data-media-kind="image" rel="noopener" style="margin-left:8px;font-size:12px;color:var(--text-faint)">${esc(b.logo_media.fileName)}</a>` : ''}
           <p class="story-step-note" style="margin-top:5px">Recommended: square, transparent PNG, at least 500×500px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB.</p>
         </div>
         <div class="field"><label>Product photos</label>
@@ -2030,7 +2032,7 @@ ${b.cta || '—'}
           <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose files</button>
           <p class="story-step-note" style="margin-top:5px">Recommended: high-resolution, at least 1000×1000px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
-            ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+            ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" data-media-preview data-media-name="${esc(p.fileName)}" data-media-kind="image" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
           </div>
         </div>
         ${colorField('Primary color', b.brand_color_primary, 'brand_color_primary', locked)}
@@ -2062,16 +2064,11 @@ ${b.cta || '—'}
         : `<button class="btn btn-primary" id="lockBriefBtn" style="width:100%;margin-top:10px">✅ Validated with customer — Start Stage 2</button>`}`;
   }
   function wireLane1() {
-    wireDownloadBtn('lane1', 1, 'Client Brief');
     document.querySelectorAll('[data-brief-section]').forEach(el => el.addEventListener('click', () => {
       const key = el.getAttribute('data-brief-section');
       state.briefOpenSection = state.briefOpenSection === key ? null : key;
       renderTool();
     }));
-    const copyMdBtn = document.getElementById('copyBriefMarkdownBtn');
-    if (copyMdBtn) copyMdBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(briefMarkdown()).then(() => toast('Copied as Markdown'));
-    });
     const sampleSelect = document.getElementById('sampleBriefSelect');
     if (sampleSelect) sampleSelect.addEventListener('change', async () => {
       const key = sampleSelect.value;
@@ -2263,7 +2260,7 @@ ${b.cta || '—'}
         <span class="item-thumb">${ITEM_THUMBS.story}</span>
         ${state.renamingItemId === story.id
           ? `<input type="text" class="item-name-input" data-rename-item="${story.id}" value="${esc(story.name || 'Story')}" maxlength="60">`
-          : `<span class="item-name">${esc(story.name || 'Story')}</span><button type="button" class="item-rename-btn" data-rename-btn="${story.id}" title="Rename">✏️</button>`}
+          : `<span class="item-name">${esc(story.name || 'Story')}</span>${isLocked ? '' : `<button type="button" class="item-rename-btn" data-rename-btn="${story.id}" title="Rename">✏️</button>`}`}
       </div>
       <div class="item-body">
         <div class="story-step">
@@ -2295,7 +2292,7 @@ ${b.cta || '—'}
             <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload file</button>
             <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
             <div class="attach-chip-row" style="margin-top:7px">
-              ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+              ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
             </div>
           </div>
         </div>
@@ -2377,7 +2374,16 @@ ${b.cta || '—'}
     const amountBtn = document.getElementById('storyAmountBtn');
     if (amountBtn) amountBtn.addEventListener('click', () => openStageAmountModal(2));
     const confirmPaidBtn = document.getElementById('storyConfirmPaidBtn');
+    // Same double-click confirmation as the shared stage payment card — this
+    // button only ever renders while paid is still false, so every click
+    // here is before the customer has confirmed anything on their own link.
+    let confirmArmed = false;
     if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
+      if (!confirmArmed) {
+        confirmArmed = true;
+        toast("Customer hasn't confirmed payment on their link yet — click again to confirm anyway");
+        return;
+      }
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, 2);
       if (res.ok) {
@@ -2386,6 +2392,7 @@ ${b.cta || '—'}
         renderProjectInfoBar();
         toast('Marked as paid');
       } else {
+        confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
     });
@@ -2465,9 +2472,11 @@ ${b.cta || '—'}
   // ---------- Auto-populate sync (decoupled from Story's own Generate) ----------
   function renderAutoPopulateCardHtml() {
     const allowed = previousStageLocked(3);
+    const lock = stageLockFor(3);
+    const hardDis = lock && lock.locked ? 'disabled' : '';
     return `<div class="deliverable-card" style="margin-bottom:14px">
       <div class="card-section-label">👥 Characters from the Story</div>
-      <button type="button" class="btn btn-sm btn-primary${allowed ? '' : ' btn-guard-disabled'}" id="syncAutoPopulateBtn">🔄 Sync Characters/Props/Backgrounds/Sounds from Story</button>
+      <button type="button" class="btn btn-sm btn-primary${allowed ? '' : ' btn-guard-disabled'}" id="syncAutoPopulateBtn" ${hardDis}>🔄 Sync Characters/Props/Backgrounds/Sounds from Story</button>
       <p class="story-step-note" style="margin-top:6px">Re-reads Stage 1's locked storyboard/dialogue and drafts fresh matches here for you to review.</p>
       ${previousStageGuardNote(3)}
     </div>`;
@@ -2477,6 +2486,8 @@ ${b.cta || '—'}
     if (!btn) return;
     btn.addEventListener('click', async () => {
       if (!previousStageLocked(3)) { toast('Lock Stage 2 first — paid and approved by the customer — before syncing Stage 3'); return; }
+      const lock3 = stageLockFor(3);
+      if (lock3 && lock3.locked) { toast('Stage 3 is locked — unlock it first before syncing new items.'); return; }
       const story = itemsFor(2, 'story')[0];
       // Reads Stage 1's locked storyboard directly, not Stage 2's composed
       // prompt — that text is wrapped in Flow-only image-styling
@@ -2525,6 +2536,8 @@ ${b.cta || '—'}
     if (!btn) return;
     btn.addEventListener('click', async () => {
       if (!previousStageLocked(4)) { toast('Lock Stage 3 first — paid and approved by the customer — before syncing Stage 4'); return; }
+      const lock4 = stageLockFor(4);
+      if (lock4 && lock4.locked) { toast('Stage 4 is locked — unlock it first before syncing new items.'); return; }
       const story = itemsFor(2, 'story')[0];
       const sourceText = (state.brief && state.brief.storyboard) || '';
       if (!story) { toast('Validate the Stage 1 brief to create the Story item first'); return; }
@@ -2597,8 +2610,18 @@ ${b.cta || '—'}
       openStageAmountModal(stage);
     });
     const confirmPaidBtn = document.querySelector(`#${laneId} [data-stage-confirm-paid-btn]`);
+    // This button only ever renders while paid is still false, so every
+    // click here is, by definition, before the customer has confirmed
+    // anything on their own public link — require a second click so a
+    // designer doesn't mark a stage paid by an accidental single tap.
+    let confirmArmed = false;
     if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before confirming payment here`); return; }
+      if (!confirmArmed) {
+        confirmArmed = true;
+        toast("Customer hasn't confirmed payment on their link yet — click again to confirm anyway");
+        return;
+      }
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, stage);
       if (res.ok) {
@@ -2607,6 +2630,7 @@ ${b.cta || '—'}
         renderProjectInfoBar();
         toast('Marked as paid');
       } else {
+        confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
     });
@@ -2786,73 +2810,8 @@ ${b.cta || '—'}
     return new Blob([...parts, ...central, end], { type: 'application/zip' });
   }
 
-  // ---------- Stage prompt + package download ----------
+  // ---------- Package download ----------
   function slugify(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
-  function stagePromptText(stage, laneTitle) {
-    // Stage 1 has no items/prompts of its own — use the exact same full
-    // markdown as "Copy as Markdown" (every field, not the one-paragraph
-    // summary used to feed other prompts) so the downloaded package actually
-    // has everything the client gave, matching what the button implies.
-    if (stage === 1) return briefMarkdown();
-    const items = state.items.filter(i => i.stage === stage);
-    if (!items.length) return `${laneTitle}\n\n(No items yet.)`;
-    const sections = items.map(it => `## ${it.name || itemLabel(it.stage, it.item_key)}\n${theVersion(it).prompt || composeFinalPrompt(it, compilePrompt(it))}`);
-    return `${laneTitle}\n\n${sections.join('\n\n')}`;
-  }
-  function stageMediaFiles(stage) {
-    if (stage === 1) {
-      const b = state.brief;
-      const files = [];
-      if (b.logo_media && b.logo_media.key) files.push(b.logo_media);
-      (b.product_photos || []).forEach(p => files.push(p));
-      return files;
-    }
-    const files = [];
-    const seenKeys = new Set();
-    const add = (f) => { if (f && f.key && !seenKeys.has(f.key)) { seenKeys.add(f.key); files.push(f); } };
-    state.items.filter(i => i.stage === stage).forEach(it => {
-      const fields = theVersion(it).fields || {};
-      // Both the item's own uploaded output AND whatever it must attach from
-      // earlier stages — the same file set mustAttachHtml shows as red chips,
-      // so the package actually has everything needed to regenerate this in Flow.
-      mustAttachFiles(it, fields).forEach(add);
-      (theVersion(it).media_files || []).forEach(add);
-    });
-    return files;
-  }
-  async function downloadStagePackage(stage, laneTitle, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
-    try {
-      const promptText = stagePromptText(stage, laneTitle);
-      const promptFileName = stage === 1 ? 'brief.txt' : 'prompt.txt';
-      const files = stageMediaFiles(stage);
-      const entries = [{ name: promptFileName, data: new TextEncoder().encode(promptText) }];
-      const usedNames = new Set([promptFileName]);
-      for (const f of files) {
-        try {
-          const r = await fetch(api.mediaUrl(f.key), { credentials: 'include' });
-          if (!r.ok) continue;
-          let name = f.fileName;
-          let n = 2;
-          while (usedNames.has(name)) { name = `${n}-${f.fileName}`; n++; }
-          usedNames.add(name);
-          entries.push({ name, data: new Uint8Array(await r.arrayBuffer()) });
-        } catch (e) { /* skip a file that failed to fetch, don't block the rest */ }
-      }
-      const blob = buildZip(entries);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${slugify(state.project.name)}-stage${stage}-${slugify(laneTitle)}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast('Downloaded');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '⬇ Download stage package'; }
-    }
-  }
   // Per-item download — this item's own prompt + this item's own must-attach
   // reference files (not its already-uploaded output, and not other items'
   // data). This is the designer's own generation tool: grab exactly what's
@@ -2891,13 +2850,6 @@ ${b.cta || '—'}
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '⬇ Download'; }
     }
-  }
-  function downloadBtnHtml() {
-    return `<button type="button" class="btn btn-sm btn-primary" data-download-stage>⬇ Download stage package</button>`;
-  }
-  function wireDownloadBtn(laneId, stage, laneTitle) {
-    const btn = document.querySelector(`#${laneId} [data-download-stage]`);
-    if (btn) btn.addEventListener('click', () => downloadStagePackage(stage, laneTitle, btn));
   }
   // ---------- Stage amount modal (per stage — no link/URL here, that's project-level now) ----------
   // A real modal, not native prompt()/alert() — those get silently blocked by
@@ -4468,6 +4420,18 @@ ${b.cta || '—'}
     state.screen = 'projects';
     renderApp();
   }
+  // One delegated listener (rather than re-wiring after every renderTool()
+  // rebuild) catches every file chip across brief assets, item uploads, and
+  // must-attach references alike. Modified clicks (ctrl/cmd/shift/middle)
+  // fall through to the real href so "open in new tab" still works.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('[data-media-preview]');
+    if (!link) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    openMediaViewerModal(link.getAttribute('href'), link.getAttribute('data-media-name'), link.getAttribute('data-media-kind') || 'image');
+  });
+
   boot();
 })();
 </script>
