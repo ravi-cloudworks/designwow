@@ -12,10 +12,11 @@
       "label": "Character",
       "note": "content.geminiInstruction below is today's existing guidance, unchanged for now — this pass only fixes the output instruction. Revisit content later if needed.",
       "content": {
-        "geminiInstruction": "Describe the character for use as a visual reference: gender, age, skin tone, hair, outfit. A short, specific, production-usable description — not a placeholder. This becomes the approved, locked appearance for this character — it will be referenced again in later Scene and Final Movie generations, so it must be precise enough that the same character can be replicated exactly from a different angle or in a different scene.",
+        "geminiInstruction": "Describe the character for use as a visual reference: gender, age, ethnicity, skin tone, hair, outfit. A short, specific, production-usable description — not a placeholder. This becomes the approved, locked appearance for this character — it will be referenced again in later Scene and Final Movie generations, so it must be precise enough that the same character can be replicated exactly from a different angle or in a different scene.",
         "fieldsSchema": [
           { "key": "gender", "label": "Gender", "type": "pill", "options": ["Female", "Male", "Non-binary"] },
           { "key": "age", "label": "Age", "type": "number" },
+          { "key": "ethnicity", "label": "Ethnicity", "type": "pill", "options": ["Indian", "East Asian", "Southeast Asian", "Middle Eastern", "African", "Hispanic/Latino", "Caucasian/White", "Mixed/Other"] },
           { "key": "skin_tone", "label": "Skin tone", "type": "pill", "options": ["Fair", "Wheatish", "Dusky", "Dark"] },
           { "key": "hair", "label": "Hair", "type": "text" },
           { "key": "outfit", "label": "Outfit", "type": "text" }
