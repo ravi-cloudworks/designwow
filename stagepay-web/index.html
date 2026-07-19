@@ -746,6 +746,17 @@ Rules:
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  // Pasting from ChatGPT/Word/etc often leaves stray blank lines at the very
+  // start or end of a field — strip those (and any leading/trailing
+  // whitespace) on save, without touching intentional blank lines a
+  // designer left in the middle of a multi-paragraph field.
+  function trimBlankLines(str) {
+    if (typeof str !== 'string') return str;
+    const lines = str.split('\n');
+    while (lines.length && lines[0].trim() === '') lines.shift();
+    while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+    return lines.join('\n').trim();
+  }
   // D1's datetime('now') returns UTC as "YYYY-MM-DD HH:MM:SS" with no
   // timezone marker — must force UTC parsing (append Z) before converting,
   // otherwise the browser guesses local time and the displayed time is wrong.
@@ -1290,7 +1301,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     });
     document.getElementById('genModalSaveBtn').addEventListener('click', async () => {
       const item = genModalDraft.item;
-      const promptVal = document.getElementById('genModalPromptArea').value;
+      const promptVal = trimBlankLines(document.getElementById('genModalPromptArea').value);
       // Generate mode has nothing to show downstream (Stage 4/5 references,
       // your own review) without a real prompt — Upload mode is exempt,
       // since that path deliberately never needs one (see itemCardMode).
@@ -1299,6 +1310,12 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         toast('Write or generate a prompt first — an empty one leaves nothing for Flow (or later stages referencing this) to use.');
         return;
       }
+      // Setup fields can carry stray blank lines/whitespace in from a paste
+      // (ChatGPT output, Word, etc) — clean up every free-text value here,
+      // at Save, rather than per-keystroke so typing itself is never disturbed.
+      Object.keys(genModalDraft.fields).forEach((k) => {
+        if (typeof genModalDraft.fields[k] === 'string') genModalDraft.fields[k] = trimBlankLines(genModalDraft.fields[k]);
+      });
       const autoPopulate = genModalDraft.autoPopulate;
       const version = theVersion(item);
       version.fields = genModalDraft.fields;
@@ -2060,7 +2077,8 @@ ${b.cta || '—'}
     });
     document.querySelectorAll('[data-brief-text]').forEach(el => el.addEventListener('change', async () => {
       const key = el.getAttribute('data-brief-text');
-      const val = key === 'duration' ? Number(el.value) : el.value;
+      const val = key === 'duration' ? Number(el.value) : trimBlankLines(el.value);
+      el.value = val;
       state.brief[key] = val;
       const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
       await api.updateBrief(state.project.id, { [camel]: val });
