@@ -21,7 +21,7 @@
             { "key": "properties", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "property" } },
             { "key": "backgrounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "background" } },
             { "key": "sounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "sound" } },
-            { "key": "scenes", "shape": "array of {name, summary}", "createsItemsIn": { "stage": 4, "itemKey": "scene" } }
+            { "key": "scenes", "shape": "array of {name, location, action, dialogue, emotion} — one entry per numbered beat in the storyboard; location and action are required for every scene; dialogue should be the exact line from the storyboard if this beat has one (same language, never translated), or omitted if this beat has no dialogue; emotion must be exactly one of: Frustrated, Curious, Relieved, Happy, Excited, Confident, Calm", "createsItemsIn": { "stage": 4, "itemKey": "scene" } }
           ]
         }
       },
