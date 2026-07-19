@@ -13,6 +13,7 @@
     --mono: "SF Mono", "Roboto Mono", ui-monospace, "Consolas", monospace;
     --radius: 10px;
     --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 1px 1px rgba(20, 22, 27, 0.03);
+    --shadow-lane-active: 0 10px 28px rgba(20, 22, 27, 0.16), 0 0 0 1px rgba(20, 22, 27, 0.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -24,6 +25,7 @@
       --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
       --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
       --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+      --shadow-lane-active: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07);
     }
   }
   :root[data-theme="dark"] {
@@ -34,6 +36,8 @@
     --amber: #e2a34a; --amber-soft: #3a2e18; --amber-line: #5c4826;
     --crimson: #e2635f; --crimson-soft: #3a2220; --crimson-line: #5c3634;
     --moss: #4caf7d; --moss-soft: #1c3324; --moss-line: #2f5439;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    --shadow-lane-active: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07);
   }
   :root[data-theme="light"] {
     --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
@@ -70,8 +74,20 @@
   .dot { width: 7px; height: 7px; border-radius: 50%; }
 
   .swimlane-wrap { display: flex; overflow-x: auto; align-items: flex-start; flex: 1; min-height: 0; }
-  .lane { flex: 0 0 320px; border-right: 1px solid var(--line); padding: 18px 16px 40px; overflow-y: auto; height: 100%; }
+  /* flex-grow (not a fixed basis) so the 5 lanes always fill the full row
+     width with no trailing white space, whatever the viewport is; the
+     active lane's higher grow ratio is what makes it wider than the rest. */
+  .lane { flex: 1 1 240px; border-right: 1px solid var(--line); border-top: 3px solid transparent; padding: 18px 16px 40px; overflow-y: auto; height: 100%; position: relative; transition: flex-grow 0.15s ease, background 0.15s ease, box-shadow 0.15s ease; }
   .lane:last-child { border-right: none; }
+  .lane.active {
+    flex: 1.6 1 280px;
+    background: var(--surface);
+    border-right-color: transparent;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lane-active);
+    z-index: 1;
+  }
+  .current-stage-badge { margin-left: auto; font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; color: #fff; white-space: nowrap; }
   .lane-header { margin-bottom: 12px; }
   .lane-title-row { display: flex; align-items: center; gap: 10px; }
   .lane-badge { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0; font-family: var(--display); }
@@ -794,6 +810,16 @@ Rules:
     entry.payments = [...(entry.payments || []), { amountPaise: entry.amountPaise, paidAt }];
   }
   function stageLockFor(stage) { return state.stageLocks.find(l => l.stage === stage) || null; }
+  // Same "highest stage_locks row, +1 if it's locked" logic the project list
+  // uses server-side (GET /api/projects' current_stage) — recomputed here
+  // from state.stageLocks so it stays correct after a lock/unlock click
+  // without waiting for a full project refetch.
+  function currentActiveStage() {
+    if (!state.stageLocks.length) return 1;
+    const top = state.stageLocks.reduce((max, l) => Math.max(max, l.stage), 0);
+    const topLock = stageLockFor(top);
+    return topLock && topLock.locked ? Math.min(top + 1, 5) : top;
+  }
   // Guard rail: a designer can't start real work on a stage — adding items,
   // syncing from the story — until the stage before it is locked (paid and
   // approved by the customer, even if the amount is ₹0). Move to the next
@@ -2940,17 +2966,26 @@ ${b.cta || '—'}
       if (el) prevLaneScroll[n] = el.scrollTop;
     }
 
-    wrap.innerHTML = `
-      <div class="lane" id="lane1"></div>
-      <div class="lane" id="lane2"></div>
-      <div class="lane" id="lane3"></div>
-      <div class="lane" id="lane4"></div>
-      <div class="lane" id="lane5"></div>`;
+    const activeStage = currentActiveStage();
+    wrap.innerHTML = [1, 2, 3, 4, 5].map(n => `<div class="lane${n === activeStage ? ' active' : ''}" id="lane${n}" style="${n === activeStage ? `border-top-color:${STAGE_COLORS[n]}` : ''}"></div>`).join('');
     document.getElementById('lane1').innerHTML = renderLane1(); wireLane1();
     document.getElementById('lane2').innerHTML = renderLane2(); wireLane2();
     document.getElementById('lane3').innerHTML = renderLane3(); wireLane3();
     document.getElementById('lane4').innerHTML = renderLane4(); wireLane4();
     document.getElementById('lane5').innerHTML = renderLane5(); wireLane5();
+    // Badge injected post-render rather than threaded through each
+    // renderLaneN's return value — every lane already renders its own
+    // ".lane-title-row" independently, so this is the one shared place that
+    // knows which stage is actually active.
+    const activeTitleRow = document.querySelector(`#lane${activeStage} .lane-title-row`);
+    if (activeTitleRow) {
+      // The earned-pill (stages 2-5) already carries margin-left:auto to
+      // push itself flush right — a second auto margin on this badge would
+      // split the free space between the two instead of just sitting next
+      // to it, so only fall back to auto when there's no earned-pill.
+      const margin = activeTitleRow.querySelector('.earned-pill') ? '6px' : 'auto';
+      activeTitleRow.insertAdjacentHTML('beforeend', `<span class="current-stage-badge" style="background:${STAGE_COLORS[activeStage]};margin-left:${margin}">● Current</span>`);
+    }
 
     wrap.scrollLeft = prevWrapScroll;
     for (let n = 1; n <= 5; n++) {
