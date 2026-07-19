@@ -1475,6 +1475,16 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const suffix = existingCount > 0 ? `-${existingCount + 1}` : '';
     return `${base}${suffix}.${ext}`;
   }
+  // Same idea as cleanUploadFileName, but for Stage 1's logo/product photos,
+  // which aren't "items" — logo is always singular (logo.png), product
+  // photos are always numbered from 1 (product-1.png, product-2.png, ...)
+  // since unlike a Character/Scene there's no name to base a filename on.
+  function cleanBriefFileName(baseName, originalFileName, number) {
+    const extMatch = originalFileName.match(/\.([a-zA-Z0-9]+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : 'dat';
+    const suffix = number != null ? `-${number}` : '';
+    return `${baseName}${suffix}.${ext}`;
+  }
 
   // ---------- Item card ----------
   // Numbered-steps per-item card (Generate/Download/Flow/Upload only — no
@@ -1949,7 +1959,7 @@ ${b.cta || '—'}
           <input type="file" id="productPhotosInput" accept="image/*" multiple style="display:none">
           <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose files</button>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
-            ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> <button type="button" data-remove-photo="${i}" ${locked ? 'disabled' : ''} style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button></span>`).join('')}
+            ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
           </div>
         </div>
         ${colorField('Primary color', b.brand_color_primary, 'brand_color_primary', locked)}
@@ -2041,7 +2051,7 @@ ${b.cta || '—'}
       const file = logoInput.files[0];
       if (!file) return;
       chooseLogoBtn.disabled = true; chooseLogoBtn.textContent = 'Uploading…';
-      const uploaded = await api.uploadMedia(state.project.id, file);
+      const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
       state.brief.logo_media = { key: uploaded.key, fileName: uploaded.fileName };
       await api.updateBrief(state.project.id, { logoMedia: state.brief.logo_media });
       chooseLogoBtn.disabled = false; chooseLogoBtn.textContent = '+ Choose file';
@@ -2057,7 +2067,7 @@ ${b.cta || '—'}
       choosePhotosBtn.disabled = true; choosePhotosBtn.textContent = 'Uploading…';
       const photos = [...(state.brief.product_photos || [])];
       for (const file of files) {
-        const uploaded = await api.uploadMedia(state.project.id, file);
+        const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('product', file.name, photos.length + 1));
         photos.push({ key: uploaded.key, fileName: uploaded.fileName });
       }
       state.brief.product_photos = photos;
