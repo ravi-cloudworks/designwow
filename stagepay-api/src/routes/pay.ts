@@ -312,8 +312,8 @@ ${colorLines.length ? colorLines.join('\n') : '- —'}
 - Product photos: ${productPhotos.length ? productPhotos.map((p) => p.fileName).join(', ') : 'none uploaded yet'}
 `;
 
-  const entries: ZipEntry[] = [{ name: 'brief.md', data: new TextEncoder().encode(markdown) }];
-  const usedNames = new Set(['brief.md']);
+  const entries: ZipEntry[] = [{ name: 'brief.txt', data: new TextEncoder().encode(markdown) }];
+  const usedNames = new Set(['brief.txt']);
   const addFile = async (key: string, fileName: string) => {
     const obj = await c.env.MEDIA.get(key);
     if (!obj) return;
