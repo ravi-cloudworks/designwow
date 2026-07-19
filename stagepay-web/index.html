@@ -898,7 +898,7 @@ Rules:
     const rf = theVersion(refItem).fields || {};
     switch (refItem.item_key) {
       case 'character':
-        return `${rf.gender || '(gender)'}, around ${rf.age || '(age)'} years old, ${rf.skin_tone ? rf.skin_tone.toLowerCase() + ' skin tone, ' : ''}${rf.hair ? rf.hair + ', ' : ''}wearing ${rf.outfit || '(outfit)'}`;
+        return `${rf.gender || '(gender)'}, around ${rf.age || '(age)'} years old, ${rf.ethnicity ? rf.ethnicity + ', ' : ''}${rf.skin_tone ? rf.skin_tone.toLowerCase() + ' skin tone, ' : ''}${rf.hair ? rf.hair + ', ' : ''}wearing ${rf.outfit || '(outfit)'}`;
       case 'property':
       case 'sound':
         return rf.description || '';
@@ -928,7 +928,7 @@ Rules:
         break;
       }
       case 'character':
-        base = `${f.gender || '(gender)'}, around ${f.age || '(age)'} years old, ${f.skin_tone ? f.skin_tone.toLowerCase() + ' skin tone, ' : ''}${f.hair ? f.hair + ', ' : ''}wearing ${f.outfit || '(outfit)'}.`;
+        base = `${f.gender || '(gender)'}, around ${f.age || '(age)'} years old, ${f.ethnicity ? f.ethnicity + ', ' : ''}${f.skin_tone ? f.skin_tone.toLowerCase() + ' skin tone, ' : ''}${f.hair ? f.hair + ', ' : ''}wearing ${f.outfit || '(outfit)'}.`;
         break;
       case 'property':
       case 'sound':
