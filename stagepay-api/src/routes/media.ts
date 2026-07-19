@@ -9,6 +9,11 @@ async function projectBelongsToUser(db: D1Database, projectId: string, userId: s
   return !!row && row.user_id === userId;
 }
 
+// Backstop only — the frontend enforces a tighter per-item-type limit
+// (20MB images/audio, 100MB video) and shows it in the UI; this just caps
+// the absolute worst case for anyone hitting the API directly.
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
 // Raw bytes in the body (not multipart — simplest thing that works from a
 // plain fetch(file) call), fileName/projectId as query params. The R2 key
 // embeds the owning user id as its first segment, so the download route can
@@ -21,8 +26,12 @@ media.post('/media', async (c) => {
   if (!projectId) return c.json({ error: 'projectId_required' }, 400);
   if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
 
+  const contentLength = Number(c.req.header('Content-Length') || 0);
+  if (contentLength > MAX_UPLOAD_BYTES) return c.json({ error: 'file_too_large', maxBytes: MAX_UPLOAD_BYTES }, 413);
+
   const contentType = c.req.header('Content-Type') || 'application/octet-stream';
   const body = await c.req.arrayBuffer();
+  if (body.byteLength > MAX_UPLOAD_BYTES) return c.json({ error: 'file_too_large', maxBytes: MAX_UPLOAD_BYTES }, 413);
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
   const key = `${userId}/${projectId}/${crypto.randomUUID()}-${safeName}`;
   await c.env.MEDIA.put(key, body, { httpMetadata: { contentType } });
