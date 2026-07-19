@@ -202,18 +202,33 @@ function forceCloseJson(text: string): string | null {
   return out;
 }
 
-// autoPopulate array entries are always {name, <secondaryKey>} — secondaryKey
-// varies per field (characters/etc use "description", scenes use "summary"),
-// read straight out of the shape string in the config rather than hardcoded.
-function sanitizeAutoPopulateEntries(raw: unknown, secondaryKey: string): Record<string, string>[] {
+// autoPopulate array entries are always {name, <secondary keys...>} — the
+// secondary keys vary per field (character/property/background/sound use
+// just "description", scenes use several structured fields like
+// location/action/dialogue/emotion), read straight out of the shape string
+// in the config rather than hardcoded.
+function extractSecondaryKeys(shape: string): string[] {
+  const m = shape.match(/\{name,\s*([^}]+)\}/);
+  if (!m) return ['description'];
+  return m[1]
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+function sanitizeAutoPopulateEntries(raw: unknown, secondaryKeys: string[]): Record<string, string>[] {
   if (!Array.isArray(raw)) return [];
   const out: Record<string, string>[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue;
     const name = typeof (entry as Record<string, unknown>).name === 'string' ? ((entry as Record<string, unknown>).name as string).trim() : '';
-    const secondary =
-      typeof (entry as Record<string, unknown>)[secondaryKey] === 'string' ? ((entry as Record<string, unknown>)[secondaryKey] as string).trim() : '';
-    if (name) out.push({ name, [secondaryKey]: secondary });
+    if (!name) continue;
+    const cleaned: Record<string, string> = { name };
+    for (const key of secondaryKeys) {
+      const val = (entry as Record<string, unknown>)[key];
+      cleaned[key] = typeof val === 'string' ? val.trim() : '';
+    }
+    out.push(cleaned);
   }
   return out;
 }
@@ -433,9 +448,7 @@ Respond with ONLY the JSON object. No markdown, no code fences, no explanation. 
   if (autoPopulateFields.length) {
     autoPopulate = {};
     for (const f of autoPopulateFields) {
-      const m = f.shape.match(/\{name,\s*(\w+)\}/);
-      const secondaryKey = m ? m[1] : 'description';
-      autoPopulate[f.key] = sanitizeAutoPopulateEntries(parsed[f.key], secondaryKey);
+      autoPopulate[f.key] = sanitizeAutoPopulateEntries(parsed[f.key], extractSecondaryKeys(f.shape));
     }
   }
 
@@ -592,9 +605,7 @@ Respond with ONLY the JSON object. No markdown, no code fences, no explanation. 
 
   const autoPopulate: Record<string, Record<string, string>[]> = {};
   for (const f of autoPopulateFields) {
-    const m = f.shape.match(/\{name,\s*(\w+)\}/);
-    const secondaryKey = m ? m[1] : 'description';
-    autoPopulate[f.key] = sanitizeAutoPopulateEntries(parsed[f.key], secondaryKey);
+    autoPopulate[f.key] = sanitizeAutoPopulateEntries(parsed[f.key], extractSecondaryKeys(f.shape));
   }
 
   return c.json({
