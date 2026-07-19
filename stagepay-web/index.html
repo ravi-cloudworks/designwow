@@ -1021,10 +1021,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       </div>`;
     }
     if (def.type === 'textarea') {
-      return `<div class="field"><label for="${id}">${esc(def.label)}</label><textarea id="${id}" data-field-text="${path}">${esc(value || '')}</textarea></div>`;
+      return `<div class="field"><label for="${id}">${esc(def.label)}</label><textarea id="${id}" data-field-text="${path}" maxlength="1000">${esc(value || '')}</textarea></div>`;
     }
     const inputType = def.type === 'number' ? 'number' : 'text';
-    return `<div class="field"><label for="${id}">${esc(def.label)}</label><input id="${id}" type="${inputType}" value="${esc(value ?? '')}" data-field-text="${path}"></div>`;
+    return `<div class="field"><label for="${id}">${esc(def.label)}</label><input id="${id}" type="${inputType}" value="${esc(value ?? '')}" data-field-text="${path}" ${inputType === 'text' ? 'maxlength="150"' : ''}></div>`;
   }
   function renderFieldsForm(item, fields) {
     const ic = itemConfigFor(item);
@@ -1520,10 +1520,13 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // [disabled] attribute, so the click still fires and can explain why.
     const buildUploadWidget = (requirePrompt) => {
       const blocked = requirePrompt && !hasPrompt && !hasFile;
+      const dimensionHint = item.item_key === 'sound'
+        ? ''
+        : `<p class="story-step-note" style="margin-top:4px">Recommended: match your video's aspect ratio (9:16 for Reels/Shorts, 16:9 for YouTube), at least 1024px on the shortest side.</p>`;
       return `
         <input type="file" accept="${mediaAccept}" style="display:none" data-media-upload-input="${item.id}" ${dis}>
         ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>+ Upload file</button>`}
-        ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : ''}
+        ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : (hasFile ? '' : dimensionHint)}
         <div class="attach-chip-row" style="margin-top:7px">
           ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
         </div>`;
@@ -1583,7 +1586,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         <div class="item-row-head" data-toggle-item="${item.id}">
           <span class="item-thumb">${ITEM_THUMBS[item.item_key] || '📄'}</span>
           ${state.renamingItemId === item.id
-            ? `<input type="text" class="item-name-input" data-rename-item="${item.id}" value="${esc(item.name || itemLabel(item.stage, item.item_key))}">`
+            ? `<input type="text" class="item-name-input" data-rename-item="${item.id}" value="${esc(item.name || itemLabel(item.stage, item.item_key))}" maxlength="60">`
             : `<span class="item-name">${esc(item.name || itemLabel(item.stage, item.item_key))}</span><button type="button" class="item-rename-btn" data-rename-btn="${item.id}" title="Rename">✏️</button>`}
           ${opts.deletable && !isLocked ? `<button class="btn btn-sm btn-danger" data-delete-item="${item.id}" title="Remove">−</button>` : ''}
           <span class="chevron">›</span>
@@ -1831,8 +1834,8 @@ ${e.rawResponse || '—'}`;
 
 
   // ---------- Lane 1: Client Brief ----------
-  function textField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="text" value="${esc(value || '')}" data-brief-text="${key}" ${locked ? 'disabled' : ''}></div>`; }
-  function textareaField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-brief-text="${key}" style="min-height:110px" ${locked ? 'disabled' : ''}>${esc(value || '')}</textarea></div>`; }
+  function textField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="text" value="${esc(value || '')}" data-brief-text="${key}" maxlength="150" ${locked ? 'disabled' : ''}></div>`; }
+  function textareaField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-brief-text="${key}" style="min-height:110px" maxlength="1000" ${locked ? 'disabled' : ''}>${esc(value || '')}</textarea></div>`; }
   function pillField(label, value, options, key, locked) { return `<div class="field"><label>${esc(label)}</label><div class="pill-row">${options.map(o => `<button type="button" class="pill ${o === value ? 'selected' : ''}" data-brief-pick="${key}" data-value="${esc(o)}" ${locked ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div></div>`; }
   function selectField(label, value, options, key, placeholder, locked) {
     const id = 'b' + key;
@@ -1954,10 +1957,12 @@ ${b.cta || '—'}
           <input type="file" id="logoFileInput" accept="image/*" style="display:none">
           <button type="button" class="btn btn-sm" id="chooseLogoBtn" ${locked ? 'disabled' : ''}>+ Choose file</button>
           ${b.logo_media && b.logo_media.fileName ? `<a href="${esc(api.mediaUrl(b.logo_media.key))}" target="_blank" rel="noopener" style="margin-left:8px;font-size:12px;color:var(--text-faint)">${esc(b.logo_media.fileName)}</a>` : ''}
+          <p class="story-step-note" style="margin-top:5px">Recommended: square, transparent PNG, at least 500×500px.</p>
         </div>
         <div class="field"><label>Product photos</label>
           <input type="file" id="productPhotosInput" accept="image/*" multiple style="display:none">
           <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose files</button>
+          <p class="story-step-note" style="margin-top:5px">Recommended: high-resolution, at least 1000×1000px.</p>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
             ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
           </div>
@@ -1982,7 +1987,7 @@ ${b.cta || '—'}
             <label for="bstoryboard" style="margin:0">Storyboard / dialogue</label>
             ${!locked ? `<button type="button" class="btn btn-sm" id="storyboardTemplateBtn">📝 ChatGPT Template</button>` : ''}
           </div>
-          <textarea id="bstoryboard" data-brief-text="storyboard" style="min-height:110px" ${locked ? 'disabled' : ''}>${esc(b.storyboard || '')}</textarea>
+          <textarea id="bstoryboard" data-brief-text="storyboard" style="min-height:110px" maxlength="6000" ${locked ? 'disabled' : ''}>${esc(b.storyboard || '')}</textarea>
           ${storyboardHintHtml(b.storyboard)}
         </div>
       `)}
@@ -2187,7 +2192,7 @@ ${b.cta || '—'}
       <div class="item-row-head" style="cursor:default">
         <span class="item-thumb">${ITEM_THUMBS.story}</span>
         ${state.renamingItemId === story.id
-          ? `<input type="text" class="item-name-input" data-rename-item="${story.id}" value="${esc(story.name || 'Story')}">`
+          ? `<input type="text" class="item-name-input" data-rename-item="${story.id}" value="${esc(story.name || 'Story')}" maxlength="60">`
           : `<span class="item-name">${esc(story.name || 'Story')}</span><button type="button" class="item-rename-btn" data-rename-btn="${story.id}" title="Rename">✏️</button>`}
       </div>
       <div class="item-body">
@@ -2746,7 +2751,7 @@ ${b.cta || '—'}
     if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
     try {
       const promptText = stagePromptText(stage, laneTitle);
-      const promptFileName = stage === 1 ? 'brief.md' : 'prompt.txt';
+      const promptFileName = stage === 1 ? 'brief.txt' : 'prompt.txt';
       const files = stageMediaFiles(stage);
       const entries = [{ name: promptFileName, data: new TextEncoder().encode(promptText) }];
       const usedNames = new Set([promptFileName]);
@@ -2765,7 +2770,7 @@ ${b.cta || '—'}
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `stage${stage}-${slugify(laneTitle)}.zip`;
+      a.download = `${slugify(state.project.name)}-stage${stage}-${slugify(laneTitle)}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -2804,7 +2809,7 @@ ${b.cta || '—'}
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${slugify(item.name || itemLabel(item.stage, item.item_key))}.zip`;
+      a.download = `${slugify(state.project.name)}-${slugify(item.name || itemLabel(item.stage, item.item_key))}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -2888,48 +2893,18 @@ ${b.cta || '—'}
   }
 
   // ---------- Project-level payment link modal (one link, always exists) ----------
-  function openProjectPaymentLinkModal() {
-    const root = document.getElementById('modalRoot');
-    if (!root) return;
+  // One click, not a modal detour: opens the customer's payment page
+  // directly in a new tab (also copies the URL, so it's on the clipboard
+  // ready to paste into a message to the customer if that's the actual goal).
+  function openCustomerPaymentLink() {
     if (!state.user || !state.user.upi_id) {
       toast('Add your UPI ID in ⚙ Settings first');
       return;
     }
     if (!state.paymentLink) { toast('No payment link for this project yet'); return; }
-    root.innerHTML = `
-      <div class="modal-overlay" id="projPayLinkModalOverlay">
-        <div class="modal-card" style="max-width:440px">
-          <div class="modal-head"><strong>💳 Payment Link</strong><button class="modal-close" id="projPayLinkModalCloseBtn">×</button></div>
-          <div style="padding:16px">
-            <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 10px">One link for this whole project — the customer can bookmark it. Set/update each stage's amount from that stage's Customer Deliverable card; it shows up here automatically.</p>
-            <div class="field">
-              <label>Shareable link</label>
-              <div style="display:flex;gap:6px">
-                <input type="text" readonly value="${esc(state.paymentLink.url)}" id="projPayLinkUrlInput" style="flex:1">
-                <button class="btn btn-sm" id="projPayLinkCopyBtn">Copy</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    document.getElementById('projPayLinkModalCloseBtn').addEventListener('click', () => { root.innerHTML = ''; });
-    document.getElementById('projPayLinkModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'projPayLinkModalOverlay') root.innerHTML = ''; });
-    const urlInput = document.getElementById('projPayLinkUrlInput');
-    urlInput.addEventListener('click', () => urlInput.select());
-    const copyBtn = document.getElementById('projPayLinkCopyBtn');
-    copyBtn.addEventListener('click', async () => {
-      const original = copyBtn.textContent;
-      try {
-        await navigator.clipboard.writeText(state.paymentLink.url);
-        copyBtn.textContent = '✓ Copied';
-        toast('Copied to clipboard');
-      } catch {
-        urlInput.select();
-        copyBtn.textContent = '✓ Selected';
-        toast('Could not auto-copy — link is selected, press Ctrl/Cmd+C');
-      }
-      setTimeout(() => { copyBtn.textContent = original; }, 1600);
-    });
+    navigator.clipboard.writeText(state.paymentLink.url).catch(() => {});
+    window.open(state.paymentLink.url, '_blank', 'noopener');
+    toast('Opened the customer payment link (also copied to clipboard)');
   }
 
   // ---------- Top-level render ----------
@@ -3067,7 +3042,7 @@ ${b.cta || '—'}
         <span>Created: <strong>${formatISTWithRelative(p.created_at)}</strong></span>
         <span>Updated: <strong>${formatISTWithRelative(p.updated_at)}</strong></span>
         ${total > 0 ? `<span class="project-earned-pill lg">💰 ${formatRupees(total)} earned</span>` : ''}
-        <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Payment Link</button>
+        <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Open customer payment link</button>
       </div>`;
     if (state.renamingProject) {
       const input = document.getElementById('projectInfoNameInput');
@@ -3092,7 +3067,7 @@ ${b.cta || '—'}
       if (renameBtn) renameBtn.addEventListener('click', startRename);
     }
     const payLinkBtn = document.getElementById('projectInfoPayLinkBtn');
-    if (payLinkBtn) payLinkBtn.addEventListener('click', openProjectPaymentLinkModal);
+    if (payLinkBtn) payLinkBtn.addEventListener('click', openCustomerPaymentLink);
   }
 
   // ---------- Settings modal (UPI ID, used on every payment link's QR) ----------
@@ -3105,7 +3080,7 @@ ${b.cta || '—'}
           <div class="modal-head"><strong>⚙ Settings</strong><button class="modal-close" id="settingsModalCloseBtn">×</button></div>
           <div class="field" style="padding:16px">
             <label for="settingsUpiId">Your UPI ID</label>
-            <input id="settingsUpiId" type="text" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}">
+            <input id="settingsUpiId" type="text" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}" maxlength="50">
             <p style="font-size:11.5px;color:var(--text-faint);margin-top:6px">Used to build the payment QR code on every stage's payment link. One UPI ID per account.</p>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px">
@@ -4135,7 +4110,7 @@ ${b.cta || '—'}
     return `
       <div class="section-head-row"><span class="section-title">Your projects</span></div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
-        <input type="text" id="newProjectName" placeholder="Customer Name - Project Name" style="flex:1">
+        <input type="text" id="newProjectName" placeholder="Customer Name - Project Name" maxlength="100" style="flex:1">
         <button class="btn btn-primary" id="createProjectBtn">+ Create</button>
       </div>
       ${split ? `<div class="goal-range-toggle">
