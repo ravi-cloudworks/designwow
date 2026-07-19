@@ -17,7 +17,7 @@
         "autoPopulate": {
           "note": "One Story generation drafts the skeleton of every downstream stage instead of the designer re-typing every cast member/prop/scene by hand. Each array item becomes a real item in that stage, pre-filled with this description — the designer still reviews/edits/regenerates each one individually at its own stage afterward. This is new — nothing in the app reads these fields yet; wiring it up is a 'clean the code' task.",
           "geminiResponseFields": [
-            { "key": "characters", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "character" } },
+            { "key": "characters", "shape": "array of {name, description} — one entry per distinct person; if multiple people appear together (a couple, a family, friends), give each their own separate entry (e.g. 'Husband', 'Wife') — never merge more than one person into a single entry like 'Couple'", "createsItemsIn": { "stage": 3, "itemKey": "character" } },
             { "key": "properties", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "property" } },
             { "key": "backgrounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "background" } },
             { "key": "sounds", "shape": "array of {name, description}", "createsItemsIn": { "stage": 3, "itemKey": "sound" } },
