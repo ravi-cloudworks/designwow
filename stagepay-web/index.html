@@ -1345,12 +1345,15 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const groups = fieldDefs.map(def => {
       const entries = autoPopulate[def.key] || [];
       const existing = def.createsItemsIn ? existingNamesFor(def.createsItemsIn.stage, def.createsItemsIn.itemKey) : new Set();
-      const secondaryKey = Object.keys(entries[0] || {}).find(k => k !== 'name') || 'description';
+      // Every field beyond "name" — most types return just {name, description},
+      // but Scene returns several structured fields (location/action/dialogue/
+      // emotion) that each map straight onto that item's own Setup fields.
+      const secondaryKeys = Object.keys(entries[0] || {}).filter(k => k !== 'name');
       return {
         key: def.key,
         itemKey: def.createsItemsIn && def.createsItemsIn.itemKey,
         stage: def.createsItemsIn && def.createsItemsIn.stage,
-        secondaryKey,
+        secondaryKeys,
         entries: entries.map(e => ({ ...e, alreadyExists: existing.has((e.name || '').trim().toLowerCase()) })),
       };
     }).filter(g => g.entries.length);
@@ -1373,7 +1376,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
             ${groups.map(g => g.entries.map((e, i) => `
               <li style="display:flex;align-items:flex-start;gap:8px;background:${e.alreadyExists ? 'var(--surface-2)' : 'var(--amber-soft)'};border-color:${e.alreadyExists ? 'var(--line)' : 'var(--amber-line)'}">
                 <input type="checkbox" data-ap-check data-group="${g.key}" data-index="${i}" ${e.alreadyExists ? 'disabled' : 'checked'} style="margin-top:2px">
-                <span><strong>${esc(e.name)}</strong> <span style="font-weight:400;color:var(--text-faint)">(${esc(g.itemKey)})</span>${e.alreadyExists ? ' — already exists, skipping' : `<br><span style="font-weight:400">${esc((e[g.secondaryKey] || '').slice(0, 100))}</span>`}</span>
+                <span><strong>${esc(e.name)}</strong> <span style="font-weight:400;color:var(--text-faint)">(${esc(g.itemKey)})</span>${e.alreadyExists ? ' — already exists, skipping' : `<br><span style="font-weight:400">${esc(g.secondaryKeys.map(k => e[k]).filter(Boolean).join(' · ').slice(0, 140))}</span>`}</span>
               </li>`).join('')).join('')}
           </ul>
           <div class="modal-footer confirm-actions">
@@ -1423,8 +1426,14 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         const { g, e } = toCreate[n];
         confirmBtn.textContent = `Creating ${e.name}… (${n + 1}/${toCreate.length})`;
         const created = await api.createItem(state.project.id, { stage: g.stage, itemKey: g.itemKey, name: e.name });
-        if (created && created.id && e[g.secondaryKey]) {
-          await api.updateVersion(created.id, { fields: { [g.secondaryKey === 'summary' ? 'action' : 'description']: e[g.secondaryKey] } });
+        if (created && created.id) {
+          const newFields = {};
+          // Scene's autoPopulate keys already match its own Setup field names
+          // (location/action/dialogue/emotion) — every other type still
+          // collapses its single secondary value into a generic "description"
+          // field, same as before.
+          g.secondaryKeys.forEach(k => { if (e[k]) newFields[g.itemKey === 'scene' ? k : 'description'] = e[k]; });
+          if (Object.keys(newFields).length) await api.updateVersion(created.id, { fields: newFields });
         }
         // A Scene always needs its paired Stage 5 Movie item — the manual
         // "+ Add scene" button creates both together; without this, a
