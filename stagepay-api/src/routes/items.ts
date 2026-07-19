@@ -33,6 +33,16 @@ async function previousStageLocked(db: D1Database, projectId: string, stage: num
   return !!lock?.locked;
 }
 
+// The companion check previousStageLocked doesn't cover: is THIS stage
+// already locked (paid and approved by the customer)? Without this, an
+// already-closed-out stage was only protected by whichever frontend button
+// happened to disable itself correctly — a gap that let the Stage 3 sync
+// button create new items into an already-locked, already-paid stage.
+async function stageIsLocked(db: D1Database, projectId: string, stage: number): Promise<boolean> {
+  const lock = await db.prepare('SELECT locked FROM stage_locks WHERE project_id = ? AND stage = ?').bind(projectId, stage).first<{ locked: number }>();
+  return !!lock?.locked;
+}
+
 items.post('/projects/:projectId/items', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
@@ -55,6 +65,12 @@ items.post('/projects/:projectId/items', async (c) => {
   if (body.itemKey !== 'movie' && !(await previousStageLocked(c.env.DB, projectId, body.stage))) {
     return c.json(
       { error: 'previous_stage_not_locked', message: `Lock Stage ${body.stage - 1} first — paid and approved by the customer — before adding items to Stage ${body.stage}.` },
+      400
+    );
+  }
+  if (await stageIsLocked(c.env.DB, projectId, body.stage)) {
+    return c.json(
+      { error: 'stage_locked', message: `Stage ${body.stage} is locked — unlock it first before adding new items.` },
       400
     );
   }
@@ -81,9 +97,12 @@ items.patch('/items/:id', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
-  const projectId = await itemProjectId(c.env.DB, id);
-  if (!projectId) return c.json({ error: 'not_found' }, 404);
-  if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
+  const item = await c.env.DB.prepare('SELECT project_id, stage FROM items WHERE id = ?').bind(id).first<{ project_id: string; stage: number }>();
+  if (!item) return c.json({ error: 'not_found' }, 404);
+  if (!(await projectBelongsToUser(c.env.DB, item.project_id, userId))) return c.json({ error: 'forbidden' }, 403);
+  if (await stageIsLocked(c.env.DB, item.project_id, item.stage)) {
+    return c.json({ error: 'stage_locked', message: `Stage ${item.stage} is locked — unlock it first before renaming.` }, 400);
+  }
 
   type UpdateItemBody = { name?: string; orderIndex?: number };
   const body = await c.req.json<UpdateItemBody>().catch(() => ({}) as UpdateItemBody);
