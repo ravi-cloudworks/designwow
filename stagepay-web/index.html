@@ -61,11 +61,6 @@
   .topbar h1 { font-size: 15.5px; font-weight: 700; }
   .topbar p { margin: 1px 0 0; font-size: 11px; color: var(--text-faint); }
 
-  .mode-toggle { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
-  .mode-toggle button { border: none; background: none; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--text-faint); }
-  .mode-toggle button.active.manual { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
-  .mode-toggle button.active.agent { background: var(--teal); color: #f0f6f4; }
-
   .user-chip { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
   .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
 
@@ -256,6 +251,18 @@
   .media-viewer-body img, .media-viewer-body video { max-width: 86vw; max-height: 76vh; border-radius: 6px; display: block; object-fit: contain; }
   .media-viewer-body audio { width: 360px; max-width: 80vw; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+  .confetti-burst { position: fixed; inset: 0; pointer-events: none; z-index: 2000; overflow: hidden; }
+  .confetti-piece { position: absolute; top: -12px; width: 8px; height: 14px; opacity: 0.9; border-radius: 2px; animation: confetti-fall linear forwards; }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(540deg); opacity: 0.85; }
+  }
+  .payment-celebrate-banner { position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-16px); background: var(--surface); border: 1px solid var(--moss-line); box-shadow: 0 14px 34px rgba(20,22,27,0.25); border-radius: 14px; padding: 14px 22px; display: flex; align-items: center; gap: 12px; z-index: 2001; opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease; pointer-events: none; }
+  .payment-celebrate-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .payment-celebrate-emoji { font-size: 30px; line-height: 1; }
+  .payment-celebrate-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .payment-celebrate-amount { font-size: 17px; font-weight: 800; color: var(--moss); }
   .affected-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
   .affected-list li { font-size: 12.5px; font-weight: 600; background: var(--amber-soft); border: 1px solid var(--amber-line); border-radius: 6px; padding: 7px 10px; }
   .confirm-actions button.btn-confirm { background: var(--amber); border-color: var(--amber); color: #2a1600; }
@@ -601,13 +608,6 @@ Rules:
     const interval = setInterval(render, 1000);
     return () => clearInterval(interval);
   }
-  const GENERATE_WAIT_MESSAGES = [
-    '✨ Generating…',
-    '✨ Still thinking…',
-    '✨ Working on it, almost there…',
-    '✨ Taking a bit longer than usual…',
-    '✨ Still going — hang tight…',
-  ];
   const SYNC_WAIT_MESSAGES = [
     'Syncing…',
     'Still reading the story…',
@@ -649,9 +649,6 @@ Rules:
     async deleteItem(itemId) { return fetch(`${API_BASE}/api/items/${itemId}`, { method: 'DELETE', credentials: 'include' }); },
     async updateVersion(itemId, patch) {
       return fetch(`${API_BASE}/api/items/${itemId}/version`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
-    },
-    async suggest(itemKey, stage, currentFields, brief, attachedFileNames, featuredItems) {
-      return fetchJsonWithTimeout(`${API_BASE}/api/suggest`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemKey, stage, currentFields, brief, attachedFileNames, featuredItems }) }, 100000);
     },
     async uploadMedia(projectId, file, displayName) {
       const name = displayName || file.name;
@@ -800,8 +797,8 @@ Rules:
   function theVersion(item) { return item.versions[0]; }
   function itemById(id) { return state.items.find(i => i.id === id); }
   // Stable signature of the "real" fields (hidden underscore-prefixed
-  // bookkeeping keys like _stale/_ai_snapshot excluded) — used to tell
-  // whether anything a designer could edit has changed since the last AI call.
+  // bookkeeping keys like _chatgpt_snapshot excluded) — used to tell whether
+  // anything a designer could edit has changed since building a ChatGPT prompt.
   function fieldsSignature(fields) {
     const clean = {};
     Object.keys(fields || {}).sort().forEach(k => { if (!k.startsWith('_')) clean[k] = fields[k]; });
@@ -854,6 +851,35 @@ Rules:
   }
   function formatRupees(paise) {
     return `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+  // A confetti burst + a brief congratulation banner — getting paid is the
+  // whole point of this app, so marking a stage paid should feel like a
+  // moment, not just another quiet toast.
+  function celebratePayment(amountPaise) {
+    const colors = ['#e94057', '#f9c80e', '#00b8a9', '#8b5fbf', '#2464b4', '#2f7a4f'];
+    const burst = document.createElement('div');
+    burst.className = 'confetti-burst';
+    for (let i = 0; i < 60; i++) {
+      const piece = document.createElement('span');
+      piece.className = 'confetti-piece';
+      piece.style.left = `${Math.random() * 100}vw`;
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDelay = `${(Math.random() * 0.4).toFixed(2)}s`;
+      piece.style.animationDuration = `${(1.8 + Math.random() * 1.2).toFixed(2)}s`;
+      burst.appendChild(piece);
+    }
+    document.body.appendChild(burst);
+    setTimeout(() => burst.remove(), 3200);
+
+    const banner = document.createElement('div');
+    banner.className = 'payment-celebrate-banner';
+    banner.innerHTML = `<span class="payment-celebrate-emoji">🎉</span><span><div class="payment-celebrate-title">Payment received!</div><div class="payment-celebrate-amount">${formatRupees(amountPaise)}</div></span>`;
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add('show'));
+    setTimeout(() => {
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    }, 2800);
   }
   function earnedPillHtml(stage) {
     const paise = stageEarnedPaise(stage);
@@ -943,12 +969,15 @@ Rules:
     const rf = theVersion(refItem).fields || {};
     switch (refItem.item_key) {
       case 'character':
-        return `${rf.gender || '(gender)'}, around ${rf.age || '(age)'} years old, ${rf.ethnicity ? rf.ethnicity + ', ' : ''}${rf.skin_tone ? rf.skin_tone.toLowerCase() + ' skin tone, ' : ''}${rf.hair ? rf.hair + ', ' : ''}wearing ${rf.outfit || '(outfit)'}`;
       case 'property':
-      case 'sound':
-        return rf.description || '';
       case 'background':
-        return `${rf.location || '(location)'}, lit with ${rf.lighting || '(lighting)'} lighting, ${rf.style || '(style)'} styling`;
+      case 'sound':
+        // These four types have no Setup fields anymore — the only text
+        // available is the one-line description Story's auto-populate sync
+        // wrote when this item was created (see the auto-populate confirm
+        // handler). An item created manually via "+ Add X" has none, so fall
+        // back to pointing at the attached reference file itself.
+        return rf.description || 'the approved reference — replicate it exactly, do not redesign or reinterpret it';
       case 'story':
         // Story has no Setup fields of its own (it's compiled straight from
         // the locked Stage 1 brief) — so unlike the other types, there's no
@@ -972,16 +1001,8 @@ Rules:
         base = `${instruction}\n\n${b.tone || '(tone)'} storyline: ${b.storyboard || '(storyboard)'}`;
         break;
       }
-      case 'character':
-        base = `${f.gender || '(gender)'}, around ${f.age || '(age)'} years old, ${f.ethnicity ? f.ethnicity + ', ' : ''}${f.skin_tone ? f.skin_tone.toLowerCase() + ' skin tone, ' : ''}${f.hair ? f.hair + ', ' : ''}wearing ${f.outfit || '(outfit)'}.`;
-        break;
-      case 'property':
-      case 'sound':
-        base = f.description || '';
-        break;
-      case 'background':
-        base = `${f.location || '(location)'}, lit with ${f.lighting || '(lighting)'} lighting, ${f.style || '(style)'} styling.`;
-        break;
+      // Character/Property/Background/Sound no longer generate anything via
+      // Flow (upload-only now) — compilePrompt is never called for them.
       case 'scene': {
         const refItems = (f.refs || []).map(r => itemById(r)).filter(Boolean);
         const refLine = refItems.length
@@ -1086,18 +1107,11 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   function renderFieldsForm(item, fields) {
     const ic = itemConfigFor(item);
     const schema = (ic && ic.content && ic.content.fieldsSchema) || [];
-    let html = schema.map(def => renderFieldControl(def, fields[def.key], def.key)).join('');
-    // Story has no editable fields — the customer already decided the story,
-    // dialogue, and tone in the locked Stage 1 brief; show it read-only so
-    // the designer sees exactly what they're compiling from.
-    if (item.item_key === 'story') {
-      const b = state.brief;
-      html += `<div class="field"><label>Tone (Stage 1, locked)</label><p style="margin:0;font-size:13px">${esc(b.tone || '—')}</p></div>
-        <div class="field"><label>Storyboard / Dialogue (Stage 1, locked)</label>
-          <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:240px;overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(b.storyboard || '—')}</p>
-        </div>`;
-    }
-    // Scenes get an extra "featured items" picker driving the must-attach list.
+    let html = '';
+    // Scenes get an extra "featured items" picker driving the must-attach
+    // list — shown FIRST, before the shot-specific fields below, since who/
+    // what is actually in the scene is the foundational context a designer
+    // should see (and auto-suggested picks confirm/adjust) before anything else.
     if (item.item_key === 'scene') {
       // Storyboard included as a candidate too — it wasn't offered here at
       // all before, even though a scene following its layout is a common case.
@@ -1115,6 +1129,17 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       html += `<div class="field"><label>Featured in this scene</label><div class="refs-picker">
         ${candidates.length ? candidates.map(refChip).join('') : '<span class="empty-note">Add a Storyboard image or Characters/Properties/Backgrounds in Stage 3 first.</span>'}
       </div></div>`;
+    }
+    html += schema.map(def => renderFieldControl(def, fields[def.key], def.key)).join('');
+    // Story has no editable fields — the customer already decided the story,
+    // dialogue, and tone in the locked Stage 1 brief; show it read-only so
+    // the designer sees exactly what they're compiling from.
+    if (item.item_key === 'story') {
+      const b = state.brief;
+      html += `<div class="field"><label>Tone (Stage 1, locked)</label><p style="margin:0;font-size:13px">${esc(b.tone || '—')}</p></div>
+        <div class="field"><label>Storyboard / Dialogue (Stage 1, locked)</label>
+          <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:240px;overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(b.storyboard || '—')}</p>
+        </div>`;
     }
     return html;
   }
@@ -1152,17 +1177,8 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const root = document.getElementById('modalRoot');
     if (!genModalDraft) { root.innerHTML = ''; return; }
     const { item, prompt } = genModalDraft;
-    const isAgentMode = state.project.mode === 'agent';
-    // If this item type has no editable fields (Story — everything comes
-    // from the locked Stage 1 brief instead), there's nothing whose change
-    // the guard can key off, so it would otherwise disable the button
-    // forever after one generation. Skip the guard entirely in that case.
     const hasEditableFields = ((itemConfigFor(item) || {}).content || {}).fieldsSchema?.length > 0;
-    const unchangedSinceAI = hasEditableFields && !!genModalDraft.fields._ai_snapshot && genModalDraft.fields._ai_snapshot === fieldsSignature(genModalDraft.fields);
-    const genDisabled = isAgentMode && unchangedSinceAI;
-    const genLabel = isAgentMode ? (unchangedSinceAI ? '✓ AI draft up to date' : '✨ Generate with AI') : '⚙ Generate';
     const refFiles = mustAttachFiles(item, genModalDraft.fields);
-    // Same idea as unchangedSinceAI above, but for the manual/ChatGPT path —
     // _chatgpt_snapshot is stamped when "Open in ChatGPT" builds the meta-
     // prompt; if Setup changes after that, the copied prompt no longer
     // reflects the current fields, so warn (not block — they may have
@@ -1177,7 +1193,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <div class="generate-modal-body">
             <div class="generate-modal-left">
               <div id="genModalFields">${renderFieldsForm(item, genModalDraft.fields)}</div>
-              <button class="btn btn-primary" id="genModalGenerateBtn" ${genDisabled ? 'disabled' : ''} style="width:100%;margin-top:4px">${genLabel}</button>
+              <button class="btn btn-primary" id="genModalGenerateBtn" style="width:100%;margin-top:4px">⚙ Generate</button>
             </div>
             <div class="generate-modal-right">
               <div class="prompt-actions" style="justify-content:flex-end;margin:0 0 6px">
@@ -1236,14 +1252,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   // in-progress typing animation or a manual edit there is never disturbed.
   function refreshGenModalFields() {
     document.getElementById('genModalFields').innerHTML = renderFieldsForm(genModalDraft.item, genModalDraft.fields);
-    const isAgentMode = state.project.mode === 'agent';
     const hasEditableFields = ((itemConfigFor(genModalDraft.item) || {}).content || {}).fieldsSchema?.length > 0;
-    const unchangedSinceAI = hasEditableFields && !!genModalDraft.fields._ai_snapshot && genModalDraft.fields._ai_snapshot === fieldsSignature(genModalDraft.fields);
-    const genBtn = document.getElementById('genModalGenerateBtn');
-    if (genBtn) {
-      genBtn.disabled = isAgentMode && unchangedSinceAI;
-      genBtn.textContent = isAgentMode ? (unchangedSinceAI ? '✓ AI draft up to date' : '✨ Generate with AI') : '⚙ Generate';
-    }
     const staleEl = document.getElementById('genModalChatGptStaleness');
     if (staleEl) {
       const chatgptStale = hasEditableFields && !!genModalDraft.fields._chatgpt_snapshot && genModalDraft.fields._chatgpt_snapshot !== fieldsSignature(genModalDraft.fields);
@@ -1257,38 +1266,12 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     document.getElementById('genModalCancelBtn').addEventListener('click', closeGenerateModal);
     wireGenModalFieldControls();
     const genBtn = document.getElementById('genModalGenerateBtn');
-    genBtn.addEventListener('click', async () => {
+    genBtn.addEventListener('click', () => {
       const item = genModalDraft.item;
       const textarea = document.getElementById('genModalPromptArea');
-      if (state.project.mode === 'agent') {
-        if (!state.brief.language) { toast('Set a Language in Stage 1 before generating with AI'); return; }
-        genBtn.disabled = true;
-        const stopWaitTimer = startWaitTimer(genBtn, GENERATE_WAIT_MESSAGES);
-        try {
-          const attachedFileNames = mustAttachFiles(item, genModalDraft.fields).map(f => f.fileName);
-          // Refs are just item ids in the fields blob — meaningless to Gemini
-          // on their own, so resolve them to name + actual detail summary here
-          // rather than sending raw ids the backend has no way to look up.
-          const featuredItems = item.item_key === 'scene'
-            ? (genModalDraft.fields.refs || []).map(r => itemById(r)).filter(Boolean).map(it => ({ name: it.name, summary: describeItemForRef(it) }))
-            : undefined;
-          const result = await api.suggest(item.item_key, item.stage, genModalDraft.fields, state.brief, attachedFileNames, featuredItems);
-          logDebugEntry(item, result);
-          if (result.error) { toast(result.message || `AI suggestion failed: ${result.error}`); return; }
-          genModalDraft.fields = { ...result.fields, _ai_snapshot: fieldsSignature(result.fields) };
-          genModalDraft.autoPopulate = result.autoPopulate || null;
-          const composed = composeFinalPrompt(item, result.prompt);
-          genModalDraft.prompt = composed;
-          animateTypingInto(textarea, composed);
-          refreshGenModalFields();
-          if (result.warning) toast(result.warning);
-        } catch (e) { toast('AI suggestion failed — check your connection'); }
-        finally { stopWaitTimer(); refreshGenModalFields(); }
-      } else {
-        const composed = composeFinalPrompt(item, compilePrompt(item, genModalDraft.fields));
-        genModalDraft.prompt = composed;
-        animateTypingInto(textarea, composed);
-      }
+      const composed = composeFinalPrompt(item, compilePrompt(item, genModalDraft.fields));
+      genModalDraft.prompt = composed;
+      animateTypingInto(textarea, composed);
     });
     document.getElementById('genModalCopyBtn').addEventListener('click', () => {
       navigator.clipboard.writeText(document.getElementById('genModalPromptArea').value).then(() => toast('Copied'));
@@ -1324,7 +1307,6 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       Object.keys(genModalDraft.fields).forEach((k) => {
         if (typeof genModalDraft.fields[k] === 'string') genModalDraft.fields[k] = trimBlankLines(genModalDraft.fields[k]);
       });
-      const autoPopulate = genModalDraft.autoPopulate;
       const version = theVersion(item);
       version.fields = genModalDraft.fields;
       version.prompt = promptVal;
@@ -1332,8 +1314,6 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       closeGenerateModal();
       renderTool();
       toast('Saved');
-      const hasAutoPopulate = autoPopulate && Object.values(autoPopulate).some(arr => Array.isArray(arr) && arr.length);
-      if (hasAutoPopulate) openAutoPopulateModal(item, autoPopulate);
     });
   }
 
@@ -1346,6 +1326,15 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   let autoPopulateDraft = null;
   function existingNamesFor(stage, itemKey) {
     return new Set(itemsFor(stage, itemKey).map(i => (i.name || '').trim().toLowerCase()));
+  }
+  // Plain substring name-matching (no Gemini call) — a scene's "Featured in
+  // this scene" starts pre-picked with whichever Stage 3 Character/Property/
+  // Background is actually named in its own text, so a designer verifies/
+  // adjusts a sensible default instead of starting from a blank picker.
+  function suggestSceneRefs(text, candidates) {
+    const lower = (text || '').toLowerCase();
+    if (!lower) return [];
+    return candidates.filter(it => it.name && lower.includes(it.name.trim().toLowerCase())).map(it => it.id);
   }
   function openAutoPopulateModal(sourceItem, autoPopulate) {
     const sourceConfig = itemConfigFor(sourceItem);
@@ -1430,6 +1419,12 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       confirmBtn.disabled = true;
       if (cancelBtn) cancelBtn.disabled = true;
       if (closeBtn) closeBtn.disabled = true;
+      // A single confirm can create Characters/Properties/Backgrounds AND
+      // Scenes together (Story's autoPopulate returns all of them at once) —
+      // state.items only refreshes after the whole loop finishes, so a scene
+      // processed later in this same batch wouldn't see characters created
+      // earlier in it. Track those locally so ref-matching sees them too.
+      const createdThisBatch = [];
       for (let n = 0; n < toCreate.length; n++) {
         const { g, e } = toCreate[n];
         confirmBtn.textContent = `Creating ${e.name}… (${n + 1}/${toCreate.length})`;
@@ -1441,7 +1436,17 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           // collapses its single secondary value into a generic "description"
           // field, same as before.
           g.secondaryKeys.forEach(k => { if (e[k]) newFields[g.itemKey === 'scene' ? k : 'description'] = e[k]; });
+          if (g.itemKey === 'scene') {
+            const sceneText = [newFields.location, newFields.action, newFields.dialogue].filter(Boolean).join(' ');
+            const candidates = [
+              ...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background'),
+              ...createdThisBatch.filter(c => ['character', 'property', 'background'].includes(c.item_key)),
+            ];
+            const matchedRefs = suggestSceneRefs(sceneText, candidates);
+            if (matchedRefs.length) newFields.refs = matchedRefs;
+          }
           if (Object.keys(newFields).length) await api.updateVersion(created.id, { fields: newFields });
+          createdThisBatch.push({ item_key: g.itemKey, name: e.name, id: created.id });
         }
         // A Scene always needs its paired Stage 5 Movie item — the manual
         // "+ Add scene" button creates both together; without this, a
@@ -1610,6 +1615,12 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // fresh page load falls through to fields._uiMode, the persisted choice
     // (see wireItemCard's toggle handler), so the toggle survives a reload.
     const mode = state.itemCardMode[item.id] || (version.fields || {})._uiMode || 'generate';
+    // Character/Property/Background/Sound no longer generate anything via
+    // Flow — Gemini can't reliably infer visual specifics for an ambiguous
+    // character ("grandma", "a kid"), and designers already have their own
+    // reference libraries. These four types are upload-only: name + file,
+    // no mode toggle, no Setup, no Generate step at all.
+    const isUploadOnlyType = ['character', 'property', 'background', 'sound'].includes(item.item_key);
     // Exactly one file per item (every label in MEDIA_LABELS is singular —
     // "Character Reference", "Scene Video", never plural) — so no `multiple`,
     // and the upload button itself hides once a file exists rather than
@@ -1684,6 +1695,13 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           ${buildUploadWidget(false)}
         </div>
       </div>`;
+    // Character/Property/Background/Sound: just the upload widget, nothing
+    // else — no name-your-mode toggle, no Setup modal, no Generate step.
+    const assetOnlyStep = `
+      <div class="story-step">
+        <span class="story-step-num">1</span>
+        <div class="story-step-body">${buildUploadWidget(false)}</div>
+      </div>`;
     return `
       <div class="item-row ${isExpanded ? 'expanded' : ''}" data-item-row="${item.id}">
         <div class="item-row-head" data-toggle-item="${item.id}">
@@ -1695,11 +1713,13 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <span class="chevron">›</span>
         </div>
         <div class="item-body">
-          ${hasFile ? '' : `<div class="item-mode-toggle">
-            <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${item.id}">✨ Generate</button>
-            <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${item.id}">📤 Upload my own</button>
-          </div>`}
-          ${mode === 'upload' ? uploadOnlyStep : generateSteps}
+          ${isUploadOnlyType
+            ? assetOnlyStep
+            : `${hasFile ? '' : `<div class="item-mode-toggle">
+                <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${item.id}">✨ Generate</button>
+                <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${item.id}">📤 Upload my own</button>
+              </div>`}
+              ${mode === 'upload' ? uploadOnlyStep : generateSteps}`}
         </div>
       </div>`;
   }
@@ -2387,10 +2407,12 @@ ${e.rawResponse || '—'}`;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, 2);
       if (res.ok) {
+        const entry = state.paymentLinks.find(l => l.stage === 2);
         markPaymentLinkPaid(2, res.paidAt);
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
+        if (entry) celebratePayment(entry.amountPaise);
       } else {
         confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
@@ -2625,10 +2647,12 @@ ${e.rawResponse || '—'}`;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, stage);
       if (res.ok) {
+        const entry = state.paymentLinks.find(l => l.stage === stage);
         markPaymentLinkPaid(stage, res.paidAt);
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
+        if (entry) celebratePayment(entry.amountPaise);
       } else {
         confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
@@ -2716,6 +2740,13 @@ ${e.rawResponse || '—'}`;
       if (!name) return;
       const created = await api.createItem(state.project.id, { stage: 4, itemKey: 'scene', name, orderIndex: scenes.length });
       await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${name} — Final Clip`, parentItemId: created.id });
+      // Nothing but the name to match against yet at this point, but it
+      // costs nothing to check — same default-picking behavior as the sync
+      // flow, just usually a smaller/weaker match since there's no
+      // location/action/dialogue text yet.
+      const candidates = [...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background')];
+      const matchedRefs = suggestSceneRefs(name, candidates);
+      if (matchedRefs.length) await api.updateVersion(created.id, { fields: { refs: matchedRefs } });
       const full = await api.getProject(state.project.id);
       state.items = full.items;
       renderTool();
@@ -2876,22 +2907,42 @@ ${e.rawResponse || '—'}`;
     const root = document.getElementById('modalRoot');
     if (!root || !stageAmountDraft) { if (root) root.innerHTML = ''; return; }
     const { stage, entry } = stageAmountDraft;
+    // Goal Tracker context, if a goal/allocation has ever been set — this
+    // modal is the moment a designer is actually pricing a stage, so it's
+    // the natural place to surface "what do I usually charge" and "how far
+    // am I from my goal" instead of making them go check the Goals screen.
+    const summary = state.earningsSummary;
+    const usualPaise = summary ? (summary.stagePricesPaise || {})[stage] || 0 : 0;
+    const progress = summary ? goalProgress(summary) : null;
+    const gapPaise = progress ? Math.max(0, summary.goalAmountPaise - progress.earnedSince) : null;
+    const goalNote = progress
+      ? (gapPaise > 0
+          ? `🎯 ${formatRupees(gapPaise)} more to hit your 3-month goal (${progress.pct}% there, ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left).`
+          : `🎉 You've already hit your 3-month goal of ${formatRupees(summary.goalAmountPaise)}!`)
+      : '';
     root.innerHTML = `
       <div class="modal-overlay" id="stageAmountModalOverlay">
         <div class="modal-card" style="max-width:400px">
           <div class="modal-head"><strong>💰 Amount — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
           <div style="padding:16px">
+            ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
+              <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
+            </div>` : ''}
             <div class="field">
               <label for="stageAmountInput">Amount to charge (₹)</label>
               <input id="stageAmountInput" type="number" min="1" step="0.01" value="${entry ? (entry.amountPaise / 100) : ''}" placeholder="e.g. 1500">
             </div>
             ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
+            ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
             <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update amount' : 'Set amount'}</button>
           </div>
         </div>
       </div>`;
     document.getElementById('stageAmountModalCloseBtn').addEventListener('click', closeStageAmountModal);
     document.getElementById('stageAmountModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageAmountModalOverlay') closeStageAmountModal(); });
+    document.querySelectorAll('[data-amount-pill]').forEach(el => el.addEventListener('click', () => {
+      document.getElementById('stageAmountInput').value = (Number(el.getAttribute('data-amount-pill')) / 100).toString();
+    }));
     document.getElementById('stageAmountSaveBtn').addEventListener('click', async () => {
       const amountRupees = parseFloat(document.getElementById('stageAmountInput').value);
       if (!amountRupees || amountRupees <= 0) { toast('Enter a valid amount'); return; }
@@ -3005,13 +3056,7 @@ ${e.rawResponse || '—'}`;
         <div><h1>StagePay</h1><p>Get paid every stage. Never waste AI credits.</p></div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        ${state.project ? `
-          <div class="mode-toggle">
-            <button class="${state.project.mode === 'manual' ? 'active manual' : ''}" data-set-mode="manual">Manual</button>
-            <button class="${state.project.mode === 'agent' ? 'active agent' : ''}" data-set-mode="agent">✨ AI Agent</button>
-          </div>
-          <button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>
-        ` : ''}
+        ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
         ${state.user ? `${goalsOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>`;
     const topbarHomeLink = document.getElementById('topbarHomeLink');
@@ -3021,12 +3066,6 @@ ${e.rawResponse || '—'}`;
     const goalsHomeBtn = document.getElementById('goalsHomeBtn');
     if (goalsHomeBtn) goalsHomeBtn.addEventListener('click', goToProjectsScreen);
     if (state.project) {
-      document.querySelectorAll('[data-set-mode]').forEach(el => el.addEventListener('click', async () => {
-        const mode = el.getAttribute('data-set-mode');
-        state.project.mode = mode;
-        await api.updateProject(state.project.id, { mode });
-        renderTopbar(); renderTool();
-      }));
       document.getElementById('backToProjectsBtn').addEventListener('click', goToProjectsScreen);
     }
     if (state.user) {
@@ -3034,8 +3073,8 @@ ${e.rawResponse || '—'}`;
         await api.logout();
         // state.project (and everything scoped to it) was never cleared here —
         // renderTopbar() only keys off state.project, not state.user, so the
-        // Manual/AI Agent toggle and "All Projects" button kept showing after
-        // logout even with no user at all. Full reset, not just the user.
+        // "All Projects" button kept showing after logout even with no user
+        // at all. Full reset, not just the user.
         state.user = null;
         state.project = null;
         state.brief = null;
@@ -4125,7 +4164,7 @@ ${e.rawResponse || '—'}`;
       ? projects.map(p => {
           const stage = p.current_stage || 1;
           return `<div class="project-list-item" data-open-project="${p.id}">
-          <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">${esc(p.mode)} mode · updated ${esc(p.updated_at)}</div></div>
+          <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">updated ${esc(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
             <span class="project-stage-pill" style="background:${STAGE_COLORS[stage]}" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>
             ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : ''}
@@ -4218,6 +4257,10 @@ ${e.rawResponse || '—'}`;
     state.paymentLinks = paymentLinkRes.stages || [];
     const stageLocksRes = await api.getStageLocks(id);
     state.stageLocks = stageLocksRes.locks || [];
+    // Goal Tracker data — used by the Set Amount modal to suggest this
+    // designer's own usual price for the stage and show progress toward
+    // their goal, not just fetched lazily inside that modal.
+    state.earningsSummary = await api.getEarningsSummary();
     state.screen = 'tool';
     // Puts the project id in the URL so a page refresh reopens the same
     // project instead of always landing back on the projects list.
