@@ -1180,14 +1180,17 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const schema = (ic && ic.content && ic.content.fieldsSchema) || [];
     let html = '';
     // Location/Action/Dialogue/Emotion below were pre-filled straight from
-    // this text (via the Story sync) — showing it here, read-only, makes it
-    // obvious this scene's compiled prompt doesn't rewrite what the customer
-    // already decided in Stage 1, it just adds the shot/camera fields below
-    // on top of it.
+    // Stage 1 (via the Story sync) — showing this scene's own content
+    // read-only up top, same style as Movie's block, makes it obvious the
+    // shot/camera fields below are additive, not a rewrite of what's
+    // already been decided. Scoped to just this scene (not the whole
+    // storyboard) to match Movie's modal — for now; easy to widen back out
+    // to the full story later if that cross-check value is missed.
     if (item.item_key === 'scene') {
-      const b = state.brief;
-      html += `<div class="field"><label>Storyboard / Dialogue (Stage 1, locked)</label>
-        <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:180px;overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(b.storyboard || '—')}</p>
+      const sceneSummary = [fields.location, fields.action].filter(Boolean).join(' — ') || '—';
+      const dialogueLine = fields.dialogue ? `\nDialogue: "${fields.dialogue}"` : '';
+      html += `<div class="field"><label>This scene's content (Stage 1, locked)</label>
+        <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(sceneSummary + dialogueLine)}</p>
       </div>`;
     }
     // Scenes get an extra "featured items" picker driving the must-attach
@@ -1197,6 +1200,20 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     if (item.item_key === 'scene') {
       const refs = Array.isArray(fields.refs) ? fields.refs : [];
       html += `<div class="field"><label>Featured in this scene</label><div class="refs-picker">${sceneRefsPickerHtml(refs, 'data-ref-toggle')}</div></div>`;
+    }
+    // Movie is scoped to one specific Scene (not the whole story) — showing
+    // that Scene's own already-locked Location/Action/Dialogue here is more
+    // precise than the full Stage 1 storyboard, and for the same reason as
+    // Scene's own block above: makes clear the Animation direction below is
+    // additive, not a rewrite of what this clip needs to depict.
+    if (item.item_key === 'movie') {
+      const scene = itemById(item.parent_item_id);
+      const sf = scene ? (theVersion(scene).fields || {}) : {};
+      const sceneSummary = [sf.location, sf.action].filter(Boolean).join(' — ') || '—';
+      const dialogueLine = sf.dialogue ? `\nDialogue: "${sf.dialogue}"` : '';
+      html += `<div class="field"><label>This scene's content (Stage 1, locked)</label>
+        <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(sceneSummary + dialogueLine)}</p>
+      </div>`;
     }
     html += schema.map(def => renderFieldControl(def, fields[def.key], def.key)).join('');
     // Story has no editable fields — the customer already decided the story,
@@ -1516,13 +1533,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           if (Object.keys(newFields).length) await api.updateVersion(created.id, { fields: newFields });
           createdThisBatch.push({ item_key: g.itemKey, name: e.name, id: created.id });
         }
-        // A Scene always needs its paired Stage 5 Movie item — the manual
-        // "+ Add scene" button creates both together; without this, a
-        // scene created here would have nowhere for Stage 5 to attach its
-        // final clip.
-        if (created && created.id && g.itemKey === 'scene') {
-          await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${e.name} — Final Clip`, parentItemId: created.id });
-        }
+        // Movie items are no longer paired here — a Scene isn't final until
+        // Stage 4 is locked, so its Movie item only gets created at that
+        // point (see wireStagePaymentCard's lockBtn handler for stage 4),
+        // not the moment the Scene itself is created.
       }
       const full = await api.getProject(state.project.id);
       state.items = full.items;
@@ -2778,6 +2792,22 @@ ${e.rawResponse || '—'}`;
       if (res.ok) {
         const others = state.stageLocks.filter(l => l.stage !== stage);
         state.stageLocks = [...others, { stage, locked: true, lockedAt: new Date().toISOString() }];
+        // A Scene's Movie item is only ever created once the Scene is truly
+        // final — not at Scene-creation time (that let designers start
+        // editing an "approved" clip before Stage 4 was actually locked,
+        // and left orphaned Scenes with no Movie pair after an unlock/edit/
+        // re-lock cycle, since nothing else ever (re-)created them). Locking
+        // Stage 4 is the one place that ensures every Scene has its pair.
+        if (stage === 4) {
+          const scenes = state.items.filter(i => i.stage === 4 && i.item_key === 'scene');
+          for (const scene of scenes) {
+            if (!movieFor(scene.id)) {
+              await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Final Clip`, parentItemId: scene.id });
+            }
+          }
+          const full = await api.getProject(state.project.id);
+          state.items = full.items;
+        }
         renderTool();
         toast(stage === 5 ? '🎉 Project completed!' : `Stage ${stage} validated with customer`);
       } else {
@@ -2833,7 +2863,9 @@ ${e.rawResponse || '—'}`;
       const name = prompt('Scene name?', `Scene ${scenes.length + 1}`);
       if (!name) return;
       const created = await api.createItem(state.project.id, { stage: 4, itemKey: 'scene', name, orderIndex: scenes.length });
-      await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${name} — Final Clip`, parentItemId: created.id });
+      // No paired Movie item yet — this scene isn't final until Stage 4 is
+      // locked, so its Movie item only gets created at that point (see
+      // wireStagePaymentCard's lockBtn handler for stage 4).
       // Nothing but the name to match against yet at this point, but it
       // costs nothing to check — same default-picking behavior as the sync
       // flow, just usually a smaller/weaker match since there's no
@@ -2852,13 +2884,22 @@ ${e.rawResponse || '—'}`;
   function movieFor(sceneId) { return state.items.find(i => i.item_key === 'movie' && i.parent_item_id === sceneId); }
   function renderLane5() {
     const scenes = itemsFor(4, 'scene');
+    const movies = scenes.map(s => movieFor(s.id)).filter(Boolean);
+    // Movie items only get created once Stage 4 actually locks (see
+    // wireStagePaymentCard's lockBtn) — so scenes existing but none of them
+    // having a paired Movie yet just means Stage 4 isn't locked yet, not
+    // "nothing to see," and needs its own message instead of rendering blank.
+    let body;
+    if (!scenes.length) body = '<p class="empty-note">Add scenes in Stage 4 first.</p>';
+    else if (!movies.length) body = '<p class="empty-note">Lock Stage 4 first — paid and approved by the customer — before Final Movie clips appear here.</p>';
+    else body = scenes.map(s => { const m = movieFor(s.id); return m ? renderNumberedItemCard(m, {}) : ''; }).join('');
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}</div>
         <p class="lane-tamil">திரைப்படம்</p>
         <p class="lane-desc">One animated clip per scene — the actual delivered footage.</p>
         </div>
-      ${scenes.length ? scenes.map(s => { const m = movieFor(s.id); return m ? renderNumberedItemCard(m, {}) : ''; }).join('') : '<p class="empty-note">Add scenes in Stage 4 first.</p>'}
+      ${body}
       ${renderStagePaymentCardHtml(5)}`;
   }
   function wireLane5() {

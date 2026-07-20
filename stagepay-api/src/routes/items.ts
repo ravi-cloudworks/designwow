@@ -58,10 +58,11 @@ items.post('/projects/:projectId/items', async (c) => {
   };
   const body = await c.req.json<CreateItemBody>().catch(() => ({}) as CreateItemBody);
   if (!body.stage || !body.itemKey) return c.json({ error: 'stage_and_itemKey_required' }, 400);
-  // 'movie' is never independently added by a designer — it's always created
-  // as a mechanical pairing right alongside its parent Scene (stage 4, which
-  // is itself correctly gated below), before Stage 4 is anywhere near
-  // locked. Gating it here too would break scene creation entirely.
+  // 'movie' is never independently added by a designer — it's created as a
+  // mechanical pairing for each Scene once Stage 4 actually locks (not at
+  // Scene-creation time — a Scene isn't final until then, so its Movie
+  // shouldn't be either). By that point stage 4 is already locked, so this
+  // exemption is mostly defensive at this point, not load-bearing.
   if (body.itemKey !== 'movie' && !(await previousStageLocked(c.env.DB, projectId, body.stage))) {
     return c.json(
       { error: 'previous_stage_not_locked', message: `Lock Stage ${body.stage - 1} first — paid and approved by the customer — before adding items to Stage ${body.stage}.` },
