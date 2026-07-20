@@ -22,8 +22,21 @@
             "Quick zoom in for emphasis, then hold steady."
           ] },
           { "key": "duration", "label": "Duration (sec)", "type": "pill", "options": ["4", "6", "8", "10", "15", "30"] },
-          { "key": "broll", "label": "B-roll", "type": "pill", "options": ["None", "Product Macro Shot", "Product Spin", "Slow-Motion Detail", "Texture Close-up", "Lifestyle Cutaway"] },
-          { "key": "transition", "label": "Transition", "type": "pill", "options": ["Hard Cut", "Whip Pan", "Match Cut", "Fade", "Zoom Transition"] }
+          { "key": "broll", "label": "B-roll", "type": "pill", "options": ["None", "Product Macro Shot", "Product Spin", "Slow-Motion Detail", "Texture Close-up", "Lifestyle Cutaway"], "optionHelp": {
+            "None": "What: no supplementary footage. When to use: the main shot alone tells the story. Example: a simple testimonial clip, no product insert needed.",
+            "Product Macro Shot": "What: an extreme close-up insert of the product. When to use: to highlight fine detail like label or texture. Example: a close-up of a jar's lid twisting open.",
+            "Product Spin": "What: a rotating, 360°-style shot of the product. When to use: to show its full form and branding. Example: a bottle slowly rotating to reveal its label.",
+            "Slow-Motion Detail": "What: a slowed-down insert emphasizing a small action. When to use: for a satisfying, premium-feel moment. Example: cream dripping slowly off a spoon.",
+            "Texture Close-up": "What: a tight shot on surface texture. When to use: to emphasize quality or ingredients. Example: a close-up on the weave of a fabric.",
+            "Lifestyle Cutaway": "What: a brief shot of the product in real use. When to use: to show it fitting into daily life. Example: someone casually sipping the drink at their desk."
+          } },
+          { "key": "transition", "label": "Transition", "type": "pill", "options": ["Hard Cut", "Whip Pan", "Match Cut", "Fade", "Zoom Transition"], "optionHelp": {
+            "Hard Cut": "What: an instant cut with no effect. When to use: the default choice for most edits, keeps pacing snappy. Example: cutting straight from the product shot to the customer's reaction.",
+            "Whip Pan": "What: a fast, blurred camera swipe between shots. When to use: for energetic, fast-paced transitions. Example: whipping from the kitchen to the dining table.",
+            "Match Cut": "What: a cut where the next shot's composition or action matches the previous one. When to use: for a smooth, clever visual continuity. Example: a jar lid closing cuts to a door closing in the next scene.",
+            "Fade": "What: the shot gradually fades to/from black or the next shot. When to use: for a soft, emotional, or scene-ending transition. Example: fading out after the final call-to-action line.",
+            "Zoom Transition": "What: a quick zoom into or out of frame to transition. When to use: for punchy, modern social-style edits. Example: zooming into the logo before cutting to the next scene."
+          } }
         ]
       },
       "outputInstructions": [

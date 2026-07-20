@@ -1064,7 +1064,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   const REQUIRED_BRIEF_FIELDS = [
     ['product', 'Product / brand'], ['product_description', 'Product description'], ['goal', 'Goal'],
     ['video_style', 'Video Style'], ['tone', 'Tone'], ['audience', 'Target Audience'], ['platform', 'Platform'],
-    ['language', 'Language'], ['hook', 'Hook'], ['storyboard', 'Storyboard / dialogue'], ['cta', 'Call to action'],
+    ['language', 'Language'], ['hook', 'Hook'], ['storyboard', 'Story+Scene+Dialogues'], ['cta', 'Call to action'],
     ['brand_color_primary', 'Primary color'], ['brand_color_secondary', 'Secondary color'],
   ];
   function briefMissingFields() {
@@ -1079,8 +1079,12 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   function renderFieldControl(def, value, path) {
     const id = 'f' + Math.random().toString(36).slice(2, 9);
     if (def.type === 'pill') {
+      // Optional per-option hover tooltip (native title attribute — what it
+      // is, when to use it, an example) for fields where the option names
+      // alone don't make the choice obvious. Only set where the config
+      // actually provides it (e.g. Movie's B-roll/Transition).
       return `<div class="field"><label>${esc(def.label)}</label><div class="pill-row">
-        ${def.options.map(o => `<button type="button" class="pill ${o === value ? 'selected' : ''}" data-field-pick="${path}" data-value="${esc(o)}">${esc(o)}</button>`).join('')}
+        ${def.options.map(o => `<button type="button" class="pill ${o === value ? 'selected' : ''}" data-field-pick="${path}" data-value="${esc(o)}"${def.optionHelp && def.optionHelp[o] ? ` title="${esc(def.optionHelp[o])}"` : ''}>${esc(o)}</button>`).join('')}
       </div></div>`;
     }
     if (def.type === 'checkbox') {
@@ -1233,7 +1237,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     if (item.item_key === 'story') {
       const b = state.brief;
       html += `<div class="field"><label>Tone (Stage 1, locked)</label><p style="margin:0;font-size:13px">${esc(b.tone || '—')}</p></div>
-        <div class="field"><label>Storyboard / Dialogue (Stage 1, locked)</label>
+        <div class="field"><label>Story+Scene+Dialogues (Stage 1, locked)</label>
           <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:240px;overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(b.storyboard || '—')}</p>
         </div>`;
     }
@@ -1323,10 +1327,9 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     }));
     document.querySelectorAll('#genModalFields [data-field-preset]').forEach(el => el.addEventListener('click', () => {
       const key = el.getAttribute('data-field-preset');
-      const presetText = el.getAttribute('data-value');
-      const current = (genModalDraft.fields[key] || '').trim();
-      genModalDraft.fields[key] = current ? `${current} ${presetText}` : presetText;
+      genModalDraft.fields[key] = el.getAttribute('data-value');
       refreshGenModalFields();
+      toast('Added — you can still edit it');
     }));
     document.querySelectorAll('#genModalFields [data-ref-toggle]').forEach(el => el.addEventListener('click', () => {
       const id = el.getAttribute('data-ref-toggle');
@@ -2196,7 +2199,7 @@ ${e.rawResponse || '—'}`;
         ${textField('Call to action', b.cta, 'cta', locked)}
         <div class="field">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <label for="bstoryboard" style="margin:0">Storyboard / dialogue</label>
+            <label for="bstoryboard" style="margin:0">Story+Scene+Dialogues</label>
             ${!locked ? `<button type="button" class="btn btn-sm" id="storyboardTemplateBtn">📝 ChatGPT Template</button>` : ''}
           </div>
           <textarea id="bstoryboard" data-brief-text="storyboard" style="min-height:110px" maxlength="6000" ${locked ? 'disabled' : ''}>${esc(b.storyboard || '')}</textarea>
@@ -2398,6 +2401,58 @@ ${e.rawResponse || '—'}`;
     const isLocked = !!(lock && lock.locked);
     const dis = isLocked ? 'disabled' : '';
     const amountEntry = state.paymentLinks.find(l => l.stage === 2) || null;
+    // Story's own Generate is already fully local/deterministic (no Gemini
+    // call), but a designer may still have made their storyboard externally
+    // (ChatGPT, hand-drawn, etc.) and just want to attach it — this mirrors
+    // Scene/Movie's Generate/Upload toggle so that's an explicit choice
+    // instead of a hidden shortcut buried in step 4 of a numbered list.
+    // Story allows several storyboard images (unlike single-file item
+    // types), so unlike those, the toggle stays visible even after a file
+    // exists — more can still be added either way.
+    const mode = state.itemCardMode[story.id] || (version.fields || {})._uiMode || 'generate';
+    const uploadWidget = `
+      <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
+      <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload storyboard image</button>
+      <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
+      <div class="attach-chip-row" style="margin-top:7px">
+        ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
+      </div>`;
+    const generateStepsHtml = `
+      <div class="story-step">
+        <span class="story-step-num">1</span>
+        <div class="story-step-body">
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm btn-primary" data-open-generate="${story.id}" ${dis}>✨ Generate Story</button>
+            <button type="button" class="icon-btn" data-copy-prompt="${story.id}" title="Copy prompt">📋</button>
+          </div>
+          <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">2</span>
+        <div class="story-step-body">
+          <button type="button" class="btn btn-sm" data-download-item="${story.id}" ${dis}>⬇ Download artifacts</button>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">3</span>
+        <div class="story-step-body">
+          <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p>
+        </div>
+      </div>
+      <div class="story-step">
+        <span class="story-step-num">4</span>
+        <div class="story-step-body">${uploadWidget}</div>
+      </div>`;
+    const uploadOnlyStepHtml = `
+      <div class="story-step">
+        <span class="story-step-num">1</span>
+        <div class="story-step-body">
+          <p class="story-step-note">Upload your own storyboard image — no Flow generation needed.</p>
+          ${uploadWidget}
+        </div>
+      </div>`;
+    const nextStepStart = mode === 'upload' ? 2 : 5;
 
     return `<div class="item-row expanded story-card">
       <div class="item-row-head" style="cursor:default">
@@ -2407,48 +2462,20 @@ ${e.rawResponse || '—'}`;
           : `<span class="item-name">${esc(story.name || 'Story')}</span>${isLocked ? '' : `<button type="button" class="item-rename-btn" data-rename-btn="${story.id}" title="Rename">✏️</button>`}`}
       </div>
       <div class="item-body">
-        <div class="story-step">
-          <span class="story-step-num">1</span>
-          <div class="story-step-body">
-            <div style="display:flex;gap:6px;align-items:center">
-              <button class="btn btn-sm btn-primary" data-open-generate="${story.id}" ${dis}>✨ Generate Story</button>
-              <button type="button" class="icon-btn" data-copy-prompt="${story.id}" title="Copy prompt">📋</button>
-            </div>
-            <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
-          </div>
+        <div class="item-mode-toggle">
+          <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${story.id}" ${dis}>✨ Generate</button>
+          <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${story.id}" ${dis}>📤 Upload my own</button>
         </div>
+        ${mode === 'upload' ? uploadOnlyStepHtml : generateStepsHtml}
         <div class="story-step">
-          <span class="story-step-num">2</span>
-          <div class="story-step-body">
-            <button type="button" class="btn btn-sm" data-download-item="${story.id}" ${dis}>⬇ Download artifacts</button>
-          </div>
-        </div>
-        <div class="story-step">
-          <span class="story-step-num">3</span>
-          <div class="story-step-body">
-            <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p>
-          </div>
-        </div>
-        <div class="story-step">
-          <span class="story-step-num">4</span>
-          <div class="story-step-body">
-            <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
-            <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload storyboard image</button>
-            <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
-            <div class="attach-chip-row" style="margin-top:7px">
-              ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
-            </div>
-          </div>
-        </div>
-        <div class="story-step">
-          <span class="story-step-num">5</span>
+          <span class="story-step-num">${nextStepStart}</span>
           <div class="story-step-body">
             <button type="button" class="btn btn-sm" id="storyAmountBtn" ${dis}>💰 ${amountEntry ? 'Update amount' : 'Set amount'}</button>
             ${amountEntry ? `<span class="story-step-note">${formatRupees(amountEntry.amountPaise)}</span>` : ''}
           </div>
         </div>
         <div class="story-step">
-          <span class="story-step-num">6</span>
+          <span class="story-step-num">${nextStepStart + 1}</span>
           <div class="story-step-body">
             ${amountEntry
               ? (amountEntry.paid
@@ -2458,7 +2485,7 @@ ${e.rawResponse || '—'}`;
           </div>
         </div>
         <div class="story-step">
-          <span class="story-step-num">7</span>
+          <span class="story-step-num">${nextStepStart + 2}</span>
           <div class="story-step-body">
             ${isLocked
               ? `<div class="stale-banner" style="background:var(--moss-soft);color:var(--moss);border-color:var(--moss-line)">🔒 Validated with customer<button type="button" class="btn btn-sm" id="storyUnlockBtn" style="margin-left:auto">🔓 Unlock to edit</button></div>`
@@ -2472,6 +2499,14 @@ ${e.rawResponse || '—'}`;
     const story = itemsFor(2, 'story')[0];
     if (!story) { wireStoryPlaceholderCard(); return; }
     wireItemRename(story);
+    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${story.id}"]`).forEach(el => el.addEventListener('click', async () => {
+      const mode = el.getAttribute('data-item-mode-btn');
+      state.itemCardMode[story.id] = mode;
+      const version = theVersion(story);
+      version.fields = { ...(version.fields || {}), _uiMode: mode };
+      renderTool();
+      await api.updateVersion(story.id, { fields: version.fields });
+    }));
     const openGenBtn = document.querySelector(`[data-open-generate="${story.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(story));
     const copyBtn = document.querySelector(`[data-copy-prompt="${story.id}"]`);
@@ -2641,7 +2676,7 @@ ${e.rawResponse || '—'}`;
       // drift out of sync the way an editable field could.
       const sourceText = (state.brief && state.brief.storyboard) || '';
       if (!story) { toast('Validate the Stage 1 brief to create the Story item first'); return; }
-      if (!sourceText) { toast('Add a Storyboard/dialogue in Stage 1 first'); return; }
+      if (!sourceText) { toast('Add Story+Scene+Dialogues in Stage 1 first'); return; }
       btn.disabled = true;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
@@ -2687,7 +2722,7 @@ ${e.rawResponse || '—'}`;
       const story = itemsFor(2, 'story')[0];
       const sourceText = (state.brief && state.brief.storyboard) || '';
       if (!story) { toast('Validate the Stage 1 brief to create the Story item first'); return; }
-      if (!sourceText) { toast('Add a Storyboard/dialogue in Stage 1 first'); return; }
+      if (!sourceText) { toast('Add Story+Scene+Dialogues in Stage 1 first'); return; }
       btn.disabled = true;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
