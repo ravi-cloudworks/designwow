@@ -14,8 +14,14 @@
       "note": "content.geminiInstruction removed — animation direction is now a plain designer-set field, no Gemini drafting. Transition/B-roll moved here from Stage 4 — they're video-editing concepts (how this clip cuts into the next one, what supplementary footage to cut in) that a still keyframe image can't represent, so they belong to the actual clip, not the Scene Blueprint.",
       "content": {
         "fieldsSchema": [
-          { "key": "direction", "label": "Animation direction", "type": "textarea" },
-          { "key": "duration", "label": "Duration (sec)", "type": "number" },
+          { "key": "direction", "label": "Animation direction", "type": "textarea", "presets": [
+            "Slow push-in on the subject, hold at the end.",
+            "Static shot with a gentle handheld sway.",
+            "Pan left to right, following the product into frame.",
+            "Slow pull back to reveal the full scene.",
+            "Quick zoom in for emphasis, then hold steady."
+          ] },
+          { "key": "duration", "label": "Duration (sec)", "type": "pill", "options": ["4", "6", "8", "10", "15", "30"] },
           { "key": "broll", "label": "B-roll", "type": "pill", "options": ["None", "Product Macro Shot", "Product Spin", "Slow-Motion Detail", "Texture Close-up", "Lifestyle Cutaway"] },
           { "key": "transition", "label": "Transition", "type": "pill", "options": ["Hard Cut", "Whip Pan", "Match Cut", "Fade", "Zoom Transition"] }
         ]

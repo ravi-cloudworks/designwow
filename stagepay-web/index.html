@@ -1099,7 +1099,18 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       </div>`;
     }
     if (def.type === 'textarea') {
-      return `<div class="field"><label for="${id}">${esc(def.label)}</label><textarea id="${id}" data-field-text="${path}" maxlength="1000">${esc(value || '')}</textarea></div>`;
+      const maxLen = 1000;
+      // Optional quick-start phrases (e.g. Movie's Animation direction) —
+      // clicking one appends it rather than replacing whatever's already
+      // typed, so it's a starting point, not a forced overwrite.
+      const presetsHtml = def.presets && def.presets.length
+        ? `<div class="pill-row" style="margin-bottom:6px">${def.presets.map(p => `<button type="button" class="pill" data-field-preset="${path}" data-value="${esc(p)}">${esc(p)}</button>`).join('')}</div>`
+        : '';
+      return `<div class="field"><label for="${id}">${esc(def.label)}</label>
+        ${presetsHtml}
+        <textarea id="${id}" data-field-text="${path}" maxlength="${maxLen}">${esc(value || '')}</textarea>
+        <p class="story-step-note" style="margin-top:4px">Max ${maxLen} characters.</p>
+      </div>`;
     }
     const inputType = def.type === 'number' ? 'number' : 'text';
     return `<div class="field"><label for="${id}">${esc(def.label)}</label><input id="${id}" type="${inputType}" value="${esc(value ?? '')}" data-field-text="${path}" ${inputType === 'text' ? 'maxlength="150"' : ''}></div>`;
@@ -1309,6 +1320,13 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     document.querySelectorAll('#genModalFields [data-field-text]').forEach(el => el.addEventListener('input', () => {
       const key = el.getAttribute('data-field-text');
       genModalDraft.fields[key] = el.type === 'number' ? Number(el.value) : el.value;
+    }));
+    document.querySelectorAll('#genModalFields [data-field-preset]').forEach(el => el.addEventListener('click', () => {
+      const key = el.getAttribute('data-field-preset');
+      const presetText = el.getAttribute('data-value');
+      const current = (genModalDraft.fields[key] || '').trim();
+      genModalDraft.fields[key] = current ? `${current} ${presetText}` : presetText;
+      refreshGenModalFields();
     }));
     document.querySelectorAll('#genModalFields [data-ref-toggle]').forEach(el => el.addEventListener('click', () => {
       const id = el.getAttribute('data-ref-toggle');
