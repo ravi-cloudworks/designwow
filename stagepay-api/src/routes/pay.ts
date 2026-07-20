@@ -50,6 +50,30 @@ async function stageLaneTitle(db: D1Database, stage: number): Promise<string> {
   return config.laneTitle || `Stage ${stage}`;
 }
 
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'x';
+}
+
+// Derived from users.name (no dedicated initials field/setting exists) —
+// first letter of each whitespace-separated word, e.g. "Ravi Kumar" -> "RK".
+function initialsFrom(name: string | null | undefined): string {
+  const initials = (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  return initials || 'DW';
+}
+
+// Every customer-facing download filename follows one scheme so a customer
+// or designer juggling downloads across many projects/designers can tell
+// them apart at a glance: initials-project-stageNumber-stageName.
+function downloadBaseName(designerName: string | null | undefined, projectName: string, stage: number, stageLabel: string): string {
+  return `${initialsFrom(designerName)}-${slugify(projectName)}-${stage}-${slugify(stageLabel)}`;
+}
+
 // Every project gets a link row at creation time (see projects.ts) — this is
 // a defensive fallback only, for any project that predates that or slipped
 // through some other way, so the feature never hard-fails on a missing row.
@@ -272,7 +296,7 @@ pay.get('/pay/:token/download/brief', async (c) => {
   const token = c.req.param('token');
   const loaded = await loadPublicLink(c.env.DB, token);
   if (!loaded) return c.json({ error: 'not_found' }, 404);
-  const { project, brief } = loaded;
+  const { project, designer, brief } = loaded;
   const b = brief;
 
   const logoMedia = b?.logo_media ? (JSON.parse(b.logo_media) as { key?: string; fileName?: string }) : null;
@@ -327,11 +351,11 @@ ${colorLines.length ? colorLines.join('\n') : '- —'}
   for (const p of productPhotos) await addFile(p.key, p.fileName);
 
   const zipBytes = buildZip(entries);
-  const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'project';
+  const baseName = downloadBaseName(designer?.name, project.name, 1, 'brief');
   return new Response(zipBytes, {
     headers: {
       'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="brief-${slug}.zip"`,
+      'Content-Disposition': `attachment; filename="${baseName}.zip"`,
     },
   });
 });
@@ -349,8 +373,9 @@ pay.get('/pay/:token/download/:stage', async (c) => {
   const stage = Number(c.req.param('stage'));
   const loaded = await loadPublicLink(c.env.DB, token);
   if (!loaded) return c.json({ error: 'not_found' }, 404);
-  const { projectId, project } = loaded;
+  const { projectId, project, designer } = loaded;
   const db = c.env.DB;
+  const stageLabel = await stageLaneTitle(db, stage);
 
   // Stage 5 is special: the customer only ever gets the one finished,
   // externally-stitched Final Video — not a zip of the individual scene
@@ -369,10 +394,12 @@ pay.get('/pay/:token/download/:stage', async (c) => {
     if (finalFile) {
       const obj = await c.env.MEDIA.get(finalFile.key);
       if (obj) {
+        const ext = finalFile.fileName.includes('.') ? finalFile.fileName.slice(finalFile.fileName.lastIndexOf('.')) : '.mp4';
+        const baseName = downloadBaseName(designer?.name, project.name, stage, stageLabel);
         return new Response(obj.body, {
           headers: {
             'Content-Type': obj.httpMetadata?.contentType || 'video/mp4',
-            'Content-Disposition': `attachment; filename="${finalFile.fileName}"`,
+            'Content-Disposition': `attachment; filename="${baseName}${ext}"`,
           },
         });
       }
@@ -433,11 +460,11 @@ pay.get('/pay/:token/download/:stage', async (c) => {
   }
 
   const zipBytes = buildZip(entries);
-  const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'project';
+  const baseName = downloadBaseName(designer?.name, project.name, stage, stageLabel);
   return new Response(zipBytes, {
     headers: {
       'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="stage${stage}-${slug}.zip"`,
+      'Content-Disposition': `attachment; filename="${baseName}.zip"`,
     },
   });
 });
