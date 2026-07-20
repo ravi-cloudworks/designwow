@@ -11,9 +11,8 @@
   "items": {
     "scene": {
       "label": "Scene",
-      "note": "fieldsSchema merges the former Scene fields (objective/location/action/dialogue/emotion/duration/broll/transition) with the former Shot List fields (type/camera/lens/movement) into one schema.",
+      "note": "fieldsSchema merges the former Scene fields (objective/location/action/dialogue/emotion/duration/broll/transition) with the former Shot List fields (type/camera/lens/movement) into one schema. content.geminiInstruction removed — Scene content (location/action/dialogue/emotion) now comes directly from Stage 1 via the Story sync, and shot/camera fields are designer-set directly. Nothing regenerates this content via Gemini anymore.",
       "content": {
-        "geminiInstruction": "If the brief's \"storyboard\" field already has dialogue written for a beat matching this scene, reuse those exact lines verbatim (same language) for the \"dialogue\" field instead of inventing new ones. Also draft the camera/shot fields (type, camera, lens, movement) appropriate to this scene's action and emotion. If this scene features approved Characters, Properties, or Backgrounds (see the reference images and their descriptions attached below), treat their appearance as final and locked — describe this scene using their exact established look, never redesigning or reinterpreting them.",
         "fieldsSchema": [
           { "key": "objective", "label": "Objective", "type": "pill", "options": ["Hook", "Problem", "Solution", "Proof", "Demo", "CTA"] },
           { "key": "location", "label": "Location", "type": "text" },

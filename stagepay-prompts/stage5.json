@@ -11,9 +11,8 @@
   "items": {
     "movie": {
       "label": "Final Movie Clip",
-      "note": "content.geminiInstruction is new — there was no specific backend guidance for 'movie' before this (it only got the generic instruction).",
+      "note": "content.geminiInstruction removed — animation direction is now a plain designer-set field, no Gemini drafting.",
       "content": {
-        "geminiInstruction": "Draft the animation direction (camera movement, pacing, duration) for turning this scene's approved key-frame into a short video clip, maintaining continuity with the scene's established characters, wardrobe, props, lighting, and the approved Music Brief.",
         "fieldsSchema": [
           { "key": "direction", "label": "Animation direction", "type": "textarea" },
           { "key": "duration", "label": "Duration (sec)", "type": "number" }
