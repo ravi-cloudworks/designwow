@@ -352,6 +352,33 @@ pay.get('/pay/:token/download/:stage', async (c) => {
   const { projectId, project } = loaded;
   const db = c.env.DB;
 
+  // Stage 5 is special: the customer only ever gets the one finished,
+  // externally-stitched Final Video — not a zip of the individual scene
+  // clips, which are a designer-only production artifact for stitching it
+  // together. Falls through to the generic per-stage zip below if no Final
+  // Video has been uploaded yet, so this never breaks an in-progress project.
+  if (stage === 5) {
+    const finalVideoVersion = await db.prepare(
+      `SELECT iv.media_files FROM item_versions iv JOIN items i ON i.id = iv.item_id WHERE i.project_id = ? AND i.stage = 5 AND i.item_key = 'final_video'`
+    )
+      .bind(projectId)
+      .first<{ media_files: string }>();
+    const finalFile = finalVideoVersion
+      ? (JSON.parse(finalVideoVersion.media_files || '[]') as { key: string; fileName: string }[])[0]
+      : undefined;
+    if (finalFile) {
+      const obj = await c.env.MEDIA.get(finalFile.key);
+      if (obj) {
+        return new Response(obj.body, {
+          headers: {
+            'Content-Type': obj.httpMetadata?.contentType || 'video/mp4',
+            'Content-Disposition': `attachment; filename="${finalFile.fileName}"`,
+          },
+        });
+      }
+    }
+  }
+
   const entries: ZipEntry[] = [];
   const usedNames = new Set<string>();
   const addFile = async (key: string, fileName: string) => {

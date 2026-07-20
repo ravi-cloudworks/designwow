@@ -549,14 +549,15 @@ Rules:
   // the JSON-driven content/instruction config; fine to stay hardcoded.
   const ITEM_THUMBS = {
     story: '📝', character: '👤', property: '📦', sound: '🔊', background: '🏞️',
-    scene: '🎬', movie: '🎞️',
+    scene: '🎬', movie: '🎞️', final_video: '🏆',
   };
   const MEDIA_LABELS = {
     story: 'Storyboard Image', character: 'Character Reference', property: 'Property Reference',
     sound: 'Sound File', background: 'Background Reference', scene: 'Scene Image', movie: 'Scene Video',
+    final_video: 'Final Video',
   };
   const MEDIA_ACCEPT = {
-    sound: 'audio/*', movie: 'video/*,image/*',
+    sound: 'audio/*', movie: 'video/*', final_video: 'video/*',
   };
   // Video clips are legitimately much bigger than reference images — every
   // other item type (and Stage 1's logo/product photos) shares one default.
@@ -1722,8 +1723,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // Flow — Gemini can't reliably infer visual specifics for an ambiguous
     // character ("grandma", "a kid"), and designers already have their own
     // reference libraries. These four types are upload-only: name + file,
-    // no mode toggle, no Setup, no Generate step at all.
-    const isUploadOnlyType = ['character', 'property', 'background', 'sound'].includes(item.item_key);
+    // no mode toggle, no Setup, no Generate step at all. Final Video is the
+    // same for a different reason — it's stitched together externally from
+    // the approved per-scene clips, so there's nothing for Flow to generate.
+    const isUploadOnlyType = ['character', 'property', 'background', 'sound', 'final_video'].includes(item.item_key);
     // Exactly one file per item (every label in MEDIA_LABELS is singular —
     // "Character Reference", "Scene Video", never plural) — so no `multiple`,
     // and the upload button itself hides once a file exists rather than
@@ -2832,7 +2835,8 @@ ${e.rawResponse || '—'}`;
       // only checked that SOME item in the stage had one, so locking with
       // (say) 4 of 5 characters missing their reference image went
       // unnoticed. Named explicitly so it's obvious which ones are missing.
-      const itemsMissingUpload = stageItems.filter(i => (theVersion(i).media_files || []).length === 0);
+      // (Stage 5's scene clips are excluded — see emptyItemsForStage.)
+      const itemsMissingUpload = emptyItemsForStage(stage);
       if (itemsMissingUpload.length) {
         missing.push(`upload a file for ${itemsMissingUpload.map(i => `"${i.name || itemLabel(i.stage, i.item_key)}"`).join(', ')}`);
       }
@@ -2857,6 +2861,13 @@ ${e.rawResponse || '—'}`;
             if (!movieFor(scene.id)) {
               await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Final Clip`, parentItemId: scene.id });
             }
+          }
+          // One per project, not per scene — the designer stitches every
+          // approved clip together externally and uploads the one finished
+          // result here. Guarded the same way as the Movie pairing above so
+          // a later unlock/edit/re-lock cycle never creates a second one.
+          if (!state.items.some(i => i.stage === 5 && i.item_key === 'final_video')) {
+            await api.createItem(state.project.id, { stage: 5, itemKey: 'final_video', name: 'Final Video' });
           }
           const full = await api.getProject(state.project.id);
           state.items = full.items;
@@ -2938,24 +2949,41 @@ ${e.rawResponse || '—'}`;
   function renderLane5() {
     const scenes = itemsFor(4, 'scene');
     const movies = scenes.map(s => movieFor(s.id)).filter(Boolean);
-    // Movie items only get created once Stage 4 actually locks (see
-    // wireStagePaymentCard's lockBtn) — so scenes existing but none of them
-    // having a paired Movie yet just means Stage 4 isn't locked yet, not
-    // "nothing to see," and needs its own message instead of rendering blank.
+    const finalVideoItem = itemsFor(5, 'final_video')[0];
+    // Movie items (and the Final Video slot) only get created once Stage 4
+    // actually locks (see wireStagePaymentCard's lockBtn) — so scenes
+    // existing but nothing paired yet just means Stage 4 isn't locked yet,
+    // not "nothing to see," and needs its own message instead of blank space.
     let body;
-    if (!scenes.length) body = '<p class="empty-note">Add scenes in Stage 4 first.</p>';
-    else if (!movies.length) body = '<p class="empty-note">Lock Stage 4 first — paid and approved by the customer — before Final Movie clips appear here.</p>';
-    else body = scenes.map(s => { const m = movieFor(s.id); return m ? renderNumberedItemCard(m, {}) : ''; }).join('');
+    if (!scenes.length) {
+      body = '<p class="empty-note">Add scenes in Stage 4 first.</p>';
+    } else if (!movies.length && !finalVideoItem) {
+      body = '<p class="empty-note">Lock Stage 4 first — paid and approved by the customer — before Final Movie clips appear here.</p>';
+    } else {
+      // Final Video is the one thing the customer's public link actually
+      // downloads for this stage (see pay.ts) — shown first and clearly
+      // labeled so it reads as the headline deliverable, not just another
+      // item in the list. The per-scene clips below it are the designer's
+      // own production reference for stitching it together, not something
+      // the customer needs to see individually.
+      body = `
+        ${finalVideoItem ? `<div class="list-label-row"><span>🏆 Final Video — for the customer</span></div>${renderNumberedItemCard(finalVideoItem, {})}` : ''}
+        <div class="list-label-row"><span>Scene clips — your own production reference</span></div>
+        ${scenes.map(s => { const m = movieFor(s.id); return m ? renderNumberedItemCard(m, {}) : ''; }).join('')}
+      `;
+    }
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}</div>
         <p class="lane-tamil">திரைப்படம்</p>
-        <p class="lane-desc">One animated clip per scene — the actual delivered footage.</p>
+        <p class="lane-desc">Stitch the approved scene clips into one finished video — that's the only thing the customer downloads.</p>
         </div>
       ${body}
       ${renderStagePaymentCardHtml(5)}`;
   }
   function wireLane5() {
+    const finalVideoItem = itemsFor(5, 'final_video')[0];
+    if (finalVideoItem) wireItemCard(finalVideoItem);
     itemsFor(4, 'scene').forEach(s => { const m = movieFor(s.id); if (m) wireItemCard(m); });
     wireStagePaymentCard('lane5', 5);
   }
@@ -3080,14 +3108,30 @@ ${e.rawResponse || '—'}`;
   // Items with no file at all — no point pricing a stage that still has
   // these sitting in it, since there's nothing there to actually deliver.
   function emptyItemsForStage(stage) {
-    return state.items.filter(i => i.stage === stage && (theVersion(i).media_files || []).length === 0);
+    // Stage 5's per-scene clips are the designer's own production reference
+    // for stitching — the customer only ever downloads the Final Video, so
+    // that's the only thing that actually needs to exist here; scene clips
+    // stay optional (every other stage still requires 100% of its items,
+    // since those genuinely are the deliverable there).
+    return state.items.filter(i => i.stage === stage && !(stage === 5 && i.item_key === 'movie') && (theVersion(i).media_files || []).length === 0);
   }
-  // A real modal (not a toast) listing every empty item by name, letting the
-  // designer either delete them now (cascades to a Scene's paired Movie via
-  // the DB's own ON DELETE CASCADE) or cancel to go upload for them first.
+  // Same rule the item card itself uses to decide whether its "×" delete
+  // button shows (renderNumberedItemCard's opts.deletable) — Story/Movie/
+  // Final Video are never deletable there, so this modal must never offer
+  // to delete them either, even though they can still show up as "empty."
+  function isItemDeletable(item) {
+    return ['character', 'property', 'background', 'sound', 'scene'].includes(item.item_key);
+  }
+  // A real modal (not a toast) listing every empty item by name. Deletable
+  // ones (cascades to a Scene's paired Movie via the DB's own ON DELETE
+  // CASCADE) get a delete-or-cancel choice; non-deletable ones (Final
+  // Video) are just shown as "still needs uploading," with no way to
+  // remove them and no path to proceed until they're filled in.
   let emptyItemsDraft = null;
   function openEmptyItemsModal(stage, items, onProceed) {
-    emptyItemsDraft = { stage, items, onProceed };
+    const deletable = items.filter(isItemDeletable);
+    const mandatory = items.filter((i) => !isItemDeletable(i));
+    emptyItemsDraft = { stage, deletable, mandatory, onProceed };
     renderEmptyItemsModal();
   }
   function closeEmptyItemsModal() {
@@ -3098,37 +3142,47 @@ ${e.rawResponse || '—'}`;
   function renderEmptyItemsModal() {
     const root = document.getElementById('modalRoot');
     if (!root || !emptyItemsDraft) { if (root) root.innerHTML = ''; return; }
-    const { items } = emptyItemsDraft;
+    const { deletable, mandatory } = emptyItemsDraft;
+    const itemLine = (i) => `<li style="display:flex;align-items:center;gap:8px;background:var(--amber-soft);border-color:var(--amber-line)">
+      <span>${ITEM_THUMBS[i.item_key] || '📄'} <strong>${esc(i.name || itemLabel(i.stage, i.item_key))}</strong> <span style="color:var(--text-faint);font-weight:400">(${esc(itemLabel(i.stage, i.item_key))})</span></span>
+    </li>`;
+    const mandatorySection = mandatory.length ? `
+      <p class="modal-sub">These still need to be uploaded before you can set an amount — they can't be removed:</p>
+      <ul class="affected-list">${mandatory.map(itemLine).join('')}</ul>
+    ` : '';
+    const deletableSection = deletable.length ? `
+      <p class="modal-sub">${mandatory.length ? 'These also have no file yet — delete them now, or cancel and upload for them first:' : "These items have no file uploaded yet — there's no point setting a price for a stage that still has empty items sitting in it. Delete them now (you can always add them back later), or cancel and upload for them first."}</p>
+      <ul class="affected-list">${deletable.map(itemLine).join('')}</ul>
+    ` : '';
+    const footer = deletable.length
+      ? `<div class="modal-footer confirm-actions">
+          <button class="btn" id="emptyItemsCancelBtn">Cancel — I'll upload</button>
+          <button class="btn btn-danger" id="emptyItemsDeleteBtn">Delete ${deletable.length} empty item${deletable.length === 1 ? '' : 's'}${mandatory.length ? '' : ' & continue'}</button>
+        </div>`
+      : `<div class="modal-footer"><button class="btn btn-primary" id="emptyItemsCancelBtn">Got it</button></div>`;
     root.innerHTML = `
       <div class="modal-overlay" id="emptyItemsModalOverlay">
         <div class="modal-card" style="max-width:440px">
           <div class="modal-head"><strong>⚠ Empty items in this stage</strong><button class="modal-close" id="emptyItemsModalCloseBtn">×</button></div>
-          <p class="modal-sub">These items have no file uploaded yet — there's no point setting a price for a stage that still has empty items sitting in it. Delete them now (you can always add them back later), or cancel and upload for them first.</p>
-          <ul class="affected-list">
-            ${items.map(i => `<li style="display:flex;align-items:center;gap:8px;background:var(--amber-soft);border-color:var(--amber-line)">
-              <span>${ITEM_THUMBS[i.item_key] || '📄'} <strong>${esc(i.name || itemLabel(i.stage, i.item_key))}</strong> <span style="color:var(--text-faint);font-weight:400">(${esc(itemLabel(i.stage, i.item_key))})</span></span>
-            </li>`).join('')}
-          </ul>
-          <div class="modal-footer confirm-actions">
-            <button class="btn" id="emptyItemsCancelBtn">Cancel — I'll upload</button>
-            <button class="btn btn-danger" id="emptyItemsDeleteBtn">Delete ${items.length} empty item${items.length === 1 ? '' : 's'} &amp; continue</button>
-          </div>
+          ${mandatorySection}
+          ${deletableSection}
+          ${footer}
         </div>
       </div>`;
     document.getElementById('emptyItemsModalCloseBtn').addEventListener('click', closeEmptyItemsModal);
     document.getElementById('emptyItemsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'emptyItemsModalOverlay') closeEmptyItemsModal(); });
     document.getElementById('emptyItemsCancelBtn').addEventListener('click', closeEmptyItemsModal);
-    document.getElementById('emptyItemsDeleteBtn').addEventListener('click', async () => {
-      const { stage, items: toDelete, onProceed } = emptyItemsDraft;
-      const btn = document.getElementById('emptyItemsDeleteBtn');
-      btn.disabled = true; btn.textContent = 'Deleting…';
+    const deleteBtn = document.getElementById('emptyItemsDeleteBtn');
+    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+      const { stage, deletable: toDelete, mandatory: stillMandatory, onProceed } = emptyItemsDraft;
+      deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…';
       for (const it of toDelete) { await api.deleteItem(it.id); }
       const full = await api.getProject(state.project.id);
       state.items = full.items;
       closeEmptyItemsModal();
       renderTool();
       toast(`Removed ${toDelete.length} empty item${toDelete.length === 1 ? '' : 's'}`);
-      onProceed(stage);
+      if (!stillMandatory.length) onProceed(stage);
     });
   }
   function openStageAmountModal(stage) {
