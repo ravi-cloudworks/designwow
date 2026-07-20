@@ -363,15 +363,46 @@ pay.get('/pay/:token/download/:stage', async (c) => {
     usedNames.add(name);
     entries.push({ name, data: new Uint8Array(await obj.arrayBuffer()) });
   };
+  const addTextFile = (baseName: string, text: string) => {
+    let name = `${baseName}.txt`;
+    let n = 2;
+    while (usedNames.has(name)) { name = `${baseName}-${n}.txt`; n++; }
+    usedNames.add(name);
+    entries.push({ name, data: new TextEncoder().encode(text) });
+  };
+
+  // Setup field labels are sourced from stage_prompts, not hardcoded here —
+  // same config-lives-in-JSON principle as everywhere else in the app.
+  const stageConfigRow = await db.prepare('SELECT config FROM stage_prompts WHERE stage = ?').bind(stage).first<{ config: string }>();
+  const stageConfig = stageConfigRow ? (JSON.parse(stageConfigRow.config) as { items?: Record<string, { content?: { fieldsSchema?: { key: string; label: string }[] } }> }) : null;
 
   const { results: versions } = await db.prepare(
-    `SELECT iv.* FROM item_versions iv JOIN items i ON i.id = iv.item_id WHERE i.project_id = ? AND i.stage = ?`
+    `SELECT iv.*, i.name AS item_name, i.item_key AS item_key FROM item_versions iv JOIN items i ON i.id = iv.item_id WHERE i.project_id = ? AND i.stage = ?`
   )
     .bind(projectId, stage)
     .all<Record<string, unknown>>();
   for (const v of versions) {
     const mediaFiles = JSON.parse((v.media_files as string) || '[]') as { key: string; fileName: string }[];
     for (const f of mediaFiles) await addFile(f.key, f.fileName);
+
+    // A per-item text summary of its Setup field values, alongside its
+    // image — gives the customer the same production detail that used to
+    // be baked into the Scene Blueprint image itself as overlay text (now
+    // removed so that same image can double as Stage 5's clean
+    // video-generation keyframe).
+    const itemKey = v.item_key as string;
+    const itemName = (v.item_name as string) || itemKey;
+    const fieldsSchema = stageConfig?.items?.[itemKey]?.content?.fieldsSchema;
+    if (fieldsSchema?.length) {
+      const fields = JSON.parse((v.fields as string) || '{}') as Record<string, unknown>;
+      const lines = fieldsSchema
+        .map((def) => {
+          const val = fields[def.key];
+          return val !== undefined && val !== null && val !== '' ? `${def.label}: ${val}` : null;
+        })
+        .filter((line): line is string => line !== null);
+      if (lines.length) addTextFile(itemName, `${itemName}\n\n${lines.join('\n')}`);
+    }
   }
 
   const zipBytes = buildZip(entries);
