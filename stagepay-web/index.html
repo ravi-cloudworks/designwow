@@ -274,6 +274,22 @@
   .project-list-item:hover { border-color: var(--teal-line); background: var(--teal-soft); }
   .container { max-width: 900px; margin: 0 auto; padding: 22px 20px 60px; }
 
+  /* ---------- Public Showcase ---------- */
+  .showcase-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .showcase-tile { position: relative; }
+  .showcase-tile img, .showcase-tile video { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; display: block; background: var(--surface-2); }
+  .showcase-file-tile { width: 100%; height: 140px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; }
+  .showcase-tile-remove { position: absolute; top: 6px; right: 6px; border: none; border-radius: 999px; width: 22px; height: 22px; background: rgba(10,11,14,0.7); color: #f0f6f4; cursor: pointer; font-size: 13px; line-height: 1; }
+  .showcase-tile-name { margin: 4px 0 0; font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .showcase-candidate-project { margin-bottom: 14px; }
+  .showcase-candidate-project-title { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
+  .showcase-candidate-category { font-size: 10.5px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 6px; }
+  .showcase-candidate-add { width: 100%; justify-content: center; margin-top: 4px; }
+  .public-showcase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
+  .public-showcase-category { margin-bottom: 22px; }
+  .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
+
   /* ---------- Goal Tracker (responsive by default: flex/%, no fixed widths) ---------- */
   .goal-tracker-card .icon-btn { font-size: 11.5px; }
   .goal-range-toggle { display: flex; gap: 6px; margin: 10px 0 10px; }
@@ -727,6 +743,33 @@ Rules:
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage, itemKey, sourceText, fields }),
       }, 100000);
     },
+    async listShowcase() {
+      const r = await fetch(`${API_BASE}/api/showcase`, { credentials: 'include' });
+      return (await r.json()).items || [];
+    },
+    async listShowcaseCandidates() {
+      const r = await fetch(`${API_BASE}/api/showcase/candidates`, { credentials: 'include' });
+      return (await r.json()).candidates || [];
+    },
+    async addShowcase(sourceItemId, key, fileName) {
+      const r = await fetch(`${API_BASE}/api/showcase`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceItemId, key, fileName }),
+      });
+      return r.json();
+    },
+    async uploadShowcasePromo(file) {
+      const r = await fetch(`${API_BASE}/api/showcase/upload/${encodeURIComponent(file.name)}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file,
+      });
+      return r.json();
+    },
+    async removeShowcase(itemId) { return fetch(`${API_BASE}/api/showcase/${itemId}`, { method: 'DELETE', credentials: 'include' }); },
+    showcaseFileUrl(itemId) { return `${API_BASE}/api/showcase-items/${itemId}/file`; },
+    async getPublicShowcase(userId) {
+      const r = await fetch(`${API_BASE}/api/showcase/${userId}/public`);
+      if (!r.ok) throw new Error('not_found');
+      return r.json();
+    },
   };
 
   // ---------- App state ----------
@@ -749,6 +792,8 @@ Rules:
     stagePricesDraft: null, // {2:paise,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     stageCountsDraft: null, // {2:count,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     projectsTab: 'in-period', // 'in-period' | 'others' — only shown once a goal is set
+    showcaseItems: [], // designer's own curated public-showcase items
+    showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -3339,6 +3384,13 @@ ${e.rawResponse || '—'}`;
     state.screen = 'projects';
     renderApp();
   }
+  function goToShowcaseScreen() {
+    // ?screen=showcase (not a bare pathname reset) so a refresh on this page
+    // reopens Showcase instead of falling through boot()'s projects-list default.
+    history.replaceState(null, '', `${location.pathname}?screen=showcase`);
+    state.screen = 'showcase';
+    renderApp();
+  }
   function renderTopbar() {
     // Contextual: show "🎯 Goals" everywhere EXCEPT on the Goals screen
     // itself, where it'd be a no-op link back to the page you're already
@@ -3346,6 +3398,10 @@ ${e.rawResponse || '—'}`;
     const goalsOrHomeBtn = state.screen === 'goals'
       ? `<button class="btn btn-sm" id="goalsHomeBtn">All Projects</button>`
       : `<button class="btn btn-sm" id="goalsNavBtn">🎯 Goals</button>`;
+    // Same contextual pattern for the Showcase screen.
+    const showcaseOrHomeBtn = state.screen === 'showcase'
+      ? `<button class="btn btn-sm" id="showcaseHomeBtn">All Projects</button>`
+      : `<button class="btn btn-sm" id="showcaseNavBtn">🖼 Showcase</button>`;
     document.getElementById('topbar').innerHTML = `
       <div class="topbar-title" id="topbarHomeLink" style="cursor:pointer">
         <span class="mark">💸</span>
@@ -3353,7 +3409,7 @@ ${e.rawResponse || '—'}`;
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
-        ${state.user ? `${goalsOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
+        ${state.user ? `${goalsOrHomeBtn}${showcaseOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>`;
     const topbarHomeLink = document.getElementById('topbarHomeLink');
     if (topbarHomeLink && state.user) topbarHomeLink.addEventListener('click', goToProjectsScreen);
@@ -3361,6 +3417,10 @@ ${e.rawResponse || '—'}`;
     if (goalsNavBtn) goalsNavBtn.addEventListener('click', goToGoalsScreen);
     const goalsHomeBtn = document.getElementById('goalsHomeBtn');
     if (goalsHomeBtn) goalsHomeBtn.addEventListener('click', goToProjectsScreen);
+    const showcaseNavBtn = document.getElementById('showcaseNavBtn');
+    if (showcaseNavBtn) showcaseNavBtn.addEventListener('click', goToShowcaseScreen);
+    const showcaseHomeBtn = document.getElementById('showcaseHomeBtn');
+    if (showcaseHomeBtn) showcaseHomeBtn.addEventListener('click', goToProjectsScreen);
     if (state.project) {
       document.getElementById('backToProjectsBtn').addEventListener('click', goToProjectsScreen);
     }
@@ -4455,6 +4515,185 @@ ${e.rawResponse || '—'}`;
     renderTopbar();
     wireGoalTrackerCard();
   }
+
+  // ---------- Public Showcase screen (designer's own management view) ----------
+  // Shares its thumbnail rendering (mediaPreviewTileHtml) with the public
+  // /showcase/:userId page below — same media, same display rules, so
+  // there's exactly one place that decides "image vs video vs generic file"
+  // for both.
+  async function renderShowcaseScreen() {
+    const [items, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
+    state.showcaseItems = items;
+    state.showcaseCandidates = candidates;
+    document.getElementById('app').innerHTML = `
+      <div id="topbar" class="topbar"></div>
+      <div class="container">
+        <div class="card" id="showcaseCardRoot">${renderShowcaseCard()}</div>
+      </div>
+      <div id="modalRoot"></div>`;
+    renderTopbar();
+    wireShowcaseCard();
+  }
+  async function refreshShowcaseScreen() {
+    const [items, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
+    state.showcaseItems = items;
+    state.showcaseCandidates = candidates;
+    const root = document.getElementById('showcaseCardRoot');
+    if (!root) return;
+    root.innerHTML = renderShowcaseCard();
+    wireShowcaseCard();
+  }
+  // Images render directly; videos render as a real <video preload="metadata">
+  // tag (browsers paint its first frame on their own — no client-side
+  // capture-and-store step needed, which used to fail silently for any file
+  // fetched cross-origin from the media API); anything else (PDF etc.) gets
+  // a generic file-type tile. Wrapped in the app's existing data-media-preview
+  // chip so clicking it opens the shared full-file viewer modal
+  // (openMediaViewerModal) — no separate lightbox needed.
+  function mediaPreviewTileHtml(fileUrl, isVideo, isImage, fileName) {
+    if (isImage) {
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image"><img src="${esc(fileUrl)}" alt="${esc(fileName)}" loading="lazy"></a>`;
+    }
+    if (isVideo) {
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="video"><video src="${esc(fileUrl)}" muted playsinline preload="metadata"></video></a>`;
+    }
+    return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="file" class="showcase-file-tile"><span>${(fileName || '').toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}</span></a>`;
+  }
+  // Already-showcased items (public showcase_items row: mime_type/file_name).
+  function showcaseMediaHtml(itemId, mimeType, fileName) {
+    const mime = mimeType || '';
+    return mediaPreviewTileHtml(api.showcaseFileUrl(itemId), mime.startsWith('video/'), mime.startsWith('image/'), fileName);
+  }
+  // Not-yet-showcased candidates (source project item: served from the
+  // authenticated /api/media/:key route, since there's no showcase_items row
+  // yet — fine here since only the logged-in designer ever sees this list).
+  function candidateMediaHtml(c) {
+    return mediaPreviewTileHtml(api.mediaUrl(c.key), c.kind === 'video', c.kind === 'image', c.fileName);
+  }
+  function showcaseTileHtml(item) {
+    return `<div class="showcase-tile">
+      ${showcaseMediaHtml(item.id, item.mime_type, item.file_name)}
+      <button type="button" class="showcase-tile-remove" data-remove-showcase="${esc(item.id)}" title="Remove from showcase">×</button>
+      <p class="showcase-tile-name">${esc(item.file_name)}</p>
+    </div>`;
+  }
+  function showcaseCandidateTileHtml(c) {
+    return `<div class="showcase-tile">
+      ${candidateMediaHtml(c)}
+      <button class="btn btn-sm showcase-candidate-add" data-add-showcase="${esc(c.itemId)}" data-key="${esc(c.key)}" data-filename="${esc(c.fileName)}">+ Add</button>
+    </div>`;
+  }
+  // Project → item-type category (reusing MEDIA_LABELS — the same taxonomy
+  // a designer already sees inside their own projects, e.g. "Character
+  // Reference"/"Scene Image"/"Final Video") — rather than one flat list, so
+  // it's obvious at a glance which piece of which project you're adding.
+  function groupCandidatesByProjectAndCategory(candidates) {
+    const byProject = new Map();
+    for (const c of candidates) {
+      const projectKey = c.projectName || '(untitled project)';
+      if (!byProject.has(projectKey)) byProject.set(projectKey, new Map());
+      const byCategory = byProject.get(projectKey);
+      const categoryKey = MEDIA_LABELS[c.itemKey] || c.itemKey;
+      if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, []);
+      byCategory.get(categoryKey).push(c);
+    }
+    return byProject;
+  }
+  function showcaseCandidatesHtml(candidates) {
+    const grouped = groupCandidatesByProjectAndCategory(candidates);
+    let html = '';
+    for (const [projectName, byCategory] of grouped) {
+      html += `<div class="showcase-candidate-project"><p class="showcase-candidate-project-title">${esc(projectName)}</p>`;
+      for (const [category, items] of byCategory) {
+        html += `<p class="showcase-candidate-category">${esc(category)}</p><div class="showcase-grid" style="margin-bottom:10px">${items.map(showcaseCandidateTileHtml).join('')}</div>`;
+      }
+      html += `</div>`;
+    }
+    return html;
+  }
+  function renderShowcaseCard() {
+    const publicUrl = `${location.origin}/showcase/${state.user.id}`;
+    const items = state.showcaseItems;
+    const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
+    return `
+      <div class="section-head-row"><span class="section-title">🖼 Public Showcase</span></div>
+      <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 14px">
+        A public page you can share — pick which of your delivered work to feature. Nothing shows up here unless you add it.
+      </p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px">
+        <code style="font-size:12px;background:var(--surface-2);padding:6px 10px;border-radius:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(publicUrl)}</code>
+        <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
+        <a class="btn btn-sm" href="/showcase/${esc(state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
+      </div>
+
+      ${items.length
+        ? `<div class="showcase-grid" style="margin-bottom:18px">${items.map(showcaseTileHtml).join('')}</div>`
+        : '<p class="empty-note" style="margin-bottom:18px">Nothing showcased yet.</p>'}
+
+      <div style="margin-bottom:18px">
+        <input type="file" id="showcasePromoInput" accept="image/png,image/jpeg,video/mp4,video/quicktime" style="display:none">
+        <button class="btn" id="showcasePromoBtn">+ Upload a promo file</button>
+        <p style="margin:6px 0 0;font-size:11.5px;color:var(--text-faint)">Not a client deliverable? Add a demo reel or sample — up to 50MB.</p>
+      </div>
+
+      ${candidates.length
+        ? `<p style="margin:0 0 8px;font-size:11.5px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em">Add from your delivered work</p>
+           <div id="showcaseCandidateList">${showcaseCandidatesHtml(candidates)}</div>`
+        : (items.length === 0
+            ? '<p class="empty-note">No delivered work to add yet — that\'ll show up here once you lock a stage with real uploads. Upload a promo file above in the meantime.</p>'
+            : '')}
+    `;
+  }
+  function wireShowcaseCard() {
+    document.getElementById('showcaseCopyLinkBtn').addEventListener('click', () => {
+      const publicUrl = `${location.origin}/showcase/${state.user.id}`;
+      navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link'));
+    });
+    document.querySelectorAll('[data-remove-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      await api.removeShowcase(btn.getAttribute('data-remove-showcase'));
+      toast('Removed from your showcase');
+      await refreshShowcaseScreen();
+    }));
+    document.querySelectorAll('[data-add-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
+      const sourceItemId = btn.getAttribute('data-add-showcase');
+      const key = btn.getAttribute('data-key');
+      const fileName = btn.getAttribute('data-filename');
+      btn.disabled = true; btn.textContent = 'Adding…';
+      const result = await api.addShowcase(sourceItemId, key, fileName);
+      if (result.error) {
+        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase');
+        btn.disabled = false; btn.textContent = '+ Add';
+        return;
+      }
+      toast('Added to your showcase');
+      await refreshShowcaseScreen();
+    }));
+    const promoBtn = document.getElementById('showcasePromoBtn');
+    const promoInput = document.getElementById('showcasePromoInput');
+    promoBtn.addEventListener('click', () => promoInput.click());
+    promoInput.addEventListener('change', async () => {
+      const file = promoInput.files[0];
+      promoInput.value = '';
+      if (!file) return;
+      if (!['image/png', 'image/jpeg', 'video/mp4', 'video/quicktime'].includes(file.type)) {
+        toast('Please choose a PNG, JPG, or MP4/MOV.');
+        return;
+      }
+      if (!checkFileSize(file, 50)) return;
+      promoBtn.disabled = true; promoBtn.textContent = 'Uploading…';
+      const result = await api.uploadShowcasePromo(file);
+      if (result.error) {
+        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Upload failed');
+        promoBtn.disabled = false; promoBtn.textContent = '+ Upload a promo file';
+        return;
+      }
+      toast('Added to your showcase');
+      promoBtn.disabled = false; promoBtn.textContent = '+ Upload a promo file';
+      await refreshShowcaseScreen();
+    });
+  }
+
   function renderProjectListHtml(projects) {
     return projects.length
       ? projects.map(p => {
@@ -4569,6 +4808,7 @@ ${e.rawResponse || '—'}`;
     if (state.screen === 'login') { app.style.cssText = ''; renderLoginScreen(); return; }
     if (state.screen === 'projects') { app.style.cssText = ''; await renderProjectsScreen(); return; }
     if (state.screen === 'goals') { app.style.cssText = ''; await renderGoalsScreen(); return; }
+    if (state.screen === 'showcase') { app.style.cssText = ''; await renderShowcaseScreen(); return; }
     // Fixed-height flex column so the swimlane is the only thing that ever
     // scrolls — topbar/project-info-bar/legend size themselves naturally and
     // never move, instead of relying on a hardcoded "subtract N px" height
@@ -4737,9 +4977,70 @@ ${e.rawResponse || '—'}`;
     }
   }
 
+  // ---------- Public Showcase page (/showcase/:userId) — no login, purely read-only ----------
+  // Public showcase groups by category in a fixed, portfolio-friendly order
+  // — movie (per-scene clip) and final_video (the stitched result) collapse
+  // into one "Final Film" bucket since a visitor doesn't care about that
+  // internal distinction. Standalone promo uploads have no source item (so
+  // no item_key at all) and land in "Other" at the end.
+  const PUBLIC_SHOWCASE_CATEGORY_ORDER = ['story', 'character', 'property', 'background', 'sound', 'scene', 'movie', 'final_video', null];
+  const PUBLIC_SHOWCASE_CATEGORY_LABELS = {
+    story: 'Storyboard', character: 'Characters', property: 'Props', background: 'Backgrounds',
+    sound: 'Music', scene: 'Scenes', movie: 'Final Film', final_video: 'Final Film',
+  };
+  function groupPublicShowcaseItems(items) {
+    const groups = new Map();
+    for (const key of PUBLIC_SHOWCASE_CATEGORY_ORDER) {
+      const label = key ? PUBLIC_SHOWCASE_CATEGORY_LABELS[key] : 'Other';
+      if (!groups.has(label)) groups.set(label, []);
+    }
+    for (const it of items) {
+      const label = it.item_key ? (PUBLIC_SHOWCASE_CATEGORY_LABELS[it.item_key] || 'Other') : 'Other';
+      groups.get(label).push(it);
+    }
+    for (const [label, arr] of groups) if (!arr.length) groups.delete(label);
+    return groups;
+  }
+  async function renderPublicShowcasePage(userId) {
+    const app = document.getElementById('app');
+    app.innerHTML = `<div class="pay-page"><p>Loading…</p></div>`;
+    let data;
+    try {
+      data = await api.getPublicShowcase(userId);
+    } catch {
+      app.innerHTML = `<div class="pay-page"><p>This showcase isn't available.</p></div>`;
+      return;
+    }
+    const { profile, items } = data;
+    const grouped = groupPublicShowcaseItems(items);
+    app.innerHTML = `
+      <div class="pay-page">
+        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><span>StagePay</span></div>
+        <div class="pay-card">
+          <div class="public-showcase-header">
+            ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
+            <h1 style="margin:0">${esc(profile.name)}</h1>
+          </div>
+          ${items.length
+            ? [...grouped.entries()].map(([label, groupItems]) => `
+                <div class="public-showcase-category">
+                  <h2 class="public-showcase-category-title">${esc(label)}</h2>
+                  <div class="showcase-grid">${groupItems.map((it) => `
+                    <div class="showcase-tile">
+                      ${showcaseMediaHtml(it.id, it.mime_type, it.file_name)}
+                      ${it.caption ? `<p class="showcase-tile-name">${esc(it.caption)}</p>` : ''}
+                    </div>`).join('')}</div>
+                </div>`).join('')
+            : '<p class="pay-desc">No showcased work yet.</p>'}
+        </div>
+      </div>`;
+  }
+
   async function boot() {
     const payMatch = location.pathname.match(/^\/pay\/([^/]+)/);
     if (payMatch) { await renderPublicPayPage(payMatch[1]); return; }
+    const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
+    if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
     const projectId = new URLSearchParams(location.search).get('p');
@@ -4753,6 +5054,11 @@ ${e.rawResponse || '—'}`;
     }
     if (new URLSearchParams(location.search).get('screen') === 'goals') {
       state.screen = 'goals';
+      renderApp();
+      return;
+    }
+    if (new URLSearchParams(location.search).get('screen') === 'showcase') {
+      state.screen = 'showcase';
       renderApp();
       return;
     }

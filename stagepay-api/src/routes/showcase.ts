@@ -21,7 +21,7 @@ showcase.get('/showcase/candidates', async (c) => {
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const { results: rows } = await c.env.DB.prepare(
-    `SELECT i.id as item_id, i.name as item_name, i.stage, i.item_key, iv.media_files
+    `SELECT i.id as item_id, i.name as item_name, i.stage, i.item_key, iv.media_files, p.name as project_name
      FROM items i
      JOIN item_versions iv ON iv.item_id = i.id AND iv.version_number = 1
      JOIN projects p ON p.id = i.project_id
@@ -29,7 +29,7 @@ showcase.get('/showcase/candidates', async (c) => {
      WHERE p.user_id = ? AND sl.locked = 1 AND iv.media_files != '[]'`
   )
     .bind(userId)
-    .all<{ item_id: string; item_name: string; stage: number; item_key: string; media_files: string }>();
+    .all<{ item_id: string; item_name: string; stage: number; item_key: string; media_files: string; project_name: string }>();
 
   const { results: showcased } = await c.env.DB.prepare('SELECT r2_key FROM showcase_items WHERE user_id = ?')
     .bind(userId)
@@ -37,14 +37,14 @@ showcase.get('/showcase/candidates', async (c) => {
   const showcasedKeys = new Set(showcased.map((s) => s.r2_key));
 
   const candidates: {
-    itemId: string; itemName: string; stage: number; itemKey: string;
+    itemId: string; itemName: string; stage: number; itemKey: string; projectName: string;
     key: string; fileName: string; kind: string; isShowcased: boolean;
   }[] = [];
   for (const row of rows) {
     const files = JSON.parse(row.media_files || '[]') as MediaFileEntry[];
     for (const f of files) {
       candidates.push({
-        itemId: row.item_id, itemName: row.item_name, stage: row.stage, itemKey: row.item_key,
+        itemId: row.item_id, itemName: row.item_name, stage: row.stage, itemKey: row.item_key, projectName: row.project_name,
         key: f.key, fileName: f.fileName, kind: f.kind, isShowcased: showcasedKeys.has(f.key),
       });
     }
@@ -192,8 +192,15 @@ showcase.get('/showcase/:userId/public', async (c) => {
   const profile = await c.env.DB.prepare('SELECT id, name, avatar_url FROM users WHERE id = ?').bind(userId).first();
   if (!profile) return c.json({ error: 'not_found' }, 404);
 
+  // item_key (via the showcase item's source project item, if it has one)
+  // lets the public page group by category (Storyboard/Characters/Scenes/
+  // etc.) — standalone promo uploads have no source item, so item_key is
+  // null for those and the frontend buckets them under "Other".
   const { results: items } = await c.env.DB.prepare(
-    `SELECT id, file_name, mime_type, caption FROM showcase_items WHERE user_id = ? ORDER BY created_at ASC`
+    `SELECT si.id, si.file_name, si.mime_type, si.caption, i.item_key
+     FROM showcase_items si
+     LEFT JOIN items i ON i.id = si.source_item_id
+     WHERE si.user_id = ? ORDER BY si.created_at ASC`
   )
     .bind(userId)
     .all();
