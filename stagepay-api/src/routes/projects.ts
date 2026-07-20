@@ -143,17 +143,13 @@ projects.patch('/:id', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
-  type UpdateProjectBody = { name?: string; mode?: 'manual' | 'agent' };
+  type UpdateProjectBody = { name?: string };
   const body = await c.req.json<UpdateProjectBody>().catch(() => ({}) as UpdateProjectBody);
   const sets: string[] = [];
   const binds: unknown[] = [];
   if (body.name !== undefined) {
     sets.push('name = ?');
     binds.push(body.name);
-  }
-  if (body.mode !== undefined) {
-    sets.push('mode = ?');
-    binds.push(body.mode);
   }
   if (!sets.length) return c.json({ error: 'nothing_to_update' }, 400);
   sets.push("updated_at = datetime('now')");

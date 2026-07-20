@@ -4,10 +4,11 @@ import { currentUserId } from '../lib/bindings';
 
 const config = new Hono<{ Bindings: Bindings }>();
 
-// Stage prompt config (fieldsSchema, geminiInstruction, outputInstructions,
-// universalStyle) lives in D1, not code — editing a row changes behavior
-// with no redeploy. Used by both the Setup-form/must-attach/Generate-modal
-// rendering here and by /api/suggest's own prompt-building for the same stage.
+// Stage prompt config (fieldsSchema, outputInstructions, universalStyle)
+// lives in D1, not code — editing a row changes behavior with no redeploy.
+// Used by the Setup-form/must-attach/Generate-modal rendering for Story,
+// Scene, and Movie (Character/Property/Background/Sound no longer have a
+// Setup form or Generate step — upload-only).
 config.get('/config/:stage', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
