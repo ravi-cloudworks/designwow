@@ -1008,11 +1008,11 @@ Rules:
         const refLine = refItems.length
           ? ` Featuring (already approved and locked — replicate their appearance exactly as described, do not redesign or reinterpret them): ${refItems.map(it => `${it.name} (${describeItemForRef(it)})`).join('; ')}.`
           : '';
-        base = `${f.location || '(location)'}. ${f.action || '(action)'} Emotion: ${f.emotion || '(emotion)'}. Dialogue: "${f.dialogue || '(no dialogue)'}" (${f.duration || '?'}s).${refLine}${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}. Shot: ${f.type || '(shot type)'} on ${f.camera || '(camera)'}, ${f.lens || '(lens)'} lens, ${f.movement || '(movement)'}.`;
+        base = `${f.location || '(location)'}. ${f.action || '(action)'} Emotion: ${f.emotion || '(emotion)'}. Dialogue: "${f.dialogue || '(no dialogue)'}".${refLine} Shot: ${f.type || '(shot type)'} on ${f.camera || '(camera)'}, ${f.lens || '(lens)'} lens, ${f.camera_angle || '(camera angle)'}.`;
         break;
       }
       case 'movie':
-        base = `Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}`;
+        base = `Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
         break;
       default:
         base = '';
@@ -1104,31 +1104,99 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const inputType = def.type === 'number' ? 'number' : 'text';
     return `<div class="field"><label for="${id}">${esc(def.label)}</label><input id="${id}" type="${inputType}" value="${esc(value ?? '')}" data-field-text="${path}" ${inputType === 'text' ? 'maxlength="150"' : ''}></div>`;
   }
+  // Shared by the full Setup form and the standalone refs-only modal (for
+  // Scene items in Upload mode, where nothing else in Setup matters — see
+  // openSceneRefsModal below) so the two never drift apart.
+  function sceneRefsPickerHtml(refs, toggleAttr) {
+    // Storyboard included as a candidate too — a scene following its layout
+    // is a common case.
+    const candidates = [...itemsFor(2, 'story'), ...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background')];
+    if (!candidates.length) return '<span class="empty-note">Add a Storyboard image or Characters/Properties/Backgrounds in Stage 3 first.</span>';
+    // Real thumbnails (not just a name in a text chip) so picking who/what
+    // is in a scene is a visual decision, not something easy to skip past.
+    return candidates.map((it) => {
+      const thumbFile = itemMediaFiles(it)[0];
+      const thumb = thumbFile
+        ? `<img src="${esc(api.mediaUrl(thumbFile.key))}" alt="" class="refs-chip-thumb">`
+        : `<span class="refs-chip-thumb-fallback">${ITEM_THUMBS[it.item_key] || ''}</span>`;
+      return `<button type="button" class="refs-chip ${refs.includes(it.id) ? 'selected' : ''}" ${toggleAttr}="${it.id}">${thumb}<span>${esc(it.name)}</span></button>`;
+    }).join('');
+  }
+  // A Scene in Upload mode skips Flow generation entirely — its Location/
+  // Action/Dialogue/Emotion and shot/camera fields are only ever consumed by
+  // the compiled Flow prompt, so they have no effect here. "Featured in this
+  // scene" is the one thing that still matters (Stage 5's Movie reads it to
+  // auto-attach the right reference images), so this is a standalone, much
+  // smaller modal instead of opening the full Setup form for fields that
+  // would just be dead weight in this mode.
+  let sceneRefsDraft = null;
+  function openSceneRefsModal(item) {
+    const version = theVersion(item);
+    const refs = Array.isArray((version.fields || {}).refs) ? version.fields.refs : [];
+    sceneRefsDraft = { item, refs: [...refs] };
+    renderSceneRefsModal();
+  }
+  function closeSceneRefsModal() {
+    sceneRefsDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderSceneRefsModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !sceneRefsDraft) { if (root) root.innerHTML = ''; return; }
+    const { item, refs } = sceneRefsDraft;
+    root.innerHTML = `
+      <div class="modal-overlay" id="sceneRefsModalOverlay">
+        <div class="modal-card" style="max-width:440px">
+          <div class="modal-head"><strong>Featured in this scene — ${esc(item.name || 'Scene')}</strong><button class="modal-close" id="sceneRefsModalCloseBtn">×</button></div>
+          <p class="modal-sub">You're uploading your own scene image, so there's nothing to generate here — just confirm who/what is in this scene so the Final Movie step attaches the right reference images.</p>
+          <div class="field"><div class="refs-picker">${sceneRefsPickerHtml(refs, 'data-scene-ref-toggle')}</div></div>
+          <div class="modal-footer">
+            <button class="btn" id="sceneRefsCancelBtn">Cancel</button>
+            <button class="btn btn-primary" id="sceneRefsSaveBtn">Save</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('sceneRefsModalCloseBtn').addEventListener('click', closeSceneRefsModal);
+    document.getElementById('sceneRefsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'sceneRefsModalOverlay') closeSceneRefsModal(); });
+    document.getElementById('sceneRefsCancelBtn').addEventListener('click', closeSceneRefsModal);
+    document.querySelectorAll('[data-scene-ref-toggle]').forEach(el => el.addEventListener('click', () => {
+      const id = el.getAttribute('data-scene-ref-toggle');
+      sceneRefsDraft.refs = sceneRefsDraft.refs.includes(id) ? sceneRefsDraft.refs.filter(r => r !== id) : [...sceneRefsDraft.refs, id];
+      renderSceneRefsModal();
+    }));
+    document.getElementById('sceneRefsSaveBtn').addEventListener('click', async () => {
+      const { item: it, refs: selectedRefs } = sceneRefsDraft;
+      const version = theVersion(it);
+      version.fields = { ...(version.fields || {}), refs: selectedRefs };
+      await api.updateVersion(it.id, { fields: version.fields });
+      closeSceneRefsModal();
+      renderTool();
+      toast('Saved');
+    });
+  }
   function renderFieldsForm(item, fields) {
     const ic = itemConfigFor(item);
     const schema = (ic && ic.content && ic.content.fieldsSchema) || [];
     let html = '';
+    // Location/Action/Dialogue/Emotion below were pre-filled straight from
+    // this text (via the Story sync) — showing it here, read-only, makes it
+    // obvious this scene's compiled prompt doesn't rewrite what the customer
+    // already decided in Stage 1, it just adds the shot/camera fields below
+    // on top of it.
+    if (item.item_key === 'scene') {
+      const b = state.brief;
+      html += `<div class="field"><label>Storyboard / Dialogue (Stage 1, locked)</label>
+        <p style="margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:180px;overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px">${esc(b.storyboard || '—')}</p>
+      </div>`;
+    }
     // Scenes get an extra "featured items" picker driving the must-attach
-    // list — shown FIRST, before the shot-specific fields below, since who/
+    // list — shown next, before the shot-specific fields below, since who/
     // what is actually in the scene is the foundational context a designer
     // should see (and auto-suggested picks confirm/adjust) before anything else.
     if (item.item_key === 'scene') {
-      // Storyboard included as a candidate too — it wasn't offered here at
-      // all before, even though a scene following its layout is a common case.
-      const candidates = [...itemsFor(2, 'story'), ...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background')];
       const refs = Array.isArray(fields.refs) ? fields.refs : [];
-      // Real thumbnails (not just a name in a text chip) so picking who/what
-      // is in a scene is a visual decision, not something easy to skip past.
-      const refChip = (it) => {
-        const thumbFile = itemMediaFiles(it)[0];
-        const thumb = thumbFile
-          ? `<img src="${esc(api.mediaUrl(thumbFile.key))}" alt="" class="refs-chip-thumb">`
-          : `<span class="refs-chip-thumb-fallback">${ITEM_THUMBS[it.item_key] || ''}</span>`;
-        return `<button type="button" class="refs-chip ${refs.includes(it.id) ? 'selected' : ''}" data-ref-toggle="${it.id}">${thumb}<span>${esc(it.name)}</span></button>`;
-      };
-      html += `<div class="field"><label>Featured in this scene</label><div class="refs-picker">
-        ${candidates.length ? candidates.map(refChip).join('') : '<span class="empty-note">Add a Storyboard image or Characters/Properties/Backgrounds in Stage 3 first.</span>'}
-      </div></div>`;
+      html += `<div class="field"><label>Featured in this scene</label><div class="refs-picker">${sceneRefsPickerHtml(refs, 'data-ref-toggle')}</div></div>`;
     }
     html += schema.map(def => renderFieldControl(def, fields[def.key], def.key)).join('');
     // Story has no editable fields — the customer already decided the story,
@@ -1193,7 +1261,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <div class="generate-modal-body">
             <div class="generate-modal-left">
               <div id="genModalFields">${renderFieldsForm(item, genModalDraft.fields)}</div>
-              <button class="btn btn-primary" id="genModalGenerateBtn" style="width:100%;margin-top:4px">⚙ Generate</button>
+              <button class="btn btn-primary" id="genModalGenerateBtn" style="width:100%;margin-top:4px">⚙ ${item.item_key === 'scene' ? 'Generate Scene Image Prompt' : 'Generate'}</button>
             </div>
             <div class="generate-modal-right">
               <div class="prompt-actions" style="justify-content:flex-end;margin:0 0 6px">
@@ -1631,15 +1699,30 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // until step 1 has actually produced a prompt — soft-disabled (CSS
     // only, like the rest of this app's guard rails) rather than a real
     // [disabled] attribute, so the click still fires and can explain why.
+    // Spelling out exactly what kind of file goes here AND which specific
+    // item it's for (not just the type) — a list of several near-identical
+    // Character/Scene/etc. cards otherwise has every upload button reading
+    // the same generic text, easy to lose track of which is which.
+    const UPLOAD_LABEL_PHRASE = {
+      character: 'reference image',
+      property: 'reference image',
+      background: 'reference image',
+      sound: 'sound file',
+      scene: 'scene image',
+      movie: 'video',
+    };
     const buildUploadWidget = (requirePrompt) => {
       const blocked = requirePrompt && !hasPrompt && !hasFile;
       const maxMb = maxUploadMb(item.item_key);
+      const uploadPhrase = UPLOAD_LABEL_PHRASE[item.item_key];
+      const itemDisplayName = item.name || itemLabel(item.stage, item.item_key);
+      const uploadLabel = uploadPhrase ? `+ Upload ${uploadPhrase} for "${esc(itemDisplayName)}"` : '+ Upload file';
       const dimensionHint = item.item_key === 'sound'
         ? `<p class="story-step-note" style="margin-top:4px">Max file size: ${maxMb}MB.</p>`
-        : `<p class="story-step-note" style="margin-top:4px">Recommended: match your video's aspect ratio (9:16 for Reels/Shorts, 16:9 for YouTube), at least 1024px on the shortest side. Max file size: ${maxMb}MB.</p>`;
+        : `<p class="story-step-note" style="margin-top:4px">Use a clean reference image for better results in the scene and final movie creation. Max file size: ${maxMb}MB.</p>`;
       return `
         <input type="file" accept="${mediaAccept}" style="display:none" data-media-upload-input="${item.id}" ${dis}>
-        ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>+ Upload file</button>`}
+        ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>${uploadLabel}</button>`}
         ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : (hasFile ? '' : dimensionHint)}
         <div class="attach-chip-row" style="margin-top:7px">
           ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
@@ -1680,12 +1763,19 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // this character/prop/background consistently in later scene prompts.
     // Setup lives in the same modal as Generate — reused as-is here rather
     // than duplicated, so nothing new crowds the swimlane card itself.
+    // A Scene skipping Flow generation has nothing to gain from the full
+    // Setup form (its content/shot fields only ever feed the compiled Flow
+    // prompt) — only "Featured in this scene" still matters here, so it
+    // gets its own small standalone modal instead (see openSceneRefsModal).
     const uploadOnlyStep = `
       <div class="story-step">
         <span class="story-step-num">1</span>
         <div class="story-step-body">
-          <button class="btn btn-sm" data-open-generate="${item.id}" ${dis}>📋 ${esc(itemLabel(item.stage, item.item_key))} Details</button>
-          <p class="story-step-note" style="margin-top:6px">Fill in the details above so later scenes can describe this consistently.</p>
+          ${item.item_key === 'scene'
+            ? `<button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
+               <p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`
+            : `<button class="btn btn-sm" data-open-generate="${item.id}" ${dis}>📋 ${esc(itemLabel(item.stage, item.item_key))} Details</button>
+               <p class="story-step-note" style="margin-top:6px">Fill in the details above so later scenes can describe this consistently.</p>`}
         </div>
       </div>
       <div class="story-step">
@@ -1768,6 +1858,8 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     }));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
+    const openSceneRefsBtn = document.querySelector(`[data-open-scene-refs="${item.id}"]`);
+    if (openSceneRefsBtn) openSceneRefsBtn.addEventListener('click', () => openSceneRefsModal(item));
     const downloadItemBtn = document.querySelector(`[data-download-item="${item.id}"]`);
     if (downloadItemBtn) downloadItemBtn.addEventListener('click', () => {
       const version = theVersion(item);
@@ -2043,13 +2135,13 @@ ${e.rawResponse || '—'}`;
         ${textareaField('Product description', b.product_description, 'product_description', locked)}
         <div class="field"><label>Logo</label>
           <input type="file" id="logoFileInput" accept="image/*" style="display:none">
-          <button type="button" class="btn btn-sm" id="chooseLogoBtn" ${locked ? 'disabled' : ''}>+ Choose file</button>
+          <button type="button" class="btn btn-sm" id="chooseLogoBtn" ${locked ? 'disabled' : ''}>+ Choose logo file</button>
           ${b.logo_media && b.logo_media.fileName ? `<a href="${esc(api.mediaUrl(b.logo_media.key))}" data-media-preview data-media-name="${esc(b.logo_media.fileName)}" data-media-kind="image" rel="noopener" style="margin-left:8px;font-size:12px;color:var(--text-faint)">${esc(b.logo_media.fileName)}</a>` : ''}
           <p class="story-step-note" style="margin-top:5px">Recommended: square, transparent PNG, at least 500×500px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB.</p>
         </div>
         <div class="field"><label>Product photos</label>
           <input type="file" id="productPhotosInput" accept="image/*" multiple style="display:none">
-          <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose files</button>
+          <button type="button" class="btn btn-sm" id="chooseProductPhotosBtn" ${locked ? 'disabled' : ''}>+ Choose product photo(s)</button>
           <p class="story-step-note" style="margin-top:5px">Recommended: high-resolution, at least 1000×1000px. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
             ${(b.product_photos || []).map((p, i) => `<span class="attach-chip" style="background:var(--surface-2);border-color:var(--line);color:var(--text-soft)"><a href="${esc(api.mediaUrl(p.key))}" data-media-preview data-media-name="${esc(p.fileName)}" data-media-kind="image" rel="noopener" style="color:inherit;text-decoration:underline">📷 ${esc(p.fileName)}</a> ${locked ? '' : `<button type="button" data-remove-photo="${i}" style="border:none;background:none;cursor:pointer;color:var(--crimson);font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
@@ -2252,7 +2344,7 @@ ${e.rawResponse || '—'}`;
         <div class="story-step"><span class="story-step-num">1</span><div class="story-step-body"><button class="btn btn-sm btn-primary btn-guard-disabled" data-story-placeholder-guard>✨ Generate Story</button></div></div>
         <div class="story-step"><span class="story-step-num">2</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>⬇ Download artifacts</button></div></div>
         <div class="story-step"><span class="story-step-num">3</span><div class="story-step-body"><p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p></div></div>
-        <div class="story-step"><span class="story-step-num">4</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>+ Upload file</button></div></div>
+        <div class="story-step"><span class="story-step-num">4</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>+ Upload storyboard image</button></div></div>
         <div class="story-step"><span class="story-step-num">5</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>💰 Set amount</button></div></div>
         <div class="story-step"><span class="story-step-num">6</span><div class="story-step-body"><p class="story-step-note">Set an amount first.</p></div></div>
         <div class="story-step"><span class="story-step-num">7</span><div class="story-step-body"><button class="btn btn-primary btn-guard-disabled" style="width:100%" data-story-placeholder-guard>✅ Lock this stage</button></div></div>
@@ -2309,7 +2401,7 @@ ${e.rawResponse || '—'}`;
           <span class="story-step-num">4</span>
           <div class="story-step-body">
             <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
-            <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload file</button>
+            <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload storyboard image</button>
             <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
             <div class="attach-chip-row" style="margin-top:7px">
               ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
@@ -2629,6 +2721,8 @@ ${e.rawResponse || '—'}`;
     const amountBtn = document.querySelector(`#${laneId} [data-stage-amount-btn]`);
     if (amountBtn) amountBtn.addEventListener('click', () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before setting an amount here`); return; }
+      const emptyItems = emptyItemsForStage(stage);
+      if (emptyItems.length) { openEmptyItemsModal(stage, emptyItems, openStageAmountModal); return; }
       openStageAmountModal(stage);
     });
     const confirmPaidBtn = document.querySelector(`#${laneId} [data-stage-confirm-paid-btn]`);
@@ -2888,6 +2982,60 @@ ${e.rawResponse || '—'}`;
   let stageAmountDraft = null;
   function stageHasDeliverable(stage) {
     return state.items.some(i => i.stage === stage && (theVersion(i).media_files || []).length > 0);
+  }
+  // Items with no file at all — no point pricing a stage that still has
+  // these sitting in it, since there's nothing there to actually deliver.
+  function emptyItemsForStage(stage) {
+    return state.items.filter(i => i.stage === stage && (theVersion(i).media_files || []).length === 0);
+  }
+  // A real modal (not a toast) listing every empty item by name, letting the
+  // designer either delete them now (cascades to a Scene's paired Movie via
+  // the DB's own ON DELETE CASCADE) or cancel to go upload for them first.
+  let emptyItemsDraft = null;
+  function openEmptyItemsModal(stage, items, onProceed) {
+    emptyItemsDraft = { stage, items, onProceed };
+    renderEmptyItemsModal();
+  }
+  function closeEmptyItemsModal() {
+    emptyItemsDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderEmptyItemsModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !emptyItemsDraft) { if (root) root.innerHTML = ''; return; }
+    const { items } = emptyItemsDraft;
+    root.innerHTML = `
+      <div class="modal-overlay" id="emptyItemsModalOverlay">
+        <div class="modal-card" style="max-width:440px">
+          <div class="modal-head"><strong>⚠ Empty items in this stage</strong><button class="modal-close" id="emptyItemsModalCloseBtn">×</button></div>
+          <p class="modal-sub">These items have no file uploaded yet — there's no point setting a price for a stage that still has empty items sitting in it. Delete them now (you can always add them back later), or cancel and upload for them first.</p>
+          <ul class="affected-list">
+            ${items.map(i => `<li style="display:flex;align-items:center;gap:8px;background:var(--amber-soft);border-color:var(--amber-line)">
+              <span>${ITEM_THUMBS[i.item_key] || '📄'} <strong>${esc(i.name || itemLabel(i.stage, i.item_key))}</strong> <span style="color:var(--text-faint);font-weight:400">(${esc(itemLabel(i.stage, i.item_key))})</span></span>
+            </li>`).join('')}
+          </ul>
+          <div class="modal-footer confirm-actions">
+            <button class="btn" id="emptyItemsCancelBtn">Cancel — I'll upload</button>
+            <button class="btn btn-danger" id="emptyItemsDeleteBtn">Delete ${items.length} empty item${items.length === 1 ? '' : 's'} &amp; continue</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('emptyItemsModalCloseBtn').addEventListener('click', closeEmptyItemsModal);
+    document.getElementById('emptyItemsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'emptyItemsModalOverlay') closeEmptyItemsModal(); });
+    document.getElementById('emptyItemsCancelBtn').addEventListener('click', closeEmptyItemsModal);
+    document.getElementById('emptyItemsDeleteBtn').addEventListener('click', async () => {
+      const { stage, items: toDelete, onProceed } = emptyItemsDraft;
+      const btn = document.getElementById('emptyItemsDeleteBtn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      for (const it of toDelete) { await api.deleteItem(it.id); }
+      const full = await api.getProject(state.project.id);
+      state.items = full.items;
+      closeEmptyItemsModal();
+      renderTool();
+      toast(`Removed ${toDelete.length} empty item${toDelete.length === 1 ? '' : 's'}`);
+      onProceed(stage);
+    });
   }
   function openStageAmountModal(stage) {
     if (!stageHasDeliverable(stage)) {
