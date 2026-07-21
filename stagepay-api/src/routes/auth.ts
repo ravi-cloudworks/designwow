@@ -64,18 +64,46 @@ auth.get('/google/callback', async (c) => {
 auth.get('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ user: null });
-  const user = await c.env.DB.prepare('SELECT id, email, name, avatar_url, upi_id FROM users WHERE id = ?')
+  const user = await c.env.DB.prepare('SELECT id, email, name, avatar_url, upi_id, showcase_slug FROM users WHERE id = ?')
     .bind(sessionUserId)
     .first();
   return c.json({ user: user ?? null });
 });
 
+// 3-30 lowercase letters/numbers/hyphens, no leading/trailing hyphen — a
+// short, URL-safe handle, distinct from the designer's display name (which
+// can collide across designers and often has characters that don't belong
+// in a URL).
+const SHOWCASE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
+
 auth.patch('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
-  const body = await c.req.json<{ upiId?: string }>().catch(() => ({}) as { upiId?: string });
-  if (body.upiId === undefined) return c.json({ error: 'nothing_to_update' }, 400);
-  await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(body.upiId, sessionUserId).run();
+  const body = await c.req.json<{ upiId?: string; showcaseSlug?: string | null }>().catch(() => ({}) as { upiId?: string; showcaseSlug?: string | null });
+  if (body.upiId === undefined && body.showcaseSlug === undefined) return c.json({ error: 'nothing_to_update' }, 400);
+
+  if (body.upiId !== undefined) {
+    await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(body.upiId, sessionUserId).run();
+  }
+
+  if (body.showcaseSlug !== undefined) {
+    const trimmed = (body.showcaseSlug || '').trim().toLowerCase();
+    if (trimmed === '') {
+      // Clearing it back to the UUID-based URL — always valid, no uniqueness to check.
+      await c.env.DB.prepare('UPDATE users SET showcase_slug = NULL WHERE id = ?').bind(sessionUserId).run();
+    } else {
+      if (!SHOWCASE_SLUG_RE.test(trimmed)) {
+        return c.json({ error: 'invalid_slug', message: 'Use 3-30 lowercase letters, numbers, or hyphens — no spaces or symbols.' }, 400);
+      }
+      try {
+        await c.env.DB.prepare('UPDATE users SET showcase_slug = ? WHERE id = ?').bind(trimmed, sessionUserId).run();
+      } catch {
+        // Only failure mode here is the UNIQUE index — someone else already has this slug.
+        return c.json({ error: 'slug_taken', message: 'That link is already taken — try another.' }, 409);
+      }
+    }
+  }
+
   return c.json({ ok: true });
 });
 

@@ -187,9 +187,16 @@ showcase.delete('/showcase/:itemId', async (c) => {
 // ---------- Public, no-login ----------
 // Only ever exposes what the designer explicitly curated here — never their
 // raw project/payment history or contact details.
+// The path param can be either the raw user id (always works, forever —
+// the stable fallback) or a designer's custom showcase_slug, if they've set
+// one — resolved once here, then every subsequent query uses the real
+// profile.id, never the raw param, since showcase_items is keyed by the
+// real id regardless of which URL form a visitor used.
 showcase.get('/showcase/:userId/public', async (c) => {
-  const userId = c.req.param('userId');
-  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url FROM users WHERE id = ?').bind(userId).first();
+  const param = c.req.param('userId');
+  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url FROM users WHERE id = ? OR showcase_slug = ?')
+    .bind(param, param)
+    .first<{ id: string; name: string; avatar_url: string | null }>();
   if (!profile) return c.json({ error: 'not_found' }, 404);
 
   // item_key (via the showcase item's source project item, if it has one)
@@ -202,24 +209,67 @@ showcase.get('/showcase/:userId/public', async (c) => {
      LEFT JOIN items i ON i.id = si.source_item_id
      WHERE si.user_id = ? ORDER BY si.created_at ASC`
   )
-    .bind(userId)
+    .bind(profile.id)
     .all();
 
   return c.json({ profile, items });
 });
 
+// Parses a standard "bytes=start-end" Range header ourselves (rather than
+// trusting R2's own Headers-based range resolution — its returned
+// object.range came back with an unusable offset in testing) so we control
+// exactly what gets requested from R2 and what Content-Range we report back.
+function parseByteRange(rangeHeader: string | undefined, size: number): { offset: number; length: number } | null {
+  if (!rangeHeader) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+  if (!match) return null;
+  const [, startStr, endStr] = match;
+  if (startStr === '' && endStr === '') return null;
+  let start: number;
+  let end: number;
+  if (startStr === '') {
+    const suffixLength = Number(endStr);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
+    start = Math.max(size - suffixLength, 0);
+    end = size - 1;
+  } else {
+    start = Number(startStr);
+    end = endStr === '' ? size - 1 : Math.min(Number(endStr), size - 1);
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start < 0) return null;
+  return { offset: start, length: end - start + 1 };
+}
+// Video (and, incidentally, large images) served without honoring Range
+// requests silently breaks two things: iOS Safari refuses to load ANY
+// <video> element at all unless the server's first response is a real 206
+// with Content-Range (it always probes with a Range request before playing
+// anything), and the client-side thumbnail-capture step's video.currentTime
+// seek can hang forever waiting for a byte range that never arrives.
 showcase.get('/showcase-items/:itemId/file', async (c) => {
-  const item = await c.env.DB.prepare('SELECT r2_key, mime_type FROM showcase_items WHERE id = ?')
+  const item = await c.env.DB.prepare('SELECT r2_key, mime_type, size_bytes FROM showcase_items WHERE id = ?')
     .bind(c.req.param('itemId'))
-    .first<{ r2_key: string; mime_type: string }>();
+    .first<{ r2_key: string; mime_type: string; size_bytes: number }>();
   if (!item) return c.json({ error: 'not_found' }, 404);
+
+  const headers = new Headers({
+    'Content-Type': item.mime_type || 'application/octet-stream',
+    'Cache-Control': 'public, max-age=86400',
+    'Accept-Ranges': 'bytes',
+  });
+
+  const range = parseByteRange(c.req.header('Range'), item.size_bytes);
+  if (range) {
+    const object = await c.env.MEDIA.get(item.r2_key, { range: { offset: range.offset, length: range.length } });
+    if (!object) return c.json({ error: 'not_found' }, 404);
+    headers.set('Content-Range', `bytes ${range.offset}-${range.offset + range.length - 1}/${item.size_bytes}`);
+    headers.set('Content-Length', String(range.length));
+    return new Response(object.body, { status: 206, headers });
+  }
 
   const object = await c.env.MEDIA.get(item.r2_key);
   if (!object) return c.json({ error: 'not_found' }, 404);
-
-  return new Response(object.body, {
-    headers: { 'Content-Type': item.mime_type || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' },
-  });
+  headers.set('Content-Length', String(item.size_bytes));
+  return new Response(object.body, { headers });
 });
 
 showcase.get('/showcase-items/:itemId/thumbnail', async (c) => {

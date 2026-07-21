@@ -244,7 +244,10 @@
   .modal-sub { font-size: 12px; color: var(--text-faint); margin: 0 0 16px; }
 
   .media-viewer-overlay { z-index: 1100; }
-  .media-viewer-card { background: var(--surface); border-radius: 12px; max-width: 92vw; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+  .media-viewer-card { position: relative; background: var(--surface); border-radius: 12px; max-width: 92vw; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.35); }
+  .media-viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); border: none; background: rgba(10,11,14,0.55); color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 22px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
+  .media-viewer-nav-prev { left: 10px; }
+  .media-viewer-nav-next { right: 10px; }
   .media-viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 8px 10px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .media-viewer-head strong { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .media-viewer-body { display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--surface-2); overflow: auto; }
@@ -285,10 +288,25 @@
   .showcase-candidate-project-title { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
   .showcase-candidate-category { font-size: 10.5px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 6px; }
   .showcase-candidate-add { width: 100%; justify-content: center; margin-top: 4px; }
+  /* Full-width portfolio layout — deliberately not .pay-page/.pay-card
+     (those are a narrow, centered payment receipt; a gallery needs the
+     screen's actual width, especially on mobile where every extra px of
+     padding eats into the carousels below). */
+  .showcase-page { min-height: 100vh; background: var(--paper); padding: 20px 16px 56px; }
+  .showcase-page-inner { max-width: 900px; margin: 0 auto; }
+  .showcase-page-brand { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 22px; }
   .public-showcase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
   .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
   .public-showcase-category { margin-bottom: 22px; }
   .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
+  /* Swipeable, mobile-native row per category — native touch scrolling plus
+     scroll-snap gives the "flick through cards" feel without any dismiss
+     semantics (unlike a Tinder-style stack), and the next card peeking in
+     at the edge (tile width < viewport width) signals "swipe for more"
+     with no extra affordance needed. */
+  .showcase-carousel { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 6px; scrollbar-width: none; }
+  .showcase-carousel::-webkit-scrollbar { display: none; }
+  .showcase-carousel .showcase-tile { flex: 0 0 min(220px, 72vw); scroll-snap-align: start; }
 
   /* ---------- Goal Tracker (responsive by default: flex/%, no fixed widths) ---------- */
   .goal-tracker-card .icon-btn { font-size: 11.5px; }
@@ -765,6 +783,12 @@ Rules:
     },
     async removeShowcase(itemId) { return fetch(`${API_BASE}/api/showcase/${itemId}`, { method: 'DELETE', credentials: 'include' }); },
     showcaseFileUrl(itemId) { return `${API_BASE}/api/showcase-items/${itemId}/file`; },
+    showcaseThumbnailUrl(itemId) { return `${API_BASE}/api/showcase-items/${itemId}/thumbnail`; },
+    async uploadShowcaseThumbnail(itemId, blob) {
+      return fetch(`${API_BASE}/api/showcase/${itemId}/thumbnail`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+      });
+    },
     async getPublicShowcase(userId) {
       const r = await fetch(`${API_BASE}/api/showcase/${userId}/public`);
       if (!r.ok) throw new Error('not_found');
@@ -1655,31 +1679,68 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   // Appended straight to <body> (not the shared #modalRoot every other
   // modal uses) so it can stack on top of an already-open Generate/Setup
   // modal without clobbering it.
-  function openMediaViewerModal(url, fileName, kind) {
+  // Set only when opened from a showcase carousel/grid row (see the
+  // delegated click listener at the bottom of the file, which builds this
+  // from the clicked link's siblings) — every other data-media-preview chip
+  // in the app (a single reference-image chip on an item card, a brief
+  // asset, etc.) has no "row" to step through, so prev/next stays absent
+  // there rather than showing controls that jump to unrelated files.
+  let mediaViewerGallery = null;
+  function openMediaViewerModal(url, fileName, kind, gallery) {
     closeMediaViewerModal();
+    mediaViewerGallery = gallery || null;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay media-viewer-overlay';
     overlay.id = 'mediaViewerOverlay';
-    const body = kind === 'video'
-      ? `<video src="${esc(url)}" controls autoplay></video>`
+    overlay.innerHTML = `<div class="media-viewer-card">
+      <div class="media-viewer-head"><strong id="mediaViewerFileName"></strong><button type="button" class="modal-close" id="mediaViewerCloseBtn">×</button></div>
+      <div class="media-viewer-body" id="mediaViewerBody"></div>
+      ${mediaViewerGallery ? `
+        <button type="button" class="media-viewer-nav media-viewer-nav-prev" id="mediaViewerPrevBtn" aria-label="Previous">‹</button>
+        <button type="button" class="media-viewer-nav media-viewer-nav-next" id="mediaViewerNextBtn" aria-label="Next">›</button>
+      ` : ''}
+    </div>`;
+    document.body.appendChild(overlay);
+    renderMediaViewerBody(url, fileName, kind);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMediaViewerModal(); });
+    document.getElementById('mediaViewerCloseBtn').addEventListener('click', closeMediaViewerModal);
+    document.addEventListener('keydown', mediaViewerKeyHandler);
+    if (mediaViewerGallery) {
+      document.getElementById('mediaViewerPrevBtn').addEventListener('click', () => stepMediaViewer(-1));
+      document.getElementById('mediaViewerNextBtn').addEventListener('click', () => stepMediaViewer(1));
+    }
+  }
+  // playsinline (+ the legacy webkit- prefix) keeps the video playing inside
+  // this modal on iOS Safari instead of iOS forcing it into native
+  // fullscreen — without it, prev/next (and everything else on screen)
+  // gets covered by the OS's own fullscreen video player.
+  function renderMediaViewerBody(url, fileName, kind) {
+    const body = document.getElementById('mediaViewerBody');
+    document.getElementById('mediaViewerFileName').textContent = fileName;
+    body.innerHTML = kind === 'video'
+      ? `<video src="${esc(url)}" controls autoplay playsinline webkit-playsinline="true"></video>`
       : kind === 'audio'
         ? `<audio src="${esc(url)}" controls autoplay></audio>`
         : `<img src="${esc(url)}" alt="${esc(fileName)}">`;
-    overlay.innerHTML = `<div class="media-viewer-card">
-      <div class="media-viewer-head"><strong>${esc(fileName)}</strong><button type="button" class="modal-close" id="mediaViewerCloseBtn">×</button></div>
-      <div class="media-viewer-body">${body}</div>
-    </div>`;
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMediaViewerModal(); });
-    document.getElementById('mediaViewerCloseBtn').addEventListener('click', closeMediaViewerModal);
-    document.addEventListener('keydown', mediaViewerEscHandler);
+  }
+  function stepMediaViewer(delta) {
+    if (!mediaViewerGallery) return;
+    const { items } = mediaViewerGallery;
+    mediaViewerGallery.index = (mediaViewerGallery.index + delta + items.length) % items.length;
+    const item = items[mediaViewerGallery.index];
+    renderMediaViewerBody(item.url, item.fileName, item.kind);
   }
   function closeMediaViewerModal() {
     const el = document.getElementById('mediaViewerOverlay');
     if (el) el.remove();
-    document.removeEventListener('keydown', mediaViewerEscHandler);
+    mediaViewerGallery = null;
+    document.removeEventListener('keydown', mediaViewerKeyHandler);
   }
-  function mediaViewerEscHandler(e) { if (e.key === 'Escape') closeMediaViewerModal(); }
+  function mediaViewerKeyHandler(e) {
+    if (e.key === 'Escape') closeMediaViewerModal();
+    else if (e.key === 'ArrowLeft') stepMediaViewer(-1);
+    else if (e.key === 'ArrowRight') stepMediaViewer(1);
+  }
   // All of an item's own uploaded media files — an item can carry more than
   // one now (e.g. a Story's several storyboard frames).
   function itemMediaFiles(item) { return item ? (theVersion(item).media_files || []) : []; }
@@ -4543,13 +4604,15 @@ ${e.rawResponse || '—'}`;
     root.innerHTML = renderShowcaseCard();
     wireShowcaseCard();
   }
-  // Images render directly; videos render as a real <video preload="metadata">
-  // tag (browsers paint its first frame on their own — no client-side
-  // capture-and-store step needed, which used to fail silently for any file
-  // fetched cross-origin from the media API); anything else (PDF etc.) gets
+  // Images render directly; anything that isn't image/video (PDF etc.) gets
   // a generic file-type tile. Wrapped in the app's existing data-media-preview
   // chip so clicking it opens the shared full-file viewer modal
-  // (openMediaViewerModal) — no separate lightbox needed.
+  // (openMediaViewerModal) — no separate lightbox needed. Videos are handled
+  // separately by showcaseMediaHtml below (needs a stored thumbnail, not
+  // just a live <video> tag — see its own comment) — this helper is only
+  // used for the image/file cases plus candidateMediaHtml's plain video
+  // preview (candidates only ever show inside the authenticated, desktop-
+  // only management screen, so a live <video> tag there is fine).
   function mediaPreviewTileHtml(fileUrl, isVideo, isImage, fileName) {
     if (isImage) {
       return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image"><img src="${esc(fileUrl)}" alt="${esc(fileName)}" loading="lazy"></a>`;
@@ -4559,10 +4622,114 @@ ${e.rawResponse || '—'}`;
     }
     return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="file" class="showcase-file-tile"><span>${(fileName || '').toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}</span></a>`;
   }
-  // Already-showcased items (public showcase_items row: mime_type/file_name).
+  // Already-showcased items (shown on both the management grid and the
+  // PUBLIC /showcase/:userId page). Both images and videos render a stored,
+  // downsized JPEG (captured client-side right after adding — see
+  // captureImageThumbnail/captureVideoThumbnail below), falling back to the
+  // full-size original (image) or a raw <video preload="metadata"> tag
+  // (video) only if no thumbnail was ever generated. Two reasons this
+  // matters, not just one: a live <video> tag alone frequently paints
+  // nothing at all on mobile browsers, and every project deliverable here
+  // is stored at full original resolution (routinely 0.5-2MB+) — loading
+  // that in full just to shrink it into a 140px tile is exactly why tiles
+  // felt slow to load, especially on mobile data.
   function showcaseMediaHtml(itemId, mimeType, fileName) {
+    const fileUrl = api.showcaseFileUrl(itemId);
     const mime = mimeType || '';
-    return mediaPreviewTileHtml(api.showcaseFileUrl(itemId), mime.startsWith('video/'), mime.startsWith('image/'), fileName);
+    if (mime.startsWith('video/')) {
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="video">
+        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="video">
+      </a>`;
+    }
+    if (mime.startsWith('image/')) {
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image">
+        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="image">
+      </a>`;
+    }
+    return mediaPreviewTileHtml(fileUrl, false, false, fileName);
+  }
+  // A thumbnail <img> that 404s (no stored JPEG ever generated) swaps itself
+  // for the right fallback — the full-size original for an image, a real
+  // <video> element for a video — done via a real error listener rather
+  // than an inline onerror string so the file URL never has to be escaped
+  // twice into an HTML attribute.
+  function wireShowcaseThumbFallbacks() {
+    document.querySelectorAll('img[data-showcase-fallback]').forEach((img) => {
+      img.addEventListener('error', () => {
+        const url = img.getAttribute('data-showcase-fallback');
+        if (img.getAttribute('data-showcase-fallback-kind') === 'video') {
+          const video = document.createElement('video');
+          video.src = url;
+          video.muted = true; video.playsInline = true; video.preload = 'metadata';
+          img.replaceWith(video);
+        } else {
+          img.removeAttribute('data-showcase-fallback');
+          img.src = url;
+        }
+      }, { once: true });
+    });
+  }
+  // Captures a single JPEG frame from a video — always called against the
+  // PUBLIC /showcase-items/:id/file URL (after the item has already been
+  // added to showcase), so a plain crossOrigin='anonymous' load is enough
+  // to avoid tainting the canvas — no cookies needed since that route
+  // requires no auth. (The earlier version of this tried to capture from
+  // the authenticated /api/media/:key route pre-add and never set
+  // crossOrigin at all, so it silently failed every single time.)
+  function captureVideoThumbnail(url) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true; video.playsInline = true; video.preload = 'auto';
+      video.src = url;
+      video.addEventListener('loadeddata', () => { video.currentTime = Math.min(1, (video.duration || 0) / 2); }, { once: true });
+      video.addEventListener('seeked', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('no_canvas_context')); return; }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('capture_failed')), 'image/jpeg', 0.8);
+      }, { once: true });
+      video.addEventListener('error', () => reject(new Error('video_load_failed')), { once: true });
+    });
+  }
+  // Same idea as captureVideoThumbnail, for images — downsizes to a max of
+  // 480px on the longest side, well past what a 140px tile ever needs to
+  // show, while the tile's own click-through still opens the full-size
+  // original (this only ever affects the grid thumbnail, never the file
+  // that's actually served for viewing/download).
+  function captureImageThumbnail(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const maxDim = 480;
+        const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('no_canvas_context')); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('capture_failed')), 'image/jpeg', 0.8);
+      };
+      img.onerror = () => reject(new Error('image_load_failed'));
+      img.src = url;
+    });
+  }
+  // Shared by both the "add from delivered work" and "upload a promo file"
+  // handlers below — captures + stores a thumbnail for whichever media kind
+  // was just added, best-effort (a failure just leaves the existing
+  // fallback in place, never blocks the add/upload itself).
+  async function captureAndStoreShowcaseThumbnail(showcaseItemId, kind) {
+    if (kind !== 'video' && kind !== 'image') return;
+    try {
+      const blob = kind === 'video'
+        ? await captureVideoThumbnail(api.showcaseFileUrl(showcaseItemId))
+        : await captureImageThumbnail(api.showcaseFileUrl(showcaseItemId));
+      await api.uploadShowcaseThumbnail(showcaseItemId, blob);
+    } catch { /* best-effort */ }
   }
   // Not-yet-showcased candidates (source project item: served from the
   // authenticated /api/media/:key route, since there's no showcase_items row
@@ -4612,7 +4779,7 @@ ${e.rawResponse || '—'}`;
     return html;
   }
   function renderShowcaseCard() {
-    const publicUrl = `${location.origin}/showcase/${state.user.id}`;
+    const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
     const items = state.showcaseItems;
     const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
     return `
@@ -4620,11 +4787,17 @@ ${e.rawResponse || '—'}`;
       <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 14px">
         A public page you can share — pick which of your delivered work to feature. Nothing shows up here unless you add it.
       </p>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <code style="font-size:12px;background:var(--surface-2);padding:6px 10px;border-radius:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(publicUrl)}</code>
         <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
-        <a class="btn btn-sm" href="/showcase/${esc(state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
+        <a class="btn btn-sm" href="/showcase/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-faint)">${esc(location.origin)}/showcase/</span>
+        <input type="text" id="showcaseSlugInput" placeholder="your-name" value="${esc(state.user.showcase_slug || '')}" maxlength="30" style="flex:1;font-size:12.5px">
+        <button class="btn btn-sm" id="showcaseSlugSaveBtn">Save</button>
+      </div>
+      <p style="margin:0 0 18px;font-size:11px;color:var(--text-faint)">Customize your public link — 3-30 lowercase letters, numbers, or hyphens. Leave blank to use the default link above.</p>
 
       ${items.length
         ? `<div class="showcase-grid" style="margin-bottom:18px">${items.map(showcaseTileHtml).join('')}</div>`
@@ -4645,9 +4818,27 @@ ${e.rawResponse || '—'}`;
     `;
   }
   function wireShowcaseCard() {
+    wireShowcaseThumbFallbacks();
     document.getElementById('showcaseCopyLinkBtn').addEventListener('click', () => {
-      const publicUrl = `${location.origin}/showcase/${state.user.id}`;
+      const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
       navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link'));
+    });
+    document.getElementById('showcaseSlugSaveBtn').addEventListener('click', async () => {
+      const input = document.getElementById('showcaseSlugInput');
+      const btn = document.getElementById('showcaseSlugSaveBtn');
+      const value = input.value.trim().toLowerCase();
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await api.updateMe({ showcaseSlug: value });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(body.message || 'Failed to save link');
+        btn.disabled = false; btn.textContent = 'Save';
+        return;
+      }
+      state.user.showcase_slug = value || null;
+      toast(value ? 'Public link updated' : 'Reverted to your default link');
+      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+      wireShowcaseCard();
     });
     document.querySelectorAll('[data-remove-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
       btn.disabled = true;
@@ -4667,6 +4858,8 @@ ${e.rawResponse || '—'}`;
         return;
       }
       toast('Added to your showcase');
+      const candidate = state.showcaseCandidates.find((c) => c.itemId === sourceItemId && c.key === key);
+      if (candidate) await captureAndStoreShowcaseThumbnail(result.id, candidate.kind);
       await refreshShowcaseScreen();
     }));
     const promoBtn = document.getElementById('showcasePromoBtn');
@@ -4689,6 +4882,8 @@ ${e.rawResponse || '—'}`;
         return;
       }
       toast('Added to your showcase');
+      const promoKind = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null;
+      if (promoKind) await captureAndStoreShowcaseThumbnail(result.id, promoKind);
       promoBtn.disabled = false; promoBtn.textContent = '+ Upload a promo file';
       await refreshShowcaseScreen();
     });
@@ -5001,22 +5196,26 @@ ${e.rawResponse || '—'}`;
     for (const [label, arr] of groups) if (!arr.length) groups.delete(label);
     return groups;
   }
+  // Its own layout, not borrowed from the payment page — .pay-card was
+  // built for a short, narrow, centered "receipt" (max-width:440px, heavy
+  // padding), which left barely any usable width for a portfolio's
+  // horizontally-scrolling carousels on a small phone screen.
   async function renderPublicShowcasePage(userId) {
     const app = document.getElementById('app');
-    app.innerHTML = `<div class="pay-page"><p>Loading…</p></div>`;
+    app.innerHTML = `<div class="showcase-page"><p>Loading…</p></div>`;
     let data;
     try {
       data = await api.getPublicShowcase(userId);
     } catch {
-      app.innerHTML = `<div class="pay-page"><p>This showcase isn't available.</p></div>`;
+      app.innerHTML = `<div class="showcase-page"><p>This showcase isn't available.</p></div>`;
       return;
     }
     const { profile, items } = data;
     const grouped = groupPublicShowcaseItems(items);
     app.innerHTML = `
-      <div class="pay-page">
-        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><span>StagePay</span></div>
-        <div class="pay-card">
+      <div class="showcase-page">
+        <div class="showcase-page-inner">
+          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><span>StagePay</span></a>
           <div class="public-showcase-header">
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <h1 style="margin:0">${esc(profile.name)}</h1>
@@ -5025,15 +5224,16 @@ ${e.rawResponse || '—'}`;
             ? [...grouped.entries()].map(([label, groupItems]) => `
                 <div class="public-showcase-category">
                   <h2 class="public-showcase-category-title">${esc(label)}</h2>
-                  <div class="showcase-grid">${groupItems.map((it) => `
+                  <div class="showcase-carousel">${groupItems.map((it) => `
                     <div class="showcase-tile">
                       ${showcaseMediaHtml(it.id, it.mime_type, it.file_name)}
                       ${it.caption ? `<p class="showcase-tile-name">${esc(it.caption)}</p>` : ''}
                     </div>`).join('')}</div>
                 </div>`).join('')
-            : '<p class="pay-desc">No showcased work yet.</p>'}
+            : '<p class="empty-note">No showcased work yet.</p>'}
         </div>
       </div>`;
+    wireShowcaseThumbFallbacks();
   }
 
   async function boot() {
@@ -5074,7 +5274,26 @@ ${e.rawResponse || '—'}`;
     if (!link) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
     e.preventDefault();
-    openMediaViewerModal(link.getAttribute('href'), link.getAttribute('data-media-name'), link.getAttribute('data-media-kind') || 'image');
+    // Prev/next only makes sense inside a showcase carousel/grid row — every
+    // other data-media-preview chip in the app is a standalone reference,
+    // not part of a browsable series.
+    let gallery = null;
+    const galleryRoot = link.closest('.showcase-carousel, .showcase-grid');
+    if (galleryRoot) {
+      const links = Array.from(galleryRoot.querySelectorAll('[data-media-preview]'));
+      const index = links.indexOf(link);
+      if (links.length > 1 && index !== -1) {
+        gallery = {
+          index,
+          items: links.map((el) => ({
+            url: el.getAttribute('href'),
+            fileName: el.getAttribute('data-media-name'),
+            kind: el.getAttribute('data-media-kind') || 'image',
+          })),
+        };
+      }
+    }
+    openMediaViewerModal(link.getAttribute('href'), link.getAttribute('data-media-name'), link.getAttribute('data-media-kind') || 'image', gallery);
   });
 
   boot();
