@@ -14,7 +14,10 @@ type MediaFileEntry = { key: string; fileName: string; kind: string };
 
 // No plan/subscription tiers exist in the DB yet to gate this by — a single
 // fixed cap for now, easy to make plan-dependent later once that exists.
-const SHOWCASE_MAX_ITEMS = 20;
+// One shared count across every add path (candidate-add and promo/portfolio
+// upload both check the same showcase_items row count), so this cap already
+// covers the Creative Portfolio items too, not just project deliverables.
+const SHOWCASE_MAX_ITEMS = 25;
 
 showcase.get('/showcase/candidates', async (c) => {
   const userId = currentUserId(c);
@@ -61,7 +64,7 @@ showcase.get('/showcase', async (c) => {
   )
     .bind(userId)
     .all();
-  return c.json({ items: results });
+  return c.json({ items: results, max: SHOWCASE_MAX_ITEMS });
 });
 
 showcase.post('/showcase', async (c) => {

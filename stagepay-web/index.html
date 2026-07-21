@@ -305,6 +305,12 @@
   .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
   .public-showcase-category { margin-bottom: 22px; }
   .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
+  /* Casual-deterrent only (not real protection — anyone using dev tools or
+     a screenshot can still get the file either way): blocks the obvious
+     right-click "Save as"/iOS long-press "Save Image", scoped to the public
+     showcase page only — the designer's own authenticated tool still gets
+     normal right-click on its own previews. */
+  .showcase-page img, .showcase-page video { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   /* Swipeable, mobile-native row per category — native touch scrolling plus
      scroll-snap gives the "flick through cards" feel without any dismiss
      semantics (unlike a Tinder-style stack), and the next card peeking in
@@ -773,7 +779,8 @@ Rules:
     },
     async listShowcase() {
       const r = await fetch(`${API_BASE}/api/showcase`, { credentials: 'include' });
-      return (await r.json()).items || [];
+      const body = await r.json();
+      return { items: body.items || [], max: body.max || 25 };
     },
     async listShowcaseCandidates() {
       const r = await fetch(`${API_BASE}/api/showcase/candidates`, { credentials: 'include' });
@@ -829,6 +836,7 @@ Rules:
     showcaseItems: [], // designer's own curated public-showcase items
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
+    showcaseMax: 25, // server-driven cap (see GET /api/showcase's max field) — default here is just a pre-fetch placeholder
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1729,10 +1737,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const body = document.getElementById('mediaViewerBody');
     document.getElementById('mediaViewerFileName').textContent = fileName;
     body.innerHTML = kind === 'video'
-      ? `<video src="${esc(url)}" controls autoplay playsinline webkit-playsinline="true"></video>`
+      ? `<video src="${esc(url)}" controls autoplay playsinline webkit-playsinline="true" controlslist="nodownload" disablepictureinpicture draggable="false"></video>`
       : kind === 'audio'
         ? `<audio src="${esc(url)}" controls autoplay></audio>`
-        : `<img src="${esc(url)}" alt="${esc(fileName)}">`;
+        : `<img src="${esc(url)}" alt="${esc(fileName)}" draggable="false">`;
   }
   function stepMediaViewer(delta) {
     if (!mediaViewerGallery) return;
@@ -4597,8 +4605,9 @@ ${e.rawResponse || '—'}`;
   // there's exactly one place that decides "image vs video vs generic file"
   // for both.
   async function renderShowcaseScreen() {
-    const [items, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
-    state.showcaseItems = items;
+    const [showcase, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
+    state.showcaseItems = showcase.items;
+    state.showcaseMax = showcase.max;
     state.showcaseCandidates = candidates;
     document.getElementById('app').innerHTML = `
       <div id="topbar" class="topbar"></div>
@@ -4610,8 +4619,9 @@ ${e.rawResponse || '—'}`;
     wireShowcaseCard();
   }
   async function refreshShowcaseScreen() {
-    const [items, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
-    state.showcaseItems = items;
+    const [showcase, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
+    state.showcaseItems = showcase.items;
+    state.showcaseMax = showcase.max;
     state.showcaseCandidates = candidates;
     const root = document.getElementById('showcaseCardRoot');
     if (!root) return;
@@ -4629,10 +4639,10 @@ ${e.rawResponse || '—'}`;
   // only management screen, so a live <video> tag there is fine).
   function mediaPreviewTileHtml(fileUrl, isVideo, isImage, fileName) {
     if (isImage) {
-      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image"><img src="${esc(fileUrl)}" alt="${esc(fileName)}" loading="lazy"></a>`;
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image"><img src="${esc(fileUrl)}" alt="${esc(fileName)}" loading="lazy" draggable="false"></a>`;
     }
     if (isVideo) {
-      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="video"><video src="${esc(fileUrl)}" muted playsinline preload="metadata"></video></a>`;
+      return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="video"><video src="${esc(fileUrl)}" muted playsinline preload="metadata" draggable="false" disablepictureinpicture></video></a>`;
     }
     return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="file" class="showcase-file-tile"><span>${(fileName || '').toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}</span></a>`;
   }
@@ -4652,12 +4662,12 @@ ${e.rawResponse || '—'}`;
     const mime = mimeType || '';
     if (mime.startsWith('video/')) {
       return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="video">
-        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="video">
+        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" draggable="false" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="video">
       </a>`;
     }
     if (mime.startsWith('image/')) {
       return `<a href="${esc(fileUrl)}" data-media-preview data-media-name="${esc(fileName)}" data-media-kind="image">
-        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="image">
+        <img src="${esc(api.showcaseThumbnailUrl(itemId))}" alt="${esc(fileName)}" loading="lazy" draggable="false" data-showcase-fallback="${esc(fileUrl)}" data-showcase-fallback-kind="image">
       </a>`;
     }
     return mediaPreviewTileHtml(fileUrl, false, false, fileName);
@@ -4675,9 +4685,12 @@ ${e.rawResponse || '—'}`;
           const video = document.createElement('video');
           video.src = url;
           video.muted = true; video.playsInline = true; video.preload = 'metadata';
+          video.draggable = false;
+          video.disablePictureInPicture = true;
           img.replaceWith(video);
         } else {
           img.removeAttribute('data-showcase-fallback');
+          img.draggable = false;
           img.src = url;
         }
       }, { once: true });
@@ -4817,7 +4830,10 @@ ${e.rawResponse || '—'}`;
     const items = state.showcaseItems;
     const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
     return `
-      <div class="section-head-row"><span class="section-title">🖼 Public Showcase</span></div>
+      <div class="section-head-row" style="justify-content:space-between">
+        <span class="section-title">🖼 Public Showcase</span>
+        <span style="font-size:11.5px;font-weight:700;color:${items.length >= state.showcaseMax ? 'var(--crimson)' : 'var(--text-faint)'}">${items.length} / ${state.showcaseMax} items</span>
+      </div>
       <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 14px">
         A public page you can share — pick which of your delivered work to feature. Nothing shows up here unless you add it.
       </p>
@@ -5342,6 +5358,17 @@ ${e.rawResponse || '—'}`;
     state.screen = 'projects';
     renderApp();
   }
+  // Blocks the right-click "Save image/video as..." context menu, scoped to
+  // the public showcase page only (checked by pathname, not DOM containment,
+  // so it also covers the media-viewer modal popped up from there — that
+  // modal appends to document.body, outside .showcase-page's own subtree).
+  // Deterrent only, not real protection — anyone using dev tools or a
+  // screenshot can still get the file regardless; the designer's own
+  // authenticated tool is untouched, right-click still works normally there.
+  document.addEventListener('contextmenu', (e) => {
+    if (!location.pathname.match(/^\/showcase\//)) return;
+    if (e.target.closest('img, video')) e.preventDefault();
+  });
   // One delegated listener (rather than re-wiring after every renderTool()
   // rebuild) catches every file chip across brief assets, item uploads, and
   // must-attach references alike. Modified clicks (ctrl/cmd/shift/middle)
