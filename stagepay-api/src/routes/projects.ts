@@ -40,9 +40,19 @@ const REQUIRED_BRIEF_FIELDS = [
   ['brand_color_secondary', 'Secondary color'],
 ] as const;
 
+// No plan/subscription tiers exist to gate this by yet — a single fixed
+// cap for now (same pattern as SHOWCASE_MAX_ITEMS). Deleting a project frees
+// up the slot — see the DELETE route below, which now actually cleans up
+// everything a deleted project owned rather than just its DB rows.
+const MAX_PROJECTS = 50;
+
 projects.post('/', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM projects WHERE user_id = ?').bind(userId).first<{ count: number }>();
+  if ((countRow?.count ?? 0) >= MAX_PROJECTS) {
+    return c.json({ error: 'project_limit_reached', max: MAX_PROJECTS, message: `You've reached the ${MAX_PROJECTS}-project limit — delete an old one to make room for a new one.` }, 400);
+  }
   const body = await c.req.json<{ name?: string }>().catch(() => ({}) as { name?: string });
   const id = crypto.randomUUID();
   const name = body.name?.trim() || 'Untitled project';
@@ -84,7 +94,7 @@ projects.get('/', async (c) => {
     ...rest,
     current_stage: top_stage == null ? 1 : top_stage_locked ? Math.min(top_stage + 1, 5) : top_stage,
   }));
-  return c.json({ projects: projectsWithStage });
+  return c.json({ projects: projectsWithStage, max: MAX_PROJECTS });
 });
 
 projects.get('/:id', async (c) => {
@@ -161,12 +171,54 @@ projects.patch('/:id', async (c) => {
   return c.json({ ok: true });
 });
 
+// Deleting a project used to only ever run one SQL DELETE and rely on
+// foreign-key cascades for everything else — which cleans up every DB row
+// (brief, items, item versions, payment links/history, stage locks) but
+// misses two things cascades can't reach: the actual R2-stored files
+// (uploads never referenced anywhere but by their own key, so nothing
+// cascades to them), and showcase_items sourced from this project's items
+// (source_item_id carries no foreign key at all, so those would otherwise
+// survive as orphaned records pointing at a project that no longer exists).
+// Both are cleaned up here, before the cascade deletes the rows this needs
+// to look them up by.
 projects.delete('/:id', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
-  const result = await c.env.DB.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').bind(id, userId).run();
-  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+
+  const owner = await c.env.DB.prepare('SELECT user_id FROM projects WHERE id = ?').bind(id).first<{ user_id: string }>();
+  if (!owner) return c.json({ error: 'not_found' }, 404);
+  if (owner.user_id !== userId) return c.json({ error: 'forbidden' }, 403);
+
+  const { results: orphanedShowcase } = await c.env.DB.prepare(
+    `SELECT si.id, si.thumbnail_r2_key FROM showcase_items si
+     JOIN items i ON i.id = si.source_item_id
+     WHERE i.project_id = ?`
+  )
+    .bind(id)
+    .all<{ id: string; thumbnail_r2_key: string | null }>();
+  for (const s of orphanedShowcase) {
+    if (s.thumbnail_r2_key) await c.env.MEDIA.delete(s.thumbnail_r2_key);
+  }
+  if (orphanedShowcase.length) {
+    await c.env.DB.prepare(`DELETE FROM showcase_items WHERE id IN (${orphanedShowcase.map(() => '?').join(',')})`)
+      .bind(...orphanedShowcase.map((s) => s.id))
+      .run();
+  }
+
+  // Every media file this project ever generated (item uploads, brief
+  // logo/product photos) shares the same `${userId}/${projectId}/` key
+  // prefix — sweep and delete all of them.
+  let cursor: string | undefined;
+  do {
+    const listed = await c.env.MEDIA.list({ prefix: `${userId}/${id}/`, cursor });
+    if (listed.objects.length) {
+      await Promise.all(listed.objects.map((o) => c.env.MEDIA.delete(o.key)));
+    }
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  await c.env.DB.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').bind(id, userId).run();
   return c.json({ ok: true });
 });
 
@@ -337,6 +389,27 @@ projects.post('/:id/stages/:stage/unlock', async (c) => {
 
   await c.env.DB.prepare('UPDATE stage_locks SET locked = 0 WHERE project_id = ? AND stage = ?').bind(id, stage).run();
   await c.env.DB.prepare('DELETE FROM stage_locks WHERE project_id = ? AND stage > ?').bind(id, stage).run();
+
+  // Same orphaning risk as project deletion (see the DELETE /:id route's
+  // comment) — showcase_items has no foreign key back to its source item,
+  // so any item this is about to delete that was also showcased needs its
+  // showcase entry cleaned up here too, or it survives pointing at nothing.
+  const { results: orphanedShowcase } = await c.env.DB.prepare(
+    `SELECT si.id, si.thumbnail_r2_key FROM showcase_items si
+     JOIN items i ON i.id = si.source_item_id
+     WHERE i.project_id = ? AND i.stage > ?`
+  )
+    .bind(id, stage)
+    .all<{ id: string; thumbnail_r2_key: string | null }>();
+  for (const s of orphanedShowcase) {
+    if (s.thumbnail_r2_key) await c.env.MEDIA.delete(s.thumbnail_r2_key);
+  }
+  if (orphanedShowcase.length) {
+    await c.env.DB.prepare(`DELETE FROM showcase_items WHERE id IN (${orphanedShowcase.map(() => '?').join(',')})`)
+      .bind(...orphanedShowcase.map((s) => s.id))
+      .run();
+  }
+
   await c.env.DB.prepare('DELETE FROM items WHERE project_id = ? AND stage > ?').bind(id, stage).run();
   const link = await c.env.DB.prepare('SELECT token FROM payment_links WHERE project_id = ?').bind(id).first<{ token: string }>();
   if (link) {

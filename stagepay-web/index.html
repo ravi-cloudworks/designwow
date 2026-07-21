@@ -670,7 +670,11 @@ Rules:
   const api = {
     async me() { const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' }); return (await r.json()).user; },
     async logout() { return fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }); },
-    async listProjects() { const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' }); return (await r.json()).projects; },
+    async listProjects() {
+      const r = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' });
+      const body = await r.json();
+      return { projects: body.projects || [], max: body.max || 50 };
+    },
     async createProject(name) {
       const r = await fetch(`${API_BASE}/api/projects`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
       return r.json();
@@ -837,6 +841,7 @@ Rules:
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
     showcaseMax: 25, // server-driven cap (see GET /api/showcase's max field) — default here is just a pre-fetch placeholder
+    projectsMax: 50, // server-driven cap (see GET /api/projects's max field) — default here is just a pre-fetch placeholder
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1028,6 +1033,39 @@ Rules:
       document.getElementById('unlockWarningCancelBtn').addEventListener('click', () => close(false));
       document.getElementById('unlockWarningConfirmBtn').addEventListener('click', () => close(true));
       document.getElementById('unlockWarningOverlay').addEventListener('click', (e) => { if (e.target.id === 'unlockWarningOverlay') close(false); });
+    });
+  }
+  // Replaces the old native confirm() — same promise-resolves-true/false
+  // pattern as showUnlockWarningModal, but spells out exactly what a
+  // project delete actually wipes: every uploaded file (deletion now
+  // sweeps R2, not just DB rows), the full payment history, and anything
+  // of this project's currently sitting in the public Showcase.
+  function showDeleteProjectModal(projectName) {
+    return new Promise((resolve) => {
+      const root = document.getElementById('modalRoot');
+      if (!root) { resolve(true); return; }
+      root.innerHTML = `
+        <div class="modal-overlay" id="deleteProjectOverlay">
+          <div class="modal-card" style="max-width:440px">
+            <div class="modal-head"><strong>⚠️ Delete "${esc(projectName)}"?</strong><button class="modal-close" id="deleteProjectCloseBtn">×</button></div>
+            <p class="modal-sub" style="margin-top:8px">This permanently deletes:</p>
+            <ul class="affected-list">
+              <li>Every uploaded file across all stages — references, scenes, movie clips, Final Video</li>
+              <li>Its full payment history — Goal Tracker's past/future trends won't be accurate without it</li>
+              <li>Any of its work currently in your public Showcase</li>
+            </ul>
+            <p class="modal-sub">This cannot be undone. If you're not sure, keep the project instead of deleting it.</p>
+            <div class="modal-footer confirm-actions" style="margin-top:8px">
+              <button class="btn btn-sm" id="deleteProjectCancelBtn">Cancel</button>
+              <button class="btn btn-sm btn-danger" id="deleteProjectConfirmBtn">Delete permanently</button>
+            </div>
+          </div>
+        </div>`;
+      const close = (result) => { root.innerHTML = ''; resolve(result); };
+      document.getElementById('deleteProjectCloseBtn').addEventListener('click', () => close(false));
+      document.getElementById('deleteProjectCancelBtn').addEventListener('click', () => close(false));
+      document.getElementById('deleteProjectConfirmBtn').addEventListener('click', () => close(true));
+      document.getElementById('deleteProjectOverlay').addEventListener('click', (e) => { if (e.target.id === 'deleteProjectOverlay') close(false); });
     });
   }
   function itemConfigFor(item) { const sc = stageConfigFor(item.stage); return (sc && sc.items[item.item_key]) || null; }
@@ -2453,6 +2491,7 @@ ${e.rawResponse || '—'}`;
     const unlockBtn = document.getElementById('unlockBriefBtn');
     if (unlockBtn) unlockBtn.addEventListener('click', async () => {
       if (!(await showUnlockWarningModal([2, 3, 4, 5]))) return;
+      unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       await api.unlockBrief(state.project.id);
       state.brief.locked = false;
       const full = await api.getProject(state.project.id);
@@ -2730,6 +2769,7 @@ ${e.rawResponse || '—'}`;
     const unlockBtn = document.getElementById('storyUnlockBtn');
     if (unlockBtn) unlockBtn.addEventListener('click', async () => {
       if (!(await showUnlockWarningModal([3, 4, 5]))) return;
+      unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       const res = await api.unlockStage(state.project.id, 2);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < 2);
@@ -2739,6 +2779,8 @@ ${e.rawResponse || '—'}`;
         renderTool();
         renderProjectInfoBar();
         toast('Stage 2 unlocked — Stage 3-5 cleared');
+      } else {
+        unlockBtn.disabled = false; unlockBtn.textContent = '🔓 Unlock to edit';
       }
     });
   }
@@ -3012,6 +3054,7 @@ ${e.rawResponse || '—'}`;
       // (there's no Stage 6), and shouldn't warn as if it did.
       const stagesToDelete = Array.from({ length: Math.max(0, 5 - stage) }, (_, i) => stage + 1 + i);
       if (!(await showUnlockWarningModal(stagesToDelete))) return;
+      unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       const res = await api.unlockStage(state.project.id, stage);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < stage);
@@ -3021,6 +3064,8 @@ ${e.rawResponse || '—'}`;
         renderTool();
         renderProjectInfoBar();
         toast(stagesToDelete.length ? `Stage ${stage} unlocked — Stage ${stagesToDelete[0]}-${stagesToDelete[stagesToDelete.length - 1]} cleared` : `Stage ${stage} unlocked`);
+      } else {
+        unlockBtn.disabled = false; unlockBtn.textContent = '🔓 Unlock to edit';
       }
     });
   }
@@ -5000,7 +5045,10 @@ ${e.rawResponse || '—'}`;
     const split = progress ? splitProjectsByGoalPeriod(state.projects, state.earningsSummary) : null;
     const activeList = split ? (state.projectsTab === 'others' ? split.others : split.inPeriod) : state.projects;
     return `
-      <div class="section-head-row"><span class="section-title">Your projects</span></div>
+      <div class="section-head-row" style="justify-content:space-between">
+        <span class="section-title">Your projects</span>
+        <span style="font-size:11.5px;font-weight:700;color:${state.projects.length >= state.projectsMax ? 'var(--crimson)' : 'var(--text-faint)'}">${state.projects.length} / ${state.projectsMax}</span>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <input type="text" id="newProjectName" placeholder="Customer Name - Project Name" maxlength="100" style="flex:1">
         <button class="btn btn-primary" id="createProjectBtn">+ Create</button>
@@ -5029,7 +5077,9 @@ ${e.rawResponse || '—'}`;
     document.querySelectorAll('[data-delete-project]').forEach(el => el.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = el.getAttribute('data-delete-project');
-      if (!confirm('Delete this project? This also permanently deletes its income record — your Goal Tracker\'s past and future trends won\'t be accurate without it, even for a project that earned ₹0. If you\'re not sure, keep it instead of deleting. This cannot be undone.')) return;
+      const project = state.projects.find(p => p.id === id);
+      if (!(await showDeleteProjectModal(project ? project.name : 'this project'))) return;
+      el.disabled = true; el.textContent = 'Deleting…';
       await api.deleteProject(id);
       renderProjectsScreen();
     }));
@@ -5038,12 +5088,20 @@ ${e.rawResponse || '—'}`;
       const nameInput = document.getElementById('newProjectName');
       const name = nameInput.value.trim();
       if (!name) { toast('Enter Customer Name - Project Name'); nameInput.focus(); return; }
+      createBtn.disabled = true; createBtn.textContent = 'Creating…';
       const created = await api.createProject(name);
+      if (created.error) {
+        toast(created.message || (created.error === 'project_limit_reached' ? `You've reached the ${created.max}-project limit — delete an old one first.` : 'Failed to create project'));
+        createBtn.disabled = false; createBtn.textContent = '+ Create';
+        return;
+      }
       openProject(created.id);
     });
   }
   async function renderProjectsScreen() {
-    state.projects = await api.listProjects();
+    const projectList = await api.listProjects();
+    state.projects = projectList.projects;
+    state.projectsMax = projectList.max;
     state.earningsSummary = await api.getEarningsSummary();
     document.getElementById('app').innerHTML = `
       <div id="topbar" class="topbar"></div>
