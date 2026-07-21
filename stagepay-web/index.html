@@ -283,18 +283,24 @@
   .showcase-tile img, .showcase-tile video { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; display: block; background: var(--surface-2); }
   .showcase-file-tile { width: 100%; height: 140px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; }
   .showcase-tile-remove { position: absolute; top: 6px; right: 6px; border: none; border-radius: 999px; width: 22px; height: 22px; background: rgba(10,11,14,0.7); color: #f0f6f4; cursor: pointer; font-size: 13px; line-height: 1; }
+  .showcase-tile-badge { position: absolute; top: 6px; left: 6px; background: rgba(23,107,94,0.9); color: #f0f6f4; font-size: 9px; font-weight: 700; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 999px; pointer-events: none; }
   .showcase-tile-name { margin: 4px 0 0; font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .showcase-candidate-project { margin-bottom: 14px; }
-  .showcase-candidate-project-title { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
-  .showcase-candidate-category { font-size: 10.5px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 6px; }
   .showcase-candidate-add { width: 100%; justify-content: center; margin-top: 4px; }
+  .showcase-project-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; background: var(--surface); }
+  .showcase-project-card-title { font-size: 15px; font-weight: 800; margin: -14px -16px 14px; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+  .showcase-project-columns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .showcase-project-columns { grid-template-columns: repeat(2, 1fr); } }
+  .showcase-project-column-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; }
+  .showcase-project-column-body { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
+  .showcase-project-column-body .showcase-tile img,
+  .showcase-project-column-body .showcase-tile video { height: 90px; }
   /* Full-width portfolio layout — deliberately not .pay-page/.pay-card
      (those are a narrow, centered payment receipt; a gallery needs the
      screen's actual width, especially on mobile where every extra px of
      padding eats into the carousels below). */
   .showcase-page { min-height: 100vh; background: var(--paper); padding: 20px 16px 56px; }
   .showcase-page-inner { max-width: 900px; margin: 0 auto; }
-  .showcase-page-brand { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 22px; }
+  .showcase-page-brand { display: flex; align-items: center; gap: 8px; color: var(--text); margin-bottom: 22px; }
   .public-showcase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
   .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
   .public-showcase-category { margin-bottom: 22px; }
@@ -388,6 +394,7 @@
   .landing-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
   .landing-header .wordmark { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; text-decoration: none; color: var(--text); }
   .landing-header .wordmark .mark { font-size: 18px; }
+  .landing-header-tagline { margin: 2px 0 0 26px; font-size: 11px; font-weight: 500; color: var(--text-faint); }
   .landing-section { max-width: 760px; margin: 0 auto; padding: 56px 22px; }
   .landing-section + .landing-section { border-top: 1px solid var(--line-soft); }
   .landing-hero { text-align: center; padding: 72px 22px 60px; }
@@ -446,8 +453,11 @@
   .debug-pre { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 10.5px; line-height: 1.5; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 8px; max-height: 220px; overflow-y: auto; margin: 0; }
 
   .pay-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; background: var(--paper); gap: 18px; }
-  .pay-brand-bar { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--text); }
-  .pay-brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .pay-brand-bar { display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .pay-brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .pay-brand-text { display: flex; flex-direction: column; gap: 1px; }
+  .pay-brand-name { font-size: 14px; font-weight: 800; }
+  .pay-brand-tagline { font-size: 10.5px; font-weight: 500; color: var(--text-faint); }
   .pay-card { max-width: 440px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 26px; text-align: center; }
   .pay-designer { font-size: 12.5px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
   .pay-card h1 { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
@@ -818,6 +828,7 @@ Rules:
     projectsTab: 'in-period', // 'in-period' | 'others' — only shown once a goal is set
     showcaseItems: [], // designer's own curated public-showcase items
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
+    showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -3604,7 +3615,10 @@ ${e.rawResponse || '—'}`;
     document.getElementById('app').innerHTML = `
       <div class="landing">
         <div class="landing-header">
-          <a class="wordmark" href="https://stagepay.pages.dev/"><span class="mark">💸</span><span>StagePay</span></a>
+          <div>
+            <a class="wordmark" href="https://stagepay.pages.dev/"><span class="mark">💸</span><span>StagePay</span></a>
+            <p class="landing-header-tagline">Get paid every stage. Never waste AI credits.</p>
+          </div>
           <a class="btn btn-primary btn-sm" href="/api/auth/google" data-login-link>Login</a>
         </div>
 
@@ -4738,43 +4752,63 @@ ${e.rawResponse || '—'}`;
     return mediaPreviewTileHtml(api.mediaUrl(c.key), c.kind === 'video', c.kind === 'image', c.fileName);
   }
   function showcaseTileHtml(item) {
+    // No source_item_id means this was added via "Upload your Creative
+    // Portfolio", not a real project deliverable — tagged so it's obvious
+    // at a glance which tile the "only one reel video" limit is tracking.
+    const isPortfolio = !item.source_item_id;
     return `<div class="showcase-tile">
       ${showcaseMediaHtml(item.id, item.mime_type, item.file_name)}
+      ${isPortfolio ? '<span class="showcase-tile-badge">Creative Portfolio</span>' : ''}
       <button type="button" class="showcase-tile-remove" data-remove-showcase="${esc(item.id)}" title="Remove from showcase">×</button>
       <p class="showcase-tile-name">${esc(item.file_name)}</p>
     </div>`;
   }
+  // Item-type label (MEDIA_LABELS, e.g. "Character Reference") shown under
+  // every tile — most useful in the Stage 3 column, which mixes four
+  // different item types together, but shown everywhere for consistency.
   function showcaseCandidateTileHtml(c) {
     return `<div class="showcase-tile">
       ${candidateMediaHtml(c)}
+      <p class="showcase-tile-name" title="${esc(c.fileName)}">${esc(MEDIA_LABELS[c.itemKey] || c.itemKey)}${c.itemName ? ' · ' + esc(c.itemName) : ''}</p>
       <button class="btn btn-sm showcase-candidate-add" data-add-showcase="${esc(c.itemId)}" data-key="${esc(c.key)}" data-filename="${esc(c.fileName)}">+ Add</button>
     </div>`;
   }
-  // Project → item-type category (reusing MEDIA_LABELS — the same taxonomy
-  // a designer already sees inside their own projects, e.g. "Character
-  // Reference"/"Scene Image"/"Final Video") — rather than one flat list, so
-  // it's obvious at a glance which piece of which project you're adding.
-  function groupCandidatesByProjectAndCategory(candidates) {
+  // Project → Stage (2-5) — same stage grouping as everywhere else in the
+  // app (STAGE_NAMES/STAGE_COLORS), since this is a working/management view
+  // for the designer, not the public-facing page (which groups by the finer
+  // item-type category instead — different audience, different framing).
+  function groupCandidatesByProjectAndStage(candidates) {
     const byProject = new Map();
     for (const c of candidates) {
       const projectKey = c.projectName || '(untitled project)';
-      if (!byProject.has(projectKey)) byProject.set(projectKey, new Map());
-      const byCategory = byProject.get(projectKey);
-      const categoryKey = MEDIA_LABELS[c.itemKey] || c.itemKey;
-      if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, []);
-      byCategory.get(categoryKey).push(c);
+      if (!byProject.has(projectKey)) byProject.set(projectKey, { 2: [], 3: [], 4: [], 5: [] });
+      const byStage = byProject.get(projectKey);
+      if (byStage[c.stage]) byStage[c.stage].push(c);
     }
     return byProject;
   }
+  // One card per project, 4 columns (Stage 2-5) inside — each column has a
+  // capped height with its own internal scroll, so a stage with many items
+  // (Stage 3 especially, which mixes Characters/Props/Backgrounds/Music)
+  // never stretches the card or leaves the other columns half-empty next
+  // to it; every project's card stays the same shape regardless of how
+  // lopsided its item counts are.
   function showcaseCandidatesHtml(candidates) {
-    const grouped = groupCandidatesByProjectAndCategory(candidates);
+    const grouped = groupCandidatesByProjectAndStage(candidates);
     let html = '';
-    for (const [projectName, byCategory] of grouped) {
-      html += `<div class="showcase-candidate-project"><p class="showcase-candidate-project-title">${esc(projectName)}</p>`;
-      for (const [category, items] of byCategory) {
-        html += `<p class="showcase-candidate-category">${esc(category)}</p><div class="showcase-grid" style="margin-bottom:10px">${items.map(showcaseCandidateTileHtml).join('')}</div>`;
-      }
-      html += `</div>`;
+    for (const [projectName, byStage] of grouped) {
+      html += `<div class="showcase-project-card">
+        <p class="showcase-project-card-title">📁 ${esc(projectName)}</p>
+        <div class="showcase-project-columns">
+          ${[2, 3, 4, 5].map((stage) => `
+            <div class="showcase-project-column">
+              <p class="showcase-project-column-title" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_NAMES[stage])}</p>
+              <div class="showcase-project-column-body">
+                ${byStage[stage].length ? byStage[stage].map(showcaseCandidateTileHtml).join('') : '<p class="empty-note" style="margin:0">None yet</p>'}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
     }
     return html;
   }
@@ -4805,17 +4839,53 @@ ${e.rawResponse || '—'}`;
 
       <div style="margin-bottom:18px">
         <input type="file" id="showcasePromoInput" accept="image/png,image/jpeg,video/mp4,video/quicktime" style="display:none">
-        <button class="btn" id="showcasePromoBtn">+ Upload a promo file</button>
-        <p style="margin:6px 0 0;font-size:11.5px;color:var(--text-faint)">Not a client deliverable? Add a demo reel or sample — up to 50MB.</p>
+        <button class="btn" id="showcasePromoBtn">Upload your Creative Portfolio</button>
+        <p style="margin:6px 0 0;font-size:11.5px;color:var(--text-faint)">Not a client deliverable? Add photos or a demo reel to your "Creative Portfolio" section — one reel video max (remove it to replace), images unlimited, up to 50MB each.</p>
       </div>
 
       ${candidates.length
-        ? `<p style="margin:0 0 8px;font-size:11.5px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em">Add from your delivered work</p>
-           <div id="showcaseCandidateList">${showcaseCandidatesHtml(candidates)}</div>`
+        ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+             <p style="margin:0;font-size:11.5px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em">Add from your delivered work</p>
+             <input type="text" id="showcaseCandidateSearchInput" placeholder="🔍 Search by project name…" value="${esc(state.showcaseCandidateSearch)}" style="max-width:220px;font-size:12.5px">
+           </div>
+           <div id="showcaseCandidateList">${renderShowcaseCandidateList(candidates)}</div>`
         : (items.length === 0
-            ? '<p class="empty-note">No delivered work to add yet — that\'ll show up here once you lock a stage with real uploads. Upload a promo file above in the meantime.</p>'
+            ? '<p class="empty-note">No delivered work to add yet — that\'ll show up here once you lock a stage with real uploads. Add to your Creative Portfolio above in the meantime.</p>'
             : '')}
     `;
+  }
+  // Client-side only — everything's already loaded, filtering is just an
+  // array filter + re-render of the list container (never the search input
+  // itself, so typing never loses focus/cursor position).
+  function filteredShowcaseCandidates(candidates) {
+    const term = (state.showcaseCandidateSearch || '').trim().toLowerCase();
+    if (!term) return candidates;
+    return candidates.filter((c) => (c.projectName || '').toLowerCase().includes(term));
+  }
+  function renderShowcaseCandidateList(candidates) {
+    const filtered = filteredShowcaseCandidates(candidates);
+    return filtered.length ? showcaseCandidatesHtml(filtered) : '<p class="empty-note">No projects match your search.</p>';
+  }
+  // Extracted so the search filter can re-wire just the candidate list's
+  // "+ Add" buttons after replacing its innerHTML, without re-running (and
+  // double-binding) every other handler in wireShowcaseCard.
+  function wireShowcaseCandidateButtons() {
+    document.querySelectorAll('[data-add-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
+      const sourceItemId = btn.getAttribute('data-add-showcase');
+      const key = btn.getAttribute('data-key');
+      const fileName = btn.getAttribute('data-filename');
+      btn.disabled = true; btn.textContent = 'Adding…';
+      const result = await api.addShowcase(sourceItemId, key, fileName);
+      if (result.error) {
+        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase');
+        btn.disabled = false; btn.textContent = '+ Add';
+        return;
+      }
+      toast('Added to your showcase');
+      const candidate = state.showcaseCandidates.find((c) => c.itemId === sourceItemId && c.key === key);
+      if (candidate) await captureAndStoreShowcaseThumbnail(result.id, candidate.kind);
+      await refreshShowcaseScreen();
+    }));
   }
   function wireShowcaseCard() {
     wireShowcaseThumbFallbacks();
@@ -4846,22 +4916,16 @@ ${e.rawResponse || '—'}`;
       toast('Removed from your showcase');
       await refreshShowcaseScreen();
     }));
-    document.querySelectorAll('[data-add-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
-      const sourceItemId = btn.getAttribute('data-add-showcase');
-      const key = btn.getAttribute('data-key');
-      const fileName = btn.getAttribute('data-filename');
-      btn.disabled = true; btn.textContent = 'Adding…';
-      const result = await api.addShowcase(sourceItemId, key, fileName);
-      if (result.error) {
-        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase');
-        btn.disabled = false; btn.textContent = '+ Add';
-        return;
-      }
-      toast('Added to your showcase');
-      const candidate = state.showcaseCandidates.find((c) => c.itemId === sourceItemId && c.key === key);
-      if (candidate) await captureAndStoreShowcaseThumbnail(result.id, candidate.kind);
-      await refreshShowcaseScreen();
-    }));
+    wireShowcaseCandidateButtons();
+    const searchInput = document.getElementById('showcaseCandidateSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        state.showcaseCandidateSearch = searchInput.value;
+        const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
+        document.getElementById('showcaseCandidateList').innerHTML = renderShowcaseCandidateList(candidates);
+        wireShowcaseCandidateButtons();
+      });
+    }
     const promoBtn = document.getElementById('showcasePromoBtn');
     const promoInput = document.getElementById('showcasePromoInput');
     promoBtn.addEventListener('click', () => promoInput.click());
@@ -4873,18 +4937,27 @@ ${e.rawResponse || '—'}`;
         toast('Please choose a PNG, JPG, or MP4/MOV.');
         return;
       }
+      // Only one portfolio-reel VIDEO — a promo image can still be added
+      // freely, but a second reel video would just be confusing on the
+      // public page's "Creative Portfolio" section (it's meant to be one
+      // highlight reel, not a growing pile of clips).
+      const hasPromoVideo = state.showcaseItems.some((it) => !it.source_item_id && (it.mime_type || '').startsWith('video/'));
+      if (file.type.startsWith('video/') && hasPromoVideo) {
+        toast('Only one portfolio reel video allowed — remove the existing one first.');
+        return;
+      }
       if (!checkFileSize(file, 50)) return;
       promoBtn.disabled = true; promoBtn.textContent = 'Uploading…';
       const result = await api.uploadShowcasePromo(file);
       if (result.error) {
         toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Upload failed');
-        promoBtn.disabled = false; promoBtn.textContent = '+ Upload a promo file';
+        promoBtn.disabled = false; promoBtn.textContent = 'Upload your Creative Portfolio';
         return;
       }
       toast('Added to your showcase');
       const promoKind = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null;
       if (promoKind) await captureAndStoreShowcaseThumbnail(result.id, promoKind);
-      promoBtn.disabled = false; promoBtn.textContent = '+ Upload a promo file';
+      promoBtn.disabled = false; promoBtn.textContent = 'Upload your Creative Portfolio';
       await refreshShowcaseScreen();
     });
   }
@@ -5059,7 +5132,7 @@ ${e.rawResponse || '—'}`;
 
     app.innerHTML = `
       <div class="pay-page">
-        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><span>StagePay</span></div>
+        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span><span class="pay-brand-tagline">Get paid every stage. Never waste AI credits.</span></div></div>
         <div class="pay-card">
           <p class="pay-designer">${esc(info.designerName)}</p>
           <h1>${esc(info.projectName)}</h1>
@@ -5177,20 +5250,24 @@ ${e.rawResponse || '—'}`;
   // — movie (per-scene clip) and final_video (the stitched result) collapse
   // into one "Final Film" bucket since a visitor doesn't care about that
   // internal distinction. Standalone promo uploads have no source item (so
-  // no item_key at all) and land in "Other" at the end.
-  const PUBLIC_SHOWCASE_CATEGORY_ORDER = ['story', 'character', 'property', 'background', 'sound', 'scene', 'movie', 'final_video', null];
+  // no item_key at all) and land in "Creative Portfolio" — first in the
+  // order (leads with the designer's own curated highlight, when they have
+  // one) but only actually shown once it has something in it, same as
+  // every other category.
+  const PUBLIC_SHOWCASE_CATEGORY_ORDER = [null, 'story', 'character', 'property', 'background', 'sound', 'scene', 'movie', 'final_video'];
   const PUBLIC_SHOWCASE_CATEGORY_LABELS = {
     story: 'Storyboard', character: 'Characters', property: 'Props', background: 'Backgrounds',
     sound: 'Music', scene: 'Scenes', movie: 'Final Film', final_video: 'Final Film',
   };
+  const PORTFOLIO_CATEGORY_LABEL = 'Creative Portfolio';
   function groupPublicShowcaseItems(items) {
     const groups = new Map();
     for (const key of PUBLIC_SHOWCASE_CATEGORY_ORDER) {
-      const label = key ? PUBLIC_SHOWCASE_CATEGORY_LABELS[key] : 'Other';
+      const label = key ? PUBLIC_SHOWCASE_CATEGORY_LABELS[key] : PORTFOLIO_CATEGORY_LABEL;
       if (!groups.has(label)) groups.set(label, []);
     }
     for (const it of items) {
-      const label = it.item_key ? (PUBLIC_SHOWCASE_CATEGORY_LABELS[it.item_key] || 'Other') : 'Other';
+      const label = it.item_key ? (PUBLIC_SHOWCASE_CATEGORY_LABELS[it.item_key] || PORTFOLIO_CATEGORY_LABEL) : PORTFOLIO_CATEGORY_LABEL;
       groups.get(label).push(it);
     }
     for (const [label, arr] of groups) if (!arr.length) groups.delete(label);
@@ -5215,7 +5292,7 @@ ${e.rawResponse || '—'}`;
     app.innerHTML = `
       <div class="showcase-page">
         <div class="showcase-page-inner">
-          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><span>StagePay</span></a>
+          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span><span class="pay-brand-tagline">Get paid every stage. Never waste AI credits.</span></div></a>
           <div class="public-showcase-header">
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <h1 style="margin:0">${esc(profile.name)}</h1>
