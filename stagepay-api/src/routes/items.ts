@@ -76,6 +76,34 @@ items.post('/projects/:projectId/items', async (c) => {
     );
   }
 
+  // Stage 3 (Characters/Properties/Backgrounds/Sounds combined — one shared
+  // budget, not 15 of each) and Stage 4 (Scenes) each cap at 15 total items,
+  // mainly a guardrail against a rambling story making "Sync from Story"
+  // dump an unreasonable number of items in one go — a real project rarely
+  // needs anywhere near this many. Movie/Final Video (Stage 5) are exempt —
+  // they're mechanically paired one-per-scene / one-per-project, never
+  // independently added.
+  const STAGE_ITEM_CAPS: Record<number, number> = { 3: 15, 4: 15 };
+  const cap = STAGE_ITEM_CAPS[body.stage];
+  if (cap) {
+    const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM items WHERE project_id = ? AND stage = ?')
+      .bind(projectId, body.stage)
+      .first<{ count: number }>();
+    if ((countRow?.count ?? 0) >= cap) {
+      return c.json(
+        {
+          error: 'stage_item_limit_reached',
+          max: cap,
+          message:
+            body.stage === 3
+              ? `Stage 3 already has the maximum of ${cap} items (Characters/Properties/Backgrounds/Sounds combined) — remove one to add another.`
+              : `Stage 4 already has the maximum of ${cap} scenes — remove one to add another.`,
+        },
+        400
+      );
+    }
+  }
+
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
     `INSERT INTO items (id, project_id, stage, item_key, parent_item_id, order_index, name)

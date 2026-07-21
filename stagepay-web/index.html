@@ -779,9 +779,9 @@ Rules:
     async unlockStage(projectId, stage) {
       return fetch(`${API_BASE}/api/projects/${projectId}/stages/${stage}/unlock`, { method: 'POST', credentials: 'include' });
     },
-    async autoPopulateFromText(stage, itemKey, sourceText, fields) {
+    async autoPopulateFromText(stage, itemKey, sourceText, fields, projectId) {
       return fetchJsonWithTimeout(`${API_BASE}/api/auto-populate`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage, itemKey, sourceText, fields }),
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage, itemKey, sourceText, fields, projectId }),
       }, 100000);
     },
     async listShowcase() {
@@ -1590,6 +1590,26 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         entries: entries.map(e => ({ ...e, alreadyExists: existing.has((e.name || '').trim().toLowerCase()) })),
       };
     }).filter(g => g.entries.length);
+
+    // All groups in one sync batch share the same target stage (Stage 3's
+    // sync always returns characters/properties/backgrounds/sounds together,
+    // Stage 4's sync always returns scenes alone) — the prompt already asks
+    // Gemini to respect the remaining headroom, but LLMs aren't perfectly
+    // reliable at obeying a numeric limit, so anything beyond what actually
+    // fits gets marked here and shown as disabled/unchecked with a clear
+    // reason, rather than being silently rejected mid-creation-loop later.
+    const targetStage = groups.find(g => g.stage)?.stage;
+    const cap = stageItemCap(targetStage);
+    if (cap) {
+      let remaining = Math.max(0, cap - state.items.filter(i => i.stage === targetStage).length);
+      for (const g of groups) {
+        for (const e of g.entries) {
+          if (e.alreadyExists) continue;
+          if (remaining > 0) remaining--;
+          else e.overLimit = true;
+        }
+      }
+    }
     autoPopulateDraft = { sourceItem, groups };
     renderAutoPopulateModal();
   }
@@ -1598,18 +1618,21 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const root = document.getElementById('modalRoot');
     if (!autoPopulateDraft) { root.innerHTML = ''; return; }
     const { groups } = autoPopulateDraft;
-    const totalNew = groups.reduce((n, g) => n + g.entries.filter(e => !e.alreadyExists).length, 0);
+    const totalNew = groups.reduce((n, g) => n + g.entries.filter(e => !e.alreadyExists && !e.overLimit).length, 0);
+    const overLimitCount = groups.reduce((n, g) => n + g.entries.filter(e => e.overLimit).length, 0);
+    const targetStage = groups.find(g => g.stage)?.stage;
     root.innerHTML = `
       <div class="modal-overlay" id="apModalOverlay">
         <div class="modal-card" style="width:460px">
           <div class="modal-head"><strong>Create the rest of the cast from this story?</strong>
             <button class="modal-close" id="apModalCloseBtn">×</button></div>
           <p class="modal-sub">Found in the story — uncheck anything you don't want created. Already-existing items (matched by name) are skipped automatically. We'll set these up and fill them in for you — no need to spend the next several minutes doing it by hand.</p>
+          ${overLimitCount ? `<p class="modal-sub" style="color:var(--amber);font-weight:700">⚠ ${overLimitCount} of these won't be created — ${esc(stageItemCapMessage(targetStage))}</p>` : ''}
           <ul class="affected-list">
             ${groups.map(g => g.entries.map((e, i) => `
-              <li style="display:flex;align-items:flex-start;gap:8px;background:${e.alreadyExists ? 'var(--surface-2)' : 'var(--amber-soft)'};border-color:${e.alreadyExists ? 'var(--line)' : 'var(--amber-line)'}">
-                <input type="checkbox" data-ap-check data-group="${g.key}" data-index="${i}" ${e.alreadyExists ? 'disabled' : 'checked'} style="margin-top:2px">
-                <span><strong>${esc(e.name)}</strong> <span style="font-weight:400;color:var(--text-faint)">(${esc(g.itemKey)})</span>${e.alreadyExists ? ' — already exists, skipping' : `<br><span style="font-weight:400">${esc(g.secondaryKeys.map(k => e[k]).filter(Boolean).join(' · ').slice(0, 140))}</span>`}</span>
+              <li style="display:flex;align-items:flex-start;gap:8px;background:${e.alreadyExists || e.overLimit ? 'var(--surface-2)' : 'var(--amber-soft)'};border-color:${e.alreadyExists || e.overLimit ? 'var(--line)' : 'var(--amber-line)'}">
+                <input type="checkbox" data-ap-check data-group="${g.key}" data-index="${i}" ${e.alreadyExists || e.overLimit ? 'disabled' : 'checked'} style="margin-top:2px">
+                <span><strong>${esc(e.name)}</strong> <span style="font-weight:400;color:var(--text-faint)">(${esc(g.itemKey)})</span>${e.alreadyExists ? ' — already exists, skipping' : e.overLimit ? ' — stage is full, not created' : `<br><span style="font-weight:400">${esc(g.secondaryKeys.map(k => e[k]).filter(Boolean).join(' · ').slice(0, 140))}</span>`}</span>
               </li>`).join('')).join('')}
           </ul>
           <div class="modal-footer confirm-actions">
@@ -2504,14 +2527,33 @@ ${e.rawResponse || '—'}`;
     });
   }
 
+  // Stage 3 (Characters/Properties/Backgrounds/Sounds — one shared budget,
+  // not 15 of each) and Stage 4 (Scenes) each cap at 15 total items. Mirrors
+  // the same cap the backend enforces (items.ts) — checked here too so the
+  // "+ Add" buttons disable themselves and the prompt() never even opens,
+  // rather than only failing after a round trip.
+  const STAGE_ITEM_CAPS = { 3: 15, 4: 15 };
+  function stageItemCap(stage) { return STAGE_ITEM_CAPS[stage]; }
+  function stageItemCapReached(stage) {
+    const cap = stageItemCap(stage);
+    return cap != null && state.items.filter(i => i.stage === stage).length >= cap;
+  }
+  function stageItemCapMessage(stage) {
+    const cap = stageItemCap(stage);
+    return stage === 3
+      ? `Stage 3 already has the maximum of ${cap} items (Characters/Properties/Backgrounds/Sounds combined) — remove one to add another.`
+      : `Stage 4 already has the maximum of ${cap} scenes — remove one to add another.`;
+  }
   function wireAddRepeatable(laneId) {
     document.querySelectorAll(`#${laneId} [data-add-repeatable]`).forEach(el => el.addEventListener('click', async () => {
       const itemKey = el.getAttribute('data-add-repeatable');
       const stage = Number(el.getAttribute('data-stage'));
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before adding here`); return; }
+      if (stageItemCapReached(stage)) { toast(stageItemCapMessage(stage)); return; }
       const name = prompt(`Name for the new ${itemLabel(stage, itemKey).toLowerCase()}?`);
       if (!name) return;
-      await api.createItem(state.project.id, { stage, itemKey, name });
+      const created = await api.createItem(state.project.id, { stage, itemKey, name });
+      if (created && created.error) { toast(created.message || 'Could not add — stage is at its item limit.'); return; }
       const full = await api.getProject(state.project.id);
       state.items = full.items;
       renderTool();
@@ -2800,6 +2842,7 @@ ${e.rawResponse || '—'}`;
         <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Visual &amp; Music</span>${earnedPillHtml(3)}</div>
         <p class="lane-tamil">கதாபாத்திரங்கள், பொருள்கள் மற்றும் இசை</p>
         <p class="lane-desc">Characters, properties, backgrounds, sounds — add as many as the story needs.</p>
+        ${stageItemCapReached(3) ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(3))}</p>` : ''}
         </div>
       ${renderAutoPopulateCardHtml()}
       ${renderStage3RepeatableList('CHARACTERS', '+ Add character', 'character', 3)}
@@ -2817,9 +2860,11 @@ ${e.rawResponse || '—'}`;
   function renderStage3RepeatableList(label, addLabel, itemKey, stage) {
     const list = itemsFor(stage, itemKey);
     const lock = stageLockFor(stage);
-    const hardDis = lock && lock.locked ? 'disabled' : '';
+    const capReached = stageItemCapReached(stage);
+    const hardDis = (lock && lock.locked) || capReached ? 'disabled' : '';
     const guardClass = previousStageLocked(stage) ? '' : ' btn-guard-disabled';
-    return `<div class="list-label-row"><span>${esc(label)}</span><button class="btn btn-sm${guardClass}" data-add-repeatable="${itemKey}" data-stage="${stage}" ${hardDis}>${esc(addLabel)}</button></div>
+    const titleAttr = capReached ? ` title="${esc(stageItemCapMessage(stage))}"` : '';
+    return `<div class="list-label-row"><span>${esc(label)}</span><button class="btn btn-sm${guardClass}" data-add-repeatable="${itemKey}" data-stage="${stage}" ${hardDis}${titleAttr}>${esc(addLabel)}</button></div>
       ${list.length ? list.map(it => renderNumberedItemCard(it, { deletable: true })).join('') : '<p class="empty-note">None yet.</p>'}`;
   }
 
@@ -2842,6 +2887,9 @@ ${e.rawResponse || '—'}`;
       if (!previousStageLocked(3)) { toast('Lock Stage 2 first — paid and approved by the customer — before syncing Stage 3'); return; }
       const lock3 = stageLockFor(3);
       if (lock3 && lock3.locked) { toast('Stage 3 is locked — unlock it first before syncing new items.'); return; }
+      // Checked before spending a Gemini credit, not after — same reasoning
+      // as the backend's own check in suggest.ts.
+      if (stageItemCapReached(3)) { toast(stageItemCapMessage(3)); return; }
       const story = itemsFor(2, 'story')[0];
       // Reads Stage 1's locked storyboard directly, not Stage 2's composed
       // prompt — that text is wrapped in Flow-only image-styling
@@ -2853,7 +2901,7 @@ ${e.rawResponse || '—'}`;
       btn.disabled = true;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
-        const result = await api.autoPopulateFromText(2, 'story', sourceText, ['characters', 'properties', 'backgrounds', 'sounds']);
+        const result = await api.autoPopulateFromText(2, 'story', sourceText, ['characters', 'properties', 'backgrounds', 'sounds'], state.project.id);
         logDebugEntry(story, result);
         if (result.error) { toast(result.message || `Sync failed: ${result.error}`); return; }
         const hasAny = result.autoPopulate && Object.values(result.autoPopulate).some(arr => Array.isArray(arr) && arr.length);
@@ -2892,6 +2940,7 @@ ${e.rawResponse || '—'}`;
       if (!previousStageLocked(4)) { toast('Lock Stage 3 first — paid and approved by the customer — before syncing Stage 4'); return; }
       const lock4 = stageLockFor(4);
       if (lock4 && lock4.locked) { toast('Stage 4 is locked — unlock it first before syncing new items.'); return; }
+      if (stageItemCapReached(4)) { toast(stageItemCapMessage(4)); return; }
       const story = itemsFor(2, 'story')[0];
       const sourceText = (state.brief && state.brief.storyboard) || '';
       if (!story) { toast('Validate the Stage 1 brief to create the Story item first'); return; }
@@ -2899,7 +2948,7 @@ ${e.rawResponse || '—'}`;
       btn.disabled = true;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
-        const result = await api.autoPopulateFromText(2, 'story', sourceText, ['scenes']);
+        const result = await api.autoPopulateFromText(2, 'story', sourceText, ['scenes'], state.project.id);
         logDebugEntry(story, result);
         if (result.error) { toast(result.message || `Sync failed: ${result.error}`); return; }
         const hasAny = result.autoPopulate && Object.values(result.autoPopulate).some(arr => Array.isArray(arr) && arr.length);
@@ -3077,16 +3126,19 @@ ${e.rawResponse || '—'}`;
   function renderLane4() {
     const scenes = itemsFor(4, 'scene');
     const lock = stageLockFor(4);
-    const addHardDis = lock && lock.locked ? 'disabled' : '';
+    const capReached4 = stageItemCapReached(4);
+    const addHardDis = (lock && lock.locked) || capReached4 ? 'disabled' : '';
     const addGuardClass = previousStageLocked(4) ? '' : ' btn-guard-disabled';
+    const addTitleAttr = capReached4 ? ` title="${esc(stageItemCapMessage(4))}"` : '';
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Scene Blueprint</span>${earnedPillHtml(4)}</div>
         <p class="lane-tamil">திரைக்கதை</p>
         <p class="lane-desc">Add a scene for every beat in your storyboard — content and camera/shot direction together.</p>
+        ${capReached4 ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(4))}</p>` : ''}
         </div>
       ${renderScenesSyncCardHtml()}
-      <div class="list-label-row"><span>SCENES</span><button class="btn btn-sm${addGuardClass}" id="addSceneBtn" ${addHardDis}>+ Add scene</button></div>
+      <div class="list-label-row"><span>SCENES</span><button class="btn btn-sm${addGuardClass}" id="addSceneBtn" ${addHardDis}${addTitleAttr}>+ Add scene</button></div>
       ${scenes.length ? scenes.map(s => renderNumberedItemCard(s, { deletable: true })).join('') : '<p class="empty-note">No scenes yet.</p>'}
       ${renderStagePaymentCardHtml(4)}`;
   }
@@ -3097,9 +3149,11 @@ ${e.rawResponse || '—'}`;
     const addBtn = document.getElementById('addSceneBtn');
     if (addBtn) addBtn.addEventListener('click', async () => {
       if (!previousStageLocked(4)) { toast('Lock Stage 3 first — paid and approved by the customer — before adding scenes'); return; }
+      if (stageItemCapReached(4)) { toast(stageItemCapMessage(4)); return; }
       const name = prompt('Scene name?', `Scene ${scenes.length + 1}`);
       if (!name) return;
       const created = await api.createItem(state.project.id, { stage: 4, itemKey: 'scene', name, orderIndex: scenes.length });
+      if (created && created.error) { toast(created.message || 'Could not add — stage is at its item limit.'); return; }
       // No paired Movie item yet — this scene isn't final until Stage 4 is
       // locked, so its Movie item only gets created at that point (see
       // wireStagePaymentCard's lockBtn handler for stage 4).

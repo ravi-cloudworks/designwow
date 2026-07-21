@@ -212,14 +212,15 @@ suggest.post('/auto-populate', async (c) => {
   const userId = currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
-  const body = await c.req.json<{ stage?: number; itemKey?: string; sourceText?: string; fields?: string[] }>().catch(
-    () => ({}) as { stage?: number; itemKey?: string; sourceText?: string; fields?: string[] }
+  const body = await c.req.json<{ stage?: number; itemKey?: string; sourceText?: string; fields?: string[]; projectId?: string }>().catch(
+    () => ({}) as { stage?: number; itemKey?: string; sourceText?: string; fields?: string[]; projectId?: string }
   );
   const stage = body.stage;
   const itemKey = body.itemKey || '';
   const sourceText = (body.sourceText || '').trim();
   if (!stage || !itemKey) return c.json({ error: 'stage_and_itemKey_required' }, 400);
   if (!sourceText) return c.json({ error: 'source_text_required' }, 400);
+  if (!body.projectId) return c.json({ error: 'project_id_required' }, 400);
   if (!c.env.GEMINI_API_KEY) return c.json({ error: 'gemini_not_configured' }, 500);
 
   const row = await c.env.DB.prepare('SELECT config FROM stage_prompts WHERE stage = ?').bind(stage).first<{ config: string }>();
@@ -238,9 +239,39 @@ suggest.post('/auto-populate', async (c) => {
   }
   if (!autoPopulateFields.length) return c.json({ error: 'no_autopopulate_configured' }, 400);
 
+  // Every field requested in one call targets the same stage (Stage 3's
+  // sync always requests characters/properties/backgrounds/sounds together,
+  // Stage 4's sync always requests scenes alone) — so one stage-level cap
+  // check up front covers the whole call. Checked BEFORE spending a Gemini
+  // credit, not after truncating its response, since a wasted call here
+  // costs the platform's own shared Gemini budget, not just the designer's
+  // time — matches this app's whole "never waste AI credits" premise.
+  const STAGE_ITEM_CAPS: Record<number, number> = { 3: 15, 4: 15 };
+  const targetStage = autoPopulateFields[0]?.createsItemsIn?.stage;
+  const cap = targetStage ? STAGE_ITEM_CAPS[targetStage] : undefined;
+  let remaining: number | undefined;
+  if (cap && targetStage) {
+    const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM items WHERE project_id = ? AND stage = ?')
+      .bind(body.projectId, targetStage)
+      .first<{ count: number }>();
+    remaining = Math.max(0, cap - (countRow?.count ?? 0));
+    if (remaining <= 0) {
+      return c.json({
+        error: 'stage_full',
+        max: cap,
+        message:
+          targetStage === 3
+            ? `Stage 3 already has the maximum of ${cap} items (Characters/Properties/Backgrounds/Sounds combined) — nothing synced. Remove one to make room.`
+            : `Stage 4 already has the maximum of ${cap} scenes — nothing synced. Remove one to make room.`,
+      });
+    }
+  }
+
   const autoPopulateDescriptions = autoPopulateFields
     .map((f) => `"${f.key}": ${f.shape} — omit or leave an empty array if none apply`)
     .join('\n');
+
+  const remainingNote = remaining != null ? `\n\nIMPORTANT: Only ${remaining} new item${remaining === 1 ? '' : 's'} can actually be added right now (this stage is close to its limit) — extract at most ${remaining} total across all the fields above combined, prioritizing whatever the story emphasizes most.` : '';
 
   const prompt = `You are helping a UGC video ad designer keep Stage 3 (Characters/Properties/Backgrounds/Sounds) in sync with the current story text below — the story may have just been hand-edited after customer feedback, so extract fresh, not from memory.
 
@@ -250,7 +281,7 @@ ${sourceText}
 """
 
 Return a JSON object with exactly these fields:
-${autoPopulateDescriptions}
+${autoPopulateDescriptions}${remainingNote}
 
 Respond with ONLY the JSON object. No markdown, no code fences, no explanation. The response must be strictly valid JSON: escape every double-quote (\\"), backslash (\\\\), and line break (\\n) that appears inside a string value, never use an invalid escape like \\', and never leave a trailing comma before a closing } or ]. Avoid using double quotes (") inside any field's text at all — if you need to quote a name, phrase, or brand, use single quotes (') instead, since a stray unescaped double quote breaks the JSON.`;
 
