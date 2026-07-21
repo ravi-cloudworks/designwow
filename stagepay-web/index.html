@@ -94,8 +94,8 @@
   .project-info-name-input { font-size: 16px; font-weight: 800; padding: 2px 8px; width: 280px; }
   .project-info-meta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-faint); }
   .project-info-meta strong { color: var(--text-soft); font-weight: 700; }
-  .project-stage-pill { font-size: 10.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; color: #fff; white-space: nowrap; }
-  .project-earned-pill { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
+  .project-stage-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 62px; font-size: 10.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--ink); color: var(--paper); white-space: nowrap; }
+  .project-earned-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 122px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
   .project-earned-pill.lg { font-size: 16px; padding: 7px 16px; }
   .lane-tamil { font-size: 11px; color: var(--text-faint); margin: 3px 0 0 38px; }
   .lane-desc { font-size: 11px; color: var(--text-faint); margin: 6px 0 0 38px; line-height: 1.4; }
@@ -351,16 +351,19 @@
   .goal-strip { display: block; text-decoration: none; color: inherit; cursor: pointer; margin-bottom: 16px; }
   .goal-strip-title { font-size: 14.5px; font-weight: 800; }
   .goal-strip-subtitle { font-size: 12px; font-weight: 700; color: var(--moss); margin: 2px 0 10px; }
+  .goal-strip-celebrate { font-size: 16px; font-weight: 800; color: var(--moss); margin: 4px 0 10px; }
+  .goal-strip-sub { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 4px; }
+  .goal-strip-note { font-size: 10.5px; color: var(--text-faint); margin: 4px 0 12px; font-style: italic; }
   .goal-strip-row { display: flex; align-items: center; gap: 12px; }
   .goal-strip-track { position: relative; flex: 1; height: 34px; border-radius: 999px; background: var(--moss-soft); border: 1px solid var(--moss-line); overflow: hidden; }
-  .goal-strip-fill { position: absolute; inset: 0; width: 0%; background: var(--ink); border-radius: 999px; transition: width 0.2s; }
+  .goal-strip-fill { position: absolute; inset: 0; width: 0%; background: var(--moss); border-radius: 999px; transition: width 0.2s; }
   .goal-strip-value { flex-shrink: 0; font-size: 15px; font-weight: 800; min-width: 64px; text-align: right; }
   .goal-strip-stages { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--moss-line); }
   .goal-strip-stages-sentence { font-size: 11.5px; color: var(--text-faint); margin-bottom: 6px; }
   .goal-strip-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-  .goal-strip-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .goal-strip-sub { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 8px; }
-  .goal-strip-note { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; font-style: italic; }
+  .goal-strip-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+  .goal-strip-pill.done { background: var(--moss-soft); color: var(--moss); border-color: var(--moss-line); }
+  .goal-strip-pill.pending { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); }
   .goal-strip-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--moss-soft); border: 1px solid var(--moss-line); }
   .goal-strip-empty strong { display: block; font-size: 13.5px; }
   .goal-strip-empty span { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
@@ -3908,35 +3911,45 @@ ${e.rawResponse || '—'}`;
     const deadline = new Date(setAt.getTime() + 90 * 24 * 60 * 60 * 1000);
     const dateFmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const stagePending = stagePendingSummary(summary);
+    const goalReached = progress.pct >= 100;
     return `<a class="goal-strip" href="#" id="goalStripLink">
       <div class="goal-strip-title">🎯 Your Goal &amp; Progress</div>
-      <div class="goal-strip-subtitle">Make your money — because you are worth it. →</div>
+      ${goalReached
+        ? `<div class="goal-strip-celebrate">🎉 Goal reached — congratulations!</div>`
+        : `<div class="goal-strip-subtitle">Make your money — because you are worth it. →</div>`}
+      <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
+      <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
       <div class="goal-strip-row">
         <div class="goal-strip-track"><div class="goal-strip-fill" style="width:${progress.pct}%"></div></div>
         <div class="goal-strip-value">${progress.pct}%</div>
       </div>
-      <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
-      <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
       ${stagePending.length ? `<div class="goal-strip-stages">
-        <div class="goal-strip-stages-sentence">Here's what's still pending to hit your goal:</div>
+        <div class="goal-strip-stages-sentence">${goalReached ? 'Your stage-by-stage breakdown:' : "Here's what's still pending to hit your goal:"}</div>
         <div class="goal-strip-pills">
-          ${stagePending.map(x => `<span class="goal-strip-pill" style="background:${STAGE_COLORS[x.stage]}">Stage ${x.stage} — ${esc(x.name)}: ${x.pending > 0 ? `${x.pending} pending` : '✓ Done'} (${x.done}/${x.target})</span>`).join('')}
+          ${stagePending.map(x => `<span class="goal-strip-pill ${x.pending > 0 ? 'pending' : 'done'}">Stage ${x.stage} — ${esc(x.name)} · ${x.done}/${x.target}${x.pending > 0 ? ` · ${x.pending} more needed` : ' ✓'}</span>`).join('')}
         </div>
       </div>` : ''}
     </a>`;
   }
   // How many of each planned stage are still needed to hit the goal —
   // target comes from the "Plan it yourself" allocation (stageTargetCounts),
-  // done is how many of that stage actually got paid since the goal
-  // started. Only listed for stages the designer has actually set a target
-  // for — an unplanned stage has nothing meaningful to compare against.
+  // done is how many DISTINCT PROJECTS actually paid that stage since the
+  // goal started. Counting distinct projects (not raw earnings_log rows)
+  // matters because a single project can legitimately produce more than one
+  // row per stage — renegotiating an already-paid stage's price and getting
+  // paid again appends a new row without replacing the old one (earnings_log
+  // is append-only by design) — so counting rows directly would inflate a
+  // stage's done count past its actual number of completed projects. Only
+  // listed for stages the designer has actually set a target for — an
+  // unplanned stage has nothing meaningful to compare against.
   function stagePendingSummary(summary) {
     const setAt = parseUtc(summary.goalSetAt);
     const targets = summary.stageTargetCounts || {};
-    const done = { 2: 0, 3: 0, 4: 0, 5: 0 };
+    const doneProjects = { 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() };
     summary.entries.forEach(e => {
-      if (done[e.stage] !== undefined && parseUtc(e.paidAt) >= setAt) done[e.stage]++;
+      if (doneProjects[e.stage] !== undefined && parseUtc(e.paidAt) >= setAt) doneProjects[e.stage].add(e.projectId);
     });
+    const done = { 2: doneProjects[2].size, 3: doneProjects[3].size, 4: doneProjects[4].size, 5: doneProjects[5].size };
     return STAGE_ORDER
       .filter(s => (targets[s] || 0) > 0)
       .map(s => ({ stage: s, name: STAGE_NAMES[s], target: targets[s], done: done[s], pending: Math.max(0, targets[s] - done[s]) }));
@@ -5030,8 +5043,8 @@ ${e.rawResponse || '—'}`;
           return `<div class="project-list-item" data-open-project="${p.id}">
           <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">updated ${esc(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
-            <span class="project-stage-pill" style="background:${STAGE_COLORS[stage]}" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>
-            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : ''}
+            <span class="project-stage-pill" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>
+            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : `<span class="project-earned-pill" style="visibility:hidden"></span>`}
             <button class="btn btn-sm btn-danger" data-delete-project="${p.id}">Delete</button>
           </div>
         </div>`;
