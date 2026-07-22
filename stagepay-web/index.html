@@ -1427,7 +1427,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         <div class="modal-card generate-modal-card">
           <div class="modal-head"><strong>Generate — ${esc(item.name || itemLabel(item.stage, item.item_key))}</strong>
             <button class="modal-close" id="genModalCloseBtn">×</button></div>
-          ${refFiles.length ? `<div class="attach-list"><div class="attach-list-label">🔴 Must attach these images</div><div class="attach-chip-row">${refFiles.map(f => attachChip(f.icon || '', f.fileName, f.key, f.kind)).join('')}</div></div>` : ''}
+          ${refFiles.length ? `<div class="attach-list"><div class="attach-list-label">🔴 Must attach these images in Google Flow</div><div class="attach-chip-row">${refFiles.map(f => attachChip(f.icon || '', f.fileName, f.key, f.kind)).join('')}</div></div>` : ''}
           <div class="generate-modal-body">
             <div class="generate-modal-left">
               <div id="genModalFields">${renderFieldsForm(item, genModalDraft.fields)}</div>
@@ -5526,7 +5526,6 @@ ${e.rawResponse || '—'}`;
       <div id="projectInfoBar" class="project-info-bar"></div>
       <div class="legend">
         <span>🎨 = persistent Stage 1 asset</span>
-        <span>🔴 = must attach in Google Flow</span>
       </div>
       <div id="swimlaneWrap" class="swimlane-wrap"></div>
       <div id="modalRoot"></div>
