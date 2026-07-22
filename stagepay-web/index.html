@@ -503,6 +503,17 @@
   .landing-pricing-value { font-size: 24px; font-weight: 800; color: var(--teal); }
   .landing-pricing-label { font-size: 12.5px; color: var(--text-faint); margin-top: 6px; line-height: 1.4; }
   @media (max-width: 640px) { .landing-pricing-grid { grid-template-columns: 1fr 1fr; gap: 10px; } }
+  .landing-faq-tabs { display: flex; gap: 6px; max-width: 620px; margin: 0 auto 20px; }
+  .landing-faq-tabs button { flex: 1; padding: 10px 8px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; cursor: pointer; color: var(--text); }
+  .landing-faq-tabs button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .landing-faq-list { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .landing-faq-item { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .landing-faq-question { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; font-weight: 700; font-size: 14px; text-align: left; }
+  .landing-faq-question .chevron { transition: transform 0.15s; flex-shrink: 0; color: var(--text-faint); }
+  .landing-faq-item.open .landing-faq-question .chevron { transform: rotate(90deg); }
+  .landing-faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.2s ease; }
+  .landing-faq-item.open .landing-faq-answer { max-height: 300px; }
+  .landing-faq-answer-inner { padding: 0 16px 16px; font-size: 13.5px; color: var(--text-soft); line-height: 1.6; }
   .landing-final { text-align: center; background: var(--ink); color: var(--paper); padding: 64px 22px; }
   .landing-final .landing-h2 { color: var(--paper); }
   .landing-final .landing-punch { font-size: 17px; font-weight: 700; margin-bottom: 6px; opacity: 0.85; }
@@ -945,6 +956,8 @@ Rules:
     stageCountsDraft: null, // {2:count,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     projectsTab: 'in-period', // 'in-period' | 'others' — only shown once a goal is set
     landingLang: (function () { try { return localStorage.getItem('stagepayLandingLang') || 'en'; } catch { return 'en'; } })(), // logged-out landing page only — English/Hindi/Tamil, remembered per browser
+    landingFaqTab: 0, // which of the 3 FAQ category tabs is active
+    landingFaqOpen: 0, // which question within that tab is expanded (-1 = none)
     showcaseItems: [], // designer's own curated public-showcase items
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
@@ -3969,6 +3982,26 @@ ${e.rawResponse || '—'}`;
       pricingStat3Value: '0%', pricingStat3Label: 'commission on your income, ever',
       pricingStat4Value: '₹0', pricingStat4Label: 'subscription or app usage fee',
       pricingNote: 'Your income goes straight to your own UPI ID — we never touch, hold, or route your money.',
+      faqTitle: 'Frequently Asked Questions',
+      faqTab1: 'Get New Customers Faster', faqTab2: 'Deliver UGC Faster', faqTab3: 'Earn Income Faster',
+      faqQ1_1: 'I already have a Canva/Instagram link — why do I need this?',
+      faqA1_1: 'Canva only shows what you last uploaded. Your Showcase pulls straight from real, paid client work already inside StagePay — add or remove pieces in seconds, so it’s never stale and never needs separate upkeep.',
+      faqQ1_2: 'What if I want to change what clients see before a big pitch?',
+      faqA1_2: 'That’s the point — add or remove your best work in seconds. It’s built to present the best version of yourself, exactly as you want, any time, not a page you set up once and forget.',
+      faqQ1_3: 'Will this actually look good on my clients’ phones?',
+      faqA1_3: 'Yes — mobile-optimized from the ground up, since that’s how almost every client will actually open your link, not a desktop page squeezed onto a small screen.',
+      faqQ2_1: 'I already just send files over WhatsApp or email — why change?',
+      faqA2_1: 'Those get buried in chat history and lost across devices. One link per project keeps everything — the work and the payment — in one place your client can always find again.',
+      faqQ2_2: 'Won’t this be confusing to explain to my client?',
+      faqA2_2: 'No explaining needed — you send one link, they see what’s ready to download and what’s left to pay. It’s simpler for them than digging through a WhatsApp thread.',
+      faqQ2_3: 'What if I have several projects going — will the links get mixed up?',
+      faqA2_3: 'Each project has exactly one link, permanently. Nothing to recreate, nothing to mislabel, nothing to accidentally send the wrong client.',
+      faqQ3_1: 'How do I know StagePay won’t just hold onto my money?',
+      faqA3_1: 'It can’t — StagePay isn’t a payment gateway. Every rupee goes straight to your own UPI ID. We never touch, hold, or route it.',
+      faqQ3_2: 'What if my client ghosts me after I deliver the work?',
+      faqA3_2: 'That’s exactly what this prevents — every stage is priced and approved before the next one starts, so you’re never building work nobody’s committed to paying for.',
+      faqQ3_3: 'Isn’t ₹49 a lot to pay every time I charge my income?',
+      faqA3_3: 'You only pay when you charge your income — whether it’s ₹1,000, ₹5,000, or ₹50,000, it’s just ₹49. No extra fees, no percentage of your income, no subscription.',
       footer: 'StagePay — projects are private to your account.',
     },
     hi: {
@@ -4008,6 +4041,26 @@ ${e.rawResponse || '—'}`;
       pricingStat3Value: '0%', pricingStat3Label: 'आपकी इनकम पर कमीशन, कभी नहीं',
       pricingStat4Value: '₹0', pricingStat4Label: 'सब्सक्रिप्शन या ऐप इस्तेमाल फीस',
       pricingNote: 'आपकी इनकम सीधे आपके अपने UPI ID पर जाती है — हम कभी भी आपके पैसे को छूते, रोकते या रूट नहीं करते।',
+      faqTitle: 'अक्सर पूछे जाने वाले सवाल',
+      faqTab1: 'तेज़ी से नए क्लाइंट पाएं', faqTab2: 'UGC तेज़ी से डिलीवर करें', faqTab3: 'तेज़ी से इनकम कमाएं',
+      faqQ1_1: 'मेरे पास पहले से Canva/Instagram लिंक है — मुझे इसकी क्या ज़रूरत है?',
+      faqA1_1: 'Canva सिर्फ वही दिखाता है जो आपने आखिरी बार अपलोड किया था। आपका Showcase सीधे StagePay के अंदर के असली, पेड क्लाइंट काम से बनता है — सेकंडों में पीस जोड़ें या हटाएं, ताकि यह कभी पुराना न लगे और अलग से मेंटेन भी न करना पड़े।',
+      faqQ1_2: 'अगर किसी बड़े पिच से पहले मुझे यह बदलना हो कि क्लाइंट क्या देखें?',
+      faqA1_2: 'यही तो खासियत है — सेकंडों में अपना बेहतरीन काम जोड़ें या हटाएं। यह आपको जैसा चाहें वैसा, जब चाहें, अपना सबसे अच्छा रूप दिखाने के लिए बनाया गया है — न कि एक बार बनाकर भूल जाने वाला पेज।',
+      faqQ1_3: 'क्या यह मेरे क्लाइंट के फ़ोन पर अच्छा दिखेगा?',
+      faqA1_3: 'हां — शुरू से ही मोबाइल के लिए ऑप्टिमाइज़ किया गया है, क्योंकि लगभग हर क्लाइंट आपका लिंक फ़ोन पर ही खोलेगा, न कि डेस्कटॉप के लिए बने पेज को छोटी स्क्रीन में समेटकर।',
+      faqQ2_1: 'मैं पहले से WhatsApp या ईमेल पर फ़ाइलें भेजता हूं — क्यों बदलूं?',
+      faqA2_1: 'वो चैट हिस्ट्री में दब जाती हैं और डिवाइस बदलने पर खो जाती हैं। हर प्रोजेक्ट का एक लिंक — काम और पेमेंट दोनों — एक ही जगह रखता है, जिसे आपका क्लाइंट हमेशा दोबारा ढूंढ सकता है।',
+      faqQ2_2: 'क्या यह मेरे क्लाइंट को समझाने में मुश्किल नहीं होगा?',
+      faqA2_2: 'कुछ समझाने की ज़रूरत नहीं — आप एक लिंक भेजते हैं, वे देखते हैं क्या डाउनलोड करने के लिए तैयार है और क्या पेमेंट बाकी है। यह उनके लिए WhatsApp थ्रेड खंगालने से कहीं आसान है।',
+      faqQ2_3: 'अगर मेरे कई प्रोजेक्ट चल रहे हों — क्या लिंक आपस में मिल जाएंगे?',
+      faqA2_3: 'हर प्रोजेक्ट का बिल्कुल एक ही, स्थायी लिंक होता है। कुछ भी दोबारा बनाने, गलत लेबल करने, या गलती से गलत क्लाइंट को भेजने की नौबत नहीं आती।',
+      faqQ3_1: 'मुझे कैसे पता चलेगा कि StagePay मेरा पैसा रोककर नहीं रखेगा?',
+      faqA3_1: 'यह हो ही नहीं सकता — StagePay कोई पेमेंट गेटवे नहीं है। हर रुपया सीधे आपके अपने UPI ID पर जाता है। हम इसे कभी छूते, रोकते या रूट नहीं करते।',
+      faqQ3_2: 'अगर काम डिलीवर करने के बाद मेरा क्लाइंट गायब हो जाए तो?',
+      faqA3_2: 'यही तो यह रोकता है — हर स्टेज तभी शुरू होती है जब पिछली अप्रूव और पेड हो चुकी हो, तो आप कभी ऐसा काम नहीं करते जिसके लिए किसी ने पैसे देने का वादा ही न किया हो।',
+      faqQ3_3: 'हर बार इनकम चार्ज करने पर ₹49 देना ज़्यादा नहीं है?',
+      faqA3_3: 'आप सिर्फ तभी भुगतान करते हैं जब आप अपनी इनकम चार्ज करते हैं — चाहे वह ₹1,000 हो, ₹5,000 हो, या ₹50,000 — यह सिर्फ ₹49 है। कोई अतिरिक्त फीस नहीं, आपकी इनकम का कोई प्रतिशत नहीं, कोई सब्सक्रिप्शन नहीं।',
       footer: 'StagePay — प्रोजेक्ट्स आपके अकाउंट तक निजी रहते हैं।',
     },
     ta: {
@@ -4047,6 +4100,26 @@ ${e.rawResponse || '—'}`;
       pricingStat3Value: '0%', pricingStat3Label: 'உங்கள் வருமானத்தின் மீது கமிஷன், ஒருபோதும் இல்லை',
       pricingStat4Value: '₹0', pricingStat4Label: 'சந்தா அல்லது ஆப் பயன்பாட்டு கட்டணம்',
       pricingNote: 'உங்கள் வருமானம் நேரடியாக உங்கள் சொந்த UPI ID-க்கு செல்கிறது — உங்கள் பணத்தை நாங்கள் ஒருபோதும் தொடுவதில்லை, வைத்திருப்பதில்லை, அல்லது வழிநடத்துவதில்லை.',
+      faqTitle: 'அடிக்கடி கேட்கப்படும் கேள்விகள்',
+      faqTab1: 'புதிய வாடிக்கையாளர்களை வேகமாகப் பெறுங்கள்', faqTab2: 'UGC-ஐ வேகமாக வழங்குங்கள்', faqTab3: 'வருமானத்தை வேகமாக ஈட்டுங்கள்',
+      faqQ1_1: 'எனக்கு ஏற்கனவே Canva/Instagram லிங்க் இருக்கிறதே — இது ஏன் தேவை?',
+      faqA1_1: 'Canva நீங்கள் கடைசியாக பதிவேற்றியதை மட்டுமே காட்டும். உங்கள் Showcase StagePay-க்குள் ஏற்கனவே இருக்கும் உண்மையான, பணம் பெற்ற வாடிக்கையாளர் வேலையிலிருந்து நேரடியாக உருவாகிறது — சில நொடிகளில் பகுதிகளைச் சேர்க்கவும் நீக்கவும் முடியும், எனவே இது ஒருபோதும் பழையதாகத் தெரியாது, தனியாக பராமரிக்கவும் தேவையில்லை.',
+      faqQ1_2: 'ஒரு பெரிய பிட்ச்-க்கு முன் வாடிக்கையாளர் என்ன பார்க்கிறார் என்பதை மாற்ற வேண்டுமெனில்?',
+      faqA1_2: 'அதுதான் முக்கியம் — உங்கள் சிறந்த வேலையை சில நொடிகளில் சேர்க்கலாம் அல்லது நீக்கலாம். நீங்கள் விரும்பும் நேரத்தில், விரும்பும் விதத்தில், உங்கள் சிறந்த வடிவத்தை காட்ட வடிவமைக்கப்பட்டது — ஒரு முறை அமைத்துவிட்டு மறந்துவிடும் பக்கம் அல்ல.',
+      faqQ1_3: 'இது என் வாடிக்கையாளர்களின் மொபைலில் நன்றாகத் தெரியுமா?',
+      faqA1_3: 'ஆம் — முதலிலிருந்தே மொபைலுக்கு ஏற்றவாறு வடிவமைக்கப்பட்டுள்ளது, ஏனெனில் கிட்டத்தட்ட ஒவ்வொரு வாடிக்கையாளரும் உங்கள் லிங்கை மொபைலில்தான் திறப்பார்கள், டெஸ்க்டாப்பிற்கான பக்கத்தை சிறிய திரையில் சுருக்கியதாக அல்ல.',
+      faqQ2_1: 'நான் ஏற்கனவே WhatsApp அல்லது ஈமெயில் மூலம் கோப்புகளை அனுப்புகிறேன் — ஏன் மாற வேண்டும்?',
+      faqA2_1: 'அவை சாட் வரலாற்றில் புதைந்து, சாதனங்களை மாற்றும்போது தொலைந்துவிடும். ஒரு திட்டத்திற்கு ஒரு லிங்க் — வேலையும் பணமும் — ஒரே இடத்தில் வைத்திருக்கும், உங்கள் வாடிக்கையாளர் எப்போதும் மீண்டும் கண்டுபிடிக்க முடியும்.',
+      faqQ2_2: 'இதை என் வாடிக்கையாளருக்கு விளக்குவது கடினமாக இருக்குமா?',
+      faqA2_2: 'விளக்க தேவையில்லை — நீங்கள் ஒரு லிங்க் அனுப்புகிறீர்கள், அவர்கள் என்ன பதிவிறக்கம் செய்யத் தயார் என்றும் என்ன பணம் செலுத்த வேண்டும் என்றும் பார்க்கிறார்கள். WhatsApp த்ரெட்டைத் தேடுவதை விட இது அவர்களுக்கு எளிது.',
+      faqQ2_3: 'எனக்கு பல திட்டங்கள் நடந்துகொண்டிருந்தால் — லிங்குகள் குழம்பிவிடுமா?',
+      faqA2_3: 'ஒவ்வொரு திட்டத்திற்கும் சரியாக ஒரே, நிரந்தர லிங்க் இருக்கும். எதையும் மீண்டும் உருவாக்க வேண்டியதில்லை, தவறாக லேபிள் செய்ய வேண்டியதில்லை, தவறான வாடிக்கையாளருக்கு தற்செயலாக அனுப்ப வேண்டியதில்லை.',
+      faqQ3_1: 'StagePay என் பணத்தை வைத்திருக்காது என்பது எனக்கு எப்படித் தெரியும்?',
+      faqA3_1: 'அது முடியாது — StagePay ஒரு பேமெண்ட் கேட்வே அல்ல. ஒவ்வொரு ரூபாயும் நேரடியாக உங்கள் சொந்த UPI ID-க்குச் செல்கிறது. நாங்கள் அதை ஒருபோதும் தொடுவதில்லை, வைத்திருப்பதில்லை, அல்லது வழிநடத்துவதில்லை.',
+      faqQ3_2: 'வேலையை வழங்கிய பிறகு என் வாடிக்கையாளர் மறைந்துவிட்டால்?',
+      faqA3_2: 'இதைத்தான் இது தடுக்கிறது — முந்தைய நிலை ஒப்புதல் பெற்று பணம் செலுத்தப்பட்ட பிறகுதான் அடுத்த நிலை தொடங்கும், எனவே யாரும் உறுதியளிக்காத வேலையை நீங்கள் ஒருபோதும் செய்ய மாட்டீர்கள்.',
+      faqQ3_3: 'ஒவ்வொரு முறையும் என் வருமானத்தை வசூலிக்கும்போது ₹49 அதிகமாக இல்லையா?',
+      faqA3_3: 'நீங்கள் உங்கள் வருமானத்தை வசூலிக்கும்போது மட்டுமே பணம் செலுத்துகிறீர்கள் — அது ₹1,000 ஆனாலும், ₹5,000 ஆனாலும், அல்லது ₹50,000 ஆனாலும், அது வெறும் ₹49 தான். கூடுதல் கட்டணங்கள் இல்லை, உங்கள் வருமானத்தின் சதவீதம் இல்லை, சந்தா இல்லை.',
       footer: 'StagePay — திட்டங்கள் உங்கள் கணக்கிற்கு மட்டுமே தனிப்பட்டவை.',
     },
   };
@@ -4200,6 +4273,8 @@ ${e.rawResponse || '—'}`;
           <p class="landing-lead" style="margin-top:18px">${t('pricingNote')}</p>
         </div>
 
+        <div class="landing-section" id="landingFaqRoot"></div>
+
         <div class="landing-final">
           <p class="landing-punch">${t('punchline')}</p>
           <h2 class="landing-h2">${t('heroH1')}</h2>
@@ -4209,7 +4284,43 @@ ${e.rawResponse || '—'}`;
         <div class="landing-footer">${t('footer')}</div>
       </div>
       <div id="modalRoot"></div>`;
+    renderFaqSectionInto();
     wireLoginScreen();
+  }
+  // 3 category tabs (each an accordion of 3 objection-style Q&As) — keys
+  // pair up with LANDING_I18N so the whole section stays translated.
+  const FAQ_TABS = [
+    { labelKey: 'faqTab1', items: [['faqQ1_1', 'faqA1_1'], ['faqQ1_2', 'faqA1_2'], ['faqQ1_3', 'faqA1_3']] },
+    { labelKey: 'faqTab2', items: [['faqQ2_1', 'faqA2_1'], ['faqQ2_2', 'faqA2_2'], ['faqQ2_3', 'faqA2_3']] },
+    { labelKey: 'faqTab3', items: [['faqQ3_1', 'faqA3_1'], ['faqQ3_2', 'faqA3_2'], ['faqQ3_3', 'faqA3_3']] },
+  ];
+  function renderFaqSectionInto() {
+    const root = document.getElementById('landingFaqRoot');
+    if (!root) return;
+    const t = (key) => LANDING_I18N[state.landingLang][key];
+    const tab = FAQ_TABS[state.landingFaqTab] || FAQ_TABS[0];
+    root.innerHTML = `
+      <h2 class="landing-h2">${t('faqTitle')}</h2>
+      <div class="landing-faq-tabs">
+        ${FAQ_TABS.map((tb, i) => `<button data-faq-tab="${i}" class="${i === state.landingFaqTab ? 'active' : ''}">${t(tb.labelKey)}</button>`).join('')}
+      </div>
+      <div class="landing-faq-list">
+        ${tab.items.map(([qKey, aKey], i) => `
+          <div class="landing-faq-item ${i === state.landingFaqOpen ? 'open' : ''}">
+            <div class="landing-faq-question" data-faq-question="${i}"><span>${t(qKey)}</span><span class="chevron">›</span></div>
+            <div class="landing-faq-answer"><div class="landing-faq-answer-inner">${t(aKey)}</div></div>
+          </div>`).join('')}
+      </div>`;
+    document.querySelectorAll('[data-faq-tab]').forEach((btn) => btn.addEventListener('click', () => {
+      state.landingFaqTab = Number(btn.getAttribute('data-faq-tab'));
+      state.landingFaqOpen = 0;
+      renderFaqSectionInto();
+    }));
+    document.querySelectorAll('[data-faq-question]').forEach((el) => el.addEventListener('click', () => {
+      const i = Number(el.getAttribute('data-faq-question'));
+      state.landingFaqOpen = state.landingFaqOpen === i ? -1 : i;
+      renderFaqSectionInto();
+    }));
   }
   // StagePay's swimlane/canvas UI genuinely doesn't work at phone widths —
   // rather than ship a half-broken mobile layout, block the actual sign-in
