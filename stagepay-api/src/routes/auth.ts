@@ -64,10 +64,57 @@ auth.get('/google/callback', async (c) => {
 auth.get('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ user: null });
-  const user = await c.env.DB.prepare('SELECT id, email, name, avatar_url, upi_id, showcase_slug, contact_link FROM users WHERE id = ?')
+  const user = await c.env.DB.prepare(
+    `SELECT id, email, name, avatar_url, upi_id, showcase_slug, contact_link,
+            status, role, instagram_url, youtube_url, ugc_description, free_credits_remaining
+     FROM users WHERE id = ?`
+  )
     .bind(sessionUserId)
     .first();
   return c.json({ user: user ?? null });
+});
+
+// Waitlist application — submitted once to move from 'pending_profile' to
+// 'waitlisted', but re-callable while still 'waitlisted' so a designer can
+// edit their answers before you review them. Not allowed once 'approved' —
+// there's nothing left to apply for at that point.
+auth.post('/me/apply', async (c) => {
+  const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const user = await c.env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(sessionUserId).first<{ status: string }>();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  if (user.status === 'approved') return c.json({ error: 'already_approved' }, 400);
+
+  const body = await c.req
+    .json<{ name?: string; role?: string; instagramUrl?: string; youtubeUrl?: string; ugcDescription?: string }>()
+    .catch(() => ({}) as { name?: string; role?: string; instagramUrl?: string; youtubeUrl?: string; ugcDescription?: string });
+
+  const name = (body.name || '').trim();
+  const role = (body.role || '').trim();
+  const instagramUrl = (body.instagramUrl || '').trim();
+  const youtubeUrl = (body.youtubeUrl || '').trim();
+  const ugcDescription = (body.ugcDescription || '').trim();
+
+  if (!name) return c.json({ error: 'name_required', message: 'Name cannot be empty.' }, 400);
+  if (!role) return c.json({ error: 'role_required', message: 'Please select what best describes you.' }, 400);
+  if (!/^https?:\/\//i.test(instagramUrl)) {
+    return c.json({ error: 'instagram_required', message: 'Please share your Instagram profile URL.' }, 400);
+  }
+  if (youtubeUrl && !/^https?:\/\//i.test(youtubeUrl)) {
+    return c.json({ error: 'invalid_youtube_url', message: 'That doesn’t look like a valid YouTube URL.' }, 400);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE users
+     SET name = ?, role = ?, instagram_url = ?, youtube_url = ?, ugc_description = ?,
+         status = 'waitlisted', applied_at = COALESCE(applied_at, datetime('now'))
+     WHERE id = ?`
+  )
+    .bind(name.slice(0, 100), role.slice(0, 50), instagramUrl.slice(0, 300), youtubeUrl.slice(0, 300) || null, ugcDescription.slice(0, 200) || null, sessionUserId)
+    .run();
+
+  return c.json({ ok: true });
 });
 
 // 3-30 lowercase letters/numbers/hyphens, no leading/trailing hyphen — a

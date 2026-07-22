@@ -14,7 +14,15 @@ CREATE TABLE IF NOT EXISTS users (
   stage_prices_paise TEXT NOT NULL DEFAULT '{}', -- Goal Tracker manual allocation: {"2":.., "3":.., "4":.., "5":..} — durable, survives across goals
   stage_target_counts TEXT NOT NULL DEFAULT '{}', -- Goal Tracker manual allocation: target count per stage for the CURRENT goal — reset whenever a new goal is set
   showcase_slug TEXT, -- optional custom handle for a nicer /showcase/{slug} URL — nullable, falls back to the raw id
-  contact_link TEXT, -- optional public contact link (Instagram/LinkedIn/site/mailto:) shown on the showcase page — an alternative to publishing a personal phone number
+  contact_link TEXT, -- optional public contact link (Instagram/LinkedIn/site) shown on the showcase page — an alternative to publishing a personal phone number
+  status TEXT NOT NULL DEFAULT 'pending_profile', -- 'pending_profile' | 'waitlisted' | 'approved' — gates access until manually approved
+  role TEXT, -- from the waitlist form: 'ai_creator' | 'non_ai_creator' | 'agency' | 'other'
+  instagram_url TEXT,
+  youtube_url TEXT,
+  ugc_description TEXT,
+  applied_at TEXT,
+  approved_at TEXT,
+  free_credits_remaining INTEGER NOT NULL DEFAULT 0, -- payment credits: spent when pricing a stage that isn't already an open, unpaid receivable
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_showcase_slug ON users(showcase_slug);
@@ -175,3 +183,20 @@ CREATE TABLE IF NOT EXISTS earnings_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_earnings_log_project ON earnings_log(project_id);
+
+-- A pending/approved/rejected request to buy more payment credits — settled
+-- by the designer paying the admin's own UPI ID directly (no gateway) and
+-- submitting the UTR here for manual verification via the admin queue.
+CREATE TABLE IF NOT EXISTS credit_purchase_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pack_size INTEGER NOT NULL,
+  amount_paise INTEGER NOT NULL,
+  utr TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_purchase_requests_user ON credit_purchase_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_purchase_requests_status ON credit_purchase_requests(status);

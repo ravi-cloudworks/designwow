@@ -18,6 +18,9 @@ FRONTEND_ORIGIN = "https://stagepay.pages.dev"
 # added to its authorized-redirects list, and StagePay's own users table.
 GOOGLE_CLIENT_ID = "1090261704938-0oains3voanh0hjduj03v1pdcn1d3ld9.apps.googleusercontent.com"
 GOOGLE_REDIRECT_URI = "https://stagepay.pages.dev/api/auth/google/callback"
+# Sole reviewer for the waitlist/credit-request admin queue — checked
+# against the logged-in session's own email, no roles table needed for one admin.
+ADMIN_EMAIL = "ravi.cloudworks@gmail.com"
 
 # Secrets (set via `wrangler secret put`, not stored here):
 #   GEMINI_API_KEY

@@ -421,6 +421,40 @@
   .login-card .mark { width: 48px; height: 48px; border-radius: 12px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 22px; margin: 0 auto 16px; }
   .google-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none; color: var(--text); margin-top: 16px; }
 
+  /* ---------- Waitlist gate ---------- */
+  .waitlist-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .waitlist-card { max-width: 440px; width: 100%; text-align: left; }
+  .waitlist-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
+  .waitlist-brand .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .waitlist-recap { border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px; margin: 16px 0; }
+  .waitlist-recap-row { display: flex; gap: 10px; padding: 10px 0; font-size: 13px; border-bottom: 1px solid var(--line-soft); }
+  .waitlist-recap-row:last-child { border-bottom: none; }
+  .waitlist-recap-row .label { width: 90px; flex-shrink: 0; color: var(--text-faint); font-weight: 700; }
+  .waitlist-recap-row a { color: var(--teal); }
+
+  /* ---------- Admin queue ---------- */
+  .admin-page { max-width: 720px; margin: 0 auto; padding: 24px 16px 56px; }
+  .admin-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .admin-tabs button { flex: 1; padding: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--text); }
+  .admin-tabs button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .admin-row { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); }
+  .admin-row-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .admin-row-meta { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+  .admin-row-meta a { color: var(--teal); }
+
+  /* ---------- Buy Credits ---------- */
+  .credit-pack-row { display: flex; gap: 10px; margin: 12px 0; }
+  .credit-pack { flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; }
+  .credit-pack.selected { border-color: var(--teal); background: var(--teal-soft); }
+  .credit-pack .credit-pack-count { font-size: 15px; font-weight: 800; }
+  .credit-pack .credit-pack-price { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+  .credit-request-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
+  .credit-request-row:last-child { border-bottom: none; }
+  .credit-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .credit-status.pending { background: var(--amber-soft); color: var(--amber); }
+  .credit-status.approved { background: var(--moss-soft); color: var(--moss); }
+  .credit-status.rejected { background: var(--crimson-soft); color: var(--crimson); }
+
   /* ---------- Landing page ---------- */
   .landing { background: var(--paper); }
   .landing-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -843,6 +877,43 @@ Rules:
       const r = await fetch(`${API_BASE}/api/showcase/${userId}/public`);
       if (!r.ok) throw new Error('not_found');
       return r.json();
+    },
+    async applyWaitlist(body) {
+      const r = await fetch(`${API_BASE}/api/auth/me/apply`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async getCredits() {
+      const r = await fetch(`${API_BASE}/api/credits`, { credentials: 'include' });
+      if (!r.ok) return { freeCreditsRemaining: 0, adminUpiId: '', requests: [] };
+      return r.json();
+    },
+    async requestCreditPurchase(packSize, utr) {
+      const r = await fetch(`${API_BASE}/api/credits/purchase-request`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packSize, utr }),
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminListWaitlist() {
+      const r = await fetch(`${API_BASE}/api/admin/waitlist`, { credentials: 'include' });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminApproveWaitlist(userId) {
+      const r = await fetch(`${API_BASE}/api/admin/waitlist/${userId}/approve`, { method: 'POST', credentials: 'include' });
+      return r.ok;
+    },
+    async adminListCreditRequests() {
+      const r = await fetch(`${API_BASE}/api/admin/credit-requests`, { credentials: 'include' });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminApproveCreditRequest(id) {
+      const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/approve`, { method: 'POST', credentials: 'include' });
+      return r.ok;
+    },
+    async adminRejectCreditRequest(id) {
+      const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/reject`, { method: 'POST', credentials: 'include' });
+      return r.ok;
     },
   };
 
@@ -3472,37 +3543,65 @@ ${e.rawResponse || '—'}`;
           ? `🎯 ${formatRupees(gapPaise)} more to hit your 3-month goal (${progress.pct}% there, ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left).`
           : `🎉 You've already hit your 3-month goal of ${formatRupees(summary.goalAmountPaise)}!`)
       : '';
+    // Same rule as the backend: a credit is only ever needed to open a new
+    // receivable (no entry yet, or the last round was already paid) — a
+    // plain renegotiation of a still-open, unpaid amount is always free.
+    const credits = (state.user && state.user.free_credits_remaining) || 0;
+    const isNewReceivable = !entry || !!entry.paid;
+    const blocked = isNewReceivable && credits <= 0;
+    const creditColor = credits <= 0 ? 'var(--crimson)' : credits <= 2 ? 'var(--amber)' : 'var(--teal)';
     root.innerHTML = `
       <div class="modal-overlay" id="stageAmountModalOverlay">
         <div class="modal-card" style="max-width:400px">
           <div class="modal-head"><strong>💰 Amount — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
           <div style="padding:16px">
-            ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
-              <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
-            </div>` : ''}
-            <div class="field">
-              <label for="stageAmountInput">Amount to charge (₹)</label>
-              <input id="stageAmountInput" type="number" min="1" step="0.01" value="${entry ? (entry.amountPaise / 100) : ''}" placeholder="e.g. 1500">
-            </div>
-            ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
-            ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
-            <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update amount' : 'Set amount'}</button>
+            <p style="font-size:12.5px;font-weight:700;color:${creditColor};margin:0 0 12px">💳 ${credits} payment credit${credits === 1 ? '' : 's'} remaining</p>
+            ${blocked ? `
+              <p style="font-size:13px;margin-bottom:14px">You're out of payment credits — buy more to price this stage.</p>
+              <button class="btn btn-primary" id="stageAmountBuyCreditsBtn" style="width:100%">Buy Credits</button>
+            ` : `
+              ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
+                <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
+              </div>` : ''}
+              <div class="field">
+                <label for="stageAmountInput">Amount to charge (₹)</label>
+                <input id="stageAmountInput" type="number" min="1" step="0.01" value="${entry ? (entry.amountPaise / 100) : ''}" placeholder="e.g. 1500">
+              </div>
+              ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
+              ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
+              <p style="font-size:11px;color:var(--text-faint);margin-top:8px">${isNewReceivable ? 'Setting this amount uses 1 payment credit — used once you set the price, whether or not the customer actually pays it.' : "Renegotiating this still-open amount doesn't use another credit."}</p>
+              ${isNewReceivable && credits > 0 && credits <= 2 ? `<p style="font-size:11px;color:var(--amber);margin-top:4px">⚠ Only ${credits} credit${credits === 1 ? '' : 's'} left — buy more before you run out.</p>` : ''}
+              <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update amount' : 'Set amount'}</button>
+            `}
           </div>
         </div>
       </div>`;
     document.getElementById('stageAmountModalCloseBtn').addEventListener('click', closeStageAmountModal);
     document.getElementById('stageAmountModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageAmountModalOverlay') closeStageAmountModal(); });
+    if (blocked) {
+      document.getElementById('stageAmountBuyCreditsBtn').addEventListener('click', () => {
+        closeStageAmountModal();
+        openBuyCreditsModal();
+      });
+      return;
+    }
     document.querySelectorAll('[data-amount-pill]').forEach(el => el.addEventListener('click', () => {
       document.getElementById('stageAmountInput').value = (Number(el.getAttribute('data-amount-pill')) / 100).toString();
     }));
     document.getElementById('stageAmountSaveBtn').addEventListener('click', async () => {
       const amountRupees = parseFloat(document.getElementById('stageAmountInput').value);
-      if (!amountRupees || amountRupees <= 0) { toast('Enter a valid amount'); return; }
+      if (!amountRupees || amountRupees <= 0) { toast('Enter a valid amount', true); return; }
       const saveBtn = document.getElementById('stageAmountSaveBtn');
       saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
       const amountPaise = Math.round(amountRupees * 100);
       const res = await api.setStageAmount(state.project.id, stage, amountPaise);
-      if (res.amountPaise === undefined) { toast('Could not save amount'); saveBtn.disabled = false; saveBtn.textContent = entry ? 'Update amount' : 'Set amount'; return; }
+      if (res.amountPaise === undefined) {
+        toast(res.message || 'Could not save amount', true);
+        saveBtn.disabled = false; saveBtn.textContent = entry ? 'Update amount' : 'Set amount';
+        if (res.error === 'out_of_credits') renderStageAmountModal();
+        return;
+      }
+      if (state.user) state.user.free_credits_remaining = res.freeCreditsRemaining;
       const wasResetPaid = entry && entry.paid && !res.paid;
       const others = state.paymentLinks.filter(l => l.stage !== stage);
       // Repricing never touches earnings_log, so any earlier rounds for this
@@ -3734,6 +3833,11 @@ ${e.rawResponse || '—'}`;
             <input id="settingsUpiId" type="text" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}" maxlength="50">
             <p style="font-size:11.5px;color:var(--text-faint);margin-top:6px">Used to build the payment QR code on every stage's payment link. One UPI ID per account.</p>
           </div>
+          <div class="field" style="padding:0 16px 16px;border-top:1px solid var(--line-soft);padding-top:16px">
+            <label>Payment Credits</label>
+            <p style="font-size:13px;font-weight:700;margin:2px 0 8px">💳 ${state.user.free_credits_remaining ?? 0} remaining</p>
+            <button class="btn btn-sm" id="settingsBuyCreditsBtn">Buy more credits</button>
+          </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px">
             <button class="btn btn-primary" id="settingsSaveBtn">Save</button>
           </div>
@@ -3741,6 +3845,10 @@ ${e.rawResponse || '—'}`;
       </div>`;
     document.getElementById('settingsModalCloseBtn').addEventListener('click', closeSettingsModal);
     document.getElementById('settingsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'settingsModalOverlay') closeSettingsModal(); });
+    document.getElementById('settingsBuyCreditsBtn').addEventListener('click', () => {
+      closeSettingsModal();
+      openBuyCreditsModal();
+    });
     document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
       const btn = document.getElementById('settingsSaveBtn');
       const name = document.getElementById('settingsName').value.trim();
@@ -4057,6 +4165,330 @@ ${e.rawResponse || '—'}`;
     document.getElementById('desktopOnlyCloseBtn').addEventListener('click', close);
     document.getElementById('desktopOnlyOkBtn').addEventListener('click', close);
     document.getElementById('desktopOnlyOverlay').addEventListener('click', (e) => { if (e.target.id === 'desktopOnlyOverlay') close(); });
+  }
+
+  // ---------- Waitlist gate ----------
+  const WAITLIST_ROLES = [
+    ['ai_creator', 'AI UGC Creator'],
+    ['non_ai_creator', 'Influencer / Creator'],
+    ['agency', 'Agency or Team'],
+    ['other', 'Other'],
+  ];
+  function waitlistRoleLabel(key) {
+    const found = WAITLIST_ROLES.find(([k]) => k === key);
+    return found ? found[1] : '—';
+  }
+  let waitlistFormDraft = null; // { name, role, instagramUrl, youtubeUrl, ugcDescription } — only while the form is open
+  async function renderWaitlistScreen() {
+    const app = document.getElementById('app');
+    app.style.cssText = '';
+    if (state.user.status === 'waitlisted' && !waitlistFormDraft) {
+      renderWaitlistRecap();
+      return;
+    }
+    if (!waitlistFormDraft) {
+      waitlistFormDraft = {
+        name: state.user.name || '',
+        role: state.user.role || '',
+        instagramUrl: state.user.instagram_url || '',
+        youtubeUrl: state.user.youtube_url || '',
+        ugcDescription: state.user.ugc_description || '',
+      };
+    }
+    renderWaitlistForm();
+  }
+  function renderWaitlistForm() {
+    const app = document.getElementById('app');
+    const d = waitlistFormDraft;
+    app.innerHTML = `
+      <div class="waitlist-screen">
+        <div class="waitlist-card">
+          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong></div>
+          <h2 style="margin:0 0 6px">You're almost in</h2>
+          <p style="color:var(--text-faint);font-size:13px;margin:0 0 18px">We review every application by hand to keep StagePay a great place for real UGC creators. Takes under a minute.</p>
+          <div class="field">
+            <label for="waitlistName">Name</label>
+            <input id="waitlistName" type="text" value="${esc(d.name)}" maxlength="100">
+          </div>
+          <div class="field">
+            <label>What best describes you?</label>
+            <div class="pill-row">
+              ${WAITLIST_ROLES.map(([key, label]) => `<button type="button" class="pill ${d.role === key ? 'selected' : ''}" data-waitlist-role="${key}">${esc(label)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="field">
+            <label for="waitlistInstagram">Instagram profile</label>
+            <input id="waitlistInstagram" type="text" placeholder="https://instagram.com/yourhandle" value="${esc(d.instagramUrl)}" maxlength="300">
+          </div>
+          <div class="field">
+            <label for="waitlistYoutube">YouTube channel (optional)</label>
+            <input id="waitlistYoutube" type="text" placeholder="https://youtube.com/@yourhandle" value="${esc(d.youtubeUrl)}" maxlength="300">
+          </div>
+          <div class="field">
+            <label for="waitlistDescription">What kind of UGC do you make? (optional)</label>
+            <input id="waitlistDescription" type="text" placeholder="e.g. skincare demos, tech unboxings, comedy skits" value="${esc(d.ugcDescription)}" maxlength="200">
+          </div>
+          <button class="btn btn-primary" id="waitlistSubmitBtn" style="width:100%;margin-top:8px">Submit Application</button>
+        </div>
+      </div>`;
+    document.querySelectorAll('[data-waitlist-role]').forEach((btn) => btn.addEventListener('click', () => {
+      waitlistFormDraft.role = btn.getAttribute('data-waitlist-role');
+      renderWaitlistForm();
+    }));
+    document.getElementById('waitlistSubmitBtn').addEventListener('click', async () => {
+      waitlistFormDraft.name = document.getElementById('waitlistName').value;
+      waitlistFormDraft.instagramUrl = document.getElementById('waitlistInstagram').value;
+      waitlistFormDraft.youtubeUrl = document.getElementById('waitlistYoutube').value;
+      waitlistFormDraft.ugcDescription = document.getElementById('waitlistDescription').value;
+      const btn = document.getElementById('waitlistSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      const { ok, body } = await api.applyWaitlist({
+        name: waitlistFormDraft.name, role: waitlistFormDraft.role, instagramUrl: waitlistFormDraft.instagramUrl,
+        youtubeUrl: waitlistFormDraft.youtubeUrl, ugcDescription: waitlistFormDraft.ugcDescription,
+      });
+      if (!ok) {
+        toast(body.message || 'Could not submit application', true);
+        btn.disabled = false; btn.textContent = 'Submit Application';
+        return;
+      }
+      state.user = await api.me();
+      waitlistFormDraft = null;
+      renderWaitlistScreen();
+    });
+  }
+  function renderWaitlistRecap() {
+    const app = document.getElementById('app');
+    const u = state.user;
+    const row = (label, value) => `<div class="waitlist-recap-row"><span class="label">${esc(label)}</span><span>${value}</span></div>`;
+    app.innerHTML = `
+      <div class="waitlist-screen">
+        <div class="waitlist-card">
+          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong></div>
+          <h2 style="margin:0 0 6px">⏳ You're on the waitlist</h2>
+          <p style="color:var(--text-faint);font-size:13px;margin:0">We review applications by hand — you'll hear from us soon.</p>
+          <div class="waitlist-recap">
+            ${row('Name', esc(u.name || ''))}
+            ${row('Role', esc(waitlistRoleLabel(u.role)))}
+            ${row('Instagram', u.instagram_url ? `<a href="${esc(u.instagram_url)}" target="_blank" rel="noopener">${esc(u.instagram_url)}</a>` : '—')}
+            ${row('YouTube', u.youtube_url ? `<a href="${esc(u.youtube_url)}" target="_blank" rel="noopener">${esc(u.youtube_url)}</a>` : 'Not provided')}
+            ${row('What you make', esc(u.ugc_description || '—'))}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="waitlistEditBtn">Edit Application</button>
+            <button class="btn btn-primary" id="waitlistRefreshBtn">Refresh Status</button>
+          </div>
+          <p style="margin-top:18px"><a href="#" id="waitlistLogoutLink" style="color:var(--text-faint);font-size:12.5px">Log out</a></p>
+        </div>
+      </div>`;
+    document.getElementById('waitlistEditBtn').addEventListener('click', () => {
+      waitlistFormDraft = {
+        name: u.name || '', role: u.role || '', instagramUrl: u.instagram_url || '',
+        youtubeUrl: u.youtube_url || '', ugcDescription: u.ugc_description || '',
+      };
+      renderWaitlistScreen();
+    });
+    document.getElementById('waitlistRefreshBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('waitlistRefreshBtn');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const fresh = await api.me();
+      state.user = fresh;
+      if (fresh && fresh.status === 'approved') {
+        state.screen = 'projects';
+        renderApp();
+        return;
+      }
+      btn.disabled = false; btn.textContent = 'Refresh Status';
+      toast('Still under review — check back soon');
+    });
+    document.getElementById('waitlistLogoutLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await api.logout();
+      state.user = null;
+      state.screen = 'login';
+      renderApp();
+    });
+  }
+
+  // ---------- Buy Credits modal ----------
+  const CREDIT_PACKS = [[5, 24500], [10, 49000]];
+  let buyCreditsDraft = null;
+  async function openBuyCreditsModal() {
+    const data = await api.getCredits();
+    buyCreditsDraft = { ...data, selectedPack: null };
+    renderBuyCreditsModal();
+  }
+  function closeBuyCreditsModal() {
+    buyCreditsDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderBuyCreditsModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !buyCreditsDraft) { if (root) root.innerHTML = ''; return; }
+    const { freeCreditsRemaining, adminUpiId, requests, selectedPack } = buyCreditsDraft;
+    root.innerHTML = `
+      <div class="modal-overlay" id="buyCreditsOverlay">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-head"><strong>💳 Buy Payment Credits</strong><button class="modal-close" id="buyCreditsCloseBtn">×</button></div>
+          <div style="padding:16px">
+            <p style="font-size:13px;margin:0 0 12px">You have <strong>${freeCreditsRemaining}</strong> credit${freeCreditsRemaining === 1 ? '' : 's'} remaining.</p>
+            <div class="credit-pack-row">
+              ${CREDIT_PACKS.map(([count, paise]) => `
+                <div class="credit-pack ${selectedPack === count ? 'selected' : ''}" data-credit-pack="${count}">
+                  <div class="credit-pack-count">${count} credits</div>
+                  <div class="credit-pack-price">₹${(paise / 100).toFixed(0)}</div>
+                </div>`).join('')}
+            </div>
+            ${selectedPack ? `
+              <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:6px">
+                <p style="font-size:13px;margin:0 0 10px">Pay ₹${(CREDIT_PACKS.find((p) => p[0] === selectedPack)[1] / 100).toFixed(0)} to this UPI ID:</p>
+                <div id="buyCreditsQrWrap" style="text-align:center;margin-bottom:10px"><p>Generating QR…</p></div>
+                <p style="text-align:center;font-size:13px;font-weight:700">${esc(adminUpiId || 'UPI ID not set up yet')}</p>
+                <div class="field" style="margin-top:14px">
+                  <label for="buyCreditsUtr">UTR / reference number</label>
+                  <input id="buyCreditsUtr" type="text" placeholder="e.g. 402913887561" maxlength="100">
+                </div>
+                <button class="btn btn-primary" id="buyCreditsSubmitBtn" style="width:100%">Submit for Verification</button>
+              </div>` : ''}
+            ${requests.length ? `
+              <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:14px">
+                <p style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em;margin:0 0 6px">Your requests</p>
+                ${requests.map((r) => `
+                  <div class="credit-request-row">
+                    <span>${r.pack_size} credits · ₹${(r.amount_paise / 100).toFixed(0)}</span>
+                    <span class="credit-status ${r.status}">${esc(r.status)}</span>
+                  </div>`).join('')}
+              </div>` : ''}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('buyCreditsCloseBtn').addEventListener('click', closeBuyCreditsModal);
+    document.getElementById('buyCreditsOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyCreditsOverlay') closeBuyCreditsModal(); });
+    document.querySelectorAll('[data-credit-pack]').forEach((el) => el.addEventListener('click', () => {
+      buyCreditsDraft.selectedPack = Number(el.getAttribute('data-credit-pack'));
+      renderBuyCreditsModal();
+    }));
+    if (!selectedPack) return;
+    const amountRupees = CREDIT_PACKS.find((p) => p[0] === selectedPack)[1] / 100;
+    const qrWrap = document.getElementById('buyCreditsQrWrap');
+    if (qrWrap && adminUpiId) {
+      const upiLink = buildUpiLink({ upiId: adminUpiId, payeeName: 'StagePay', amountRupees, note: `${selectedPack} payment credits` });
+      import('https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm')
+        .then(({ default: QRCode }) => QRCode.toDataURL(upiLink, { width: 200, margin: 1 }))
+        .then((dataUrl) => { qrWrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" alt="UPI payment QR code">`; })
+        .catch(() => { qrWrap.innerHTML = '<p>Could not generate QR code.</p>'; });
+    } else if (qrWrap) {
+      qrWrap.innerHTML = '<p>Admin UPI ID not set up yet — contact support directly.</p>';
+    }
+    document.getElementById('buyCreditsSubmitBtn').addEventListener('click', async () => {
+      const utr = document.getElementById('buyCreditsUtr').value.trim();
+      if (!utr) { toast('Enter your UTR / reference number', true); return; }
+      const btn = document.getElementById('buyCreditsSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      const { ok, body } = await api.requestCreditPurchase(selectedPack, utr);
+      if (!ok) {
+        toast(body.message || 'Could not submit request', true);
+        btn.disabled = false; btn.textContent = 'Submit for Verification';
+        return;
+      }
+      toast('Submitted — usually verified within a few hours');
+      const fresh = await api.getCredits();
+      buyCreditsDraft = { ...fresh, selectedPack: null };
+      renderBuyCreditsModal();
+    });
+  }
+
+  // ---------- Admin queue (?screen=admin) ----------
+  let adminTab = 'waitlist';
+  let adminData = { applicants: [], creditRequests: [] };
+  async function renderAdminScreen() {
+    const app = document.getElementById('app');
+    app.style.cssText = '';
+    app.innerHTML = `<div class="admin-page"><p>Loading…</p></div>`;
+    const [waitlistRes, creditsRes] = await Promise.all([api.adminListWaitlist(), api.adminListCreditRequests()]);
+    if (!waitlistRes.ok || !creditsRes.ok) {
+      app.innerHTML = `<div class="admin-page"><p>You don't have access to this page.</p></div>`;
+      return;
+    }
+    adminData.applicants = waitlistRes.body.applicants || [];
+    adminData.creditRequests = creditsRes.body.requests || [];
+    renderAdminScreenInto();
+  }
+  function renderAdminScreenInto() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="admin-page">
+        <div class="section-head-row"><span class="section-title">🗂 Admin Queue</span></div>
+        <div class="admin-tabs">
+          <button data-admin-tab="waitlist" class="${adminTab === 'waitlist' ? 'active' : ''}">Waitlist (${adminData.applicants.length})</button>
+          <button data-admin-tab="credits" class="${adminTab === 'credits' ? 'active' : ''}">Credit Requests (${adminData.creditRequests.length})</button>
+        </div>
+        ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : renderAdminCreditsTab()}
+      </div>`;
+    wireAdminScreen();
+  }
+  function renderAdminWaitlistTab() {
+    if (!adminData.applicants.length) return '<p class="empty-note">No pending applications.</p>';
+    return adminData.applicants.map((a) => `
+      <div class="admin-row">
+        <div class="admin-row-head">
+          <strong>${esc(a.name)}</strong>
+          <button class="btn btn-sm btn-primary" data-admin-approve-waitlist="${a.id}">Approve</button>
+        </div>
+        <div class="admin-row-meta">
+          ${esc(waitlistRoleLabel(a.role))}
+          ${a.instagram_url ? ` · <a href="${esc(a.instagram_url)}" target="_blank" rel="noopener">Instagram ↗</a>` : ''}
+          ${a.youtube_url ? ` · <a href="${esc(a.youtube_url)}" target="_blank" rel="noopener">YouTube ↗</a>` : ''}
+          · Applied ${a.applied_at ? esc(formatIST(a.applied_at)) : '—'}
+        </div>
+        ${a.ugc_description ? `<p style="font-size:12.5px;margin:6px 0 0">"${esc(a.ugc_description)}"</p>` : ''}
+      </div>`).join('');
+  }
+  function renderAdminCreditsTab() {
+    if (!adminData.creditRequests.length) return '<p class="empty-note">No pending credit requests.</p>';
+    return adminData.creditRequests.map((r) => `
+      <div class="admin-row">
+        <div class="admin-row-head"><strong>${esc(r.user_name)}</strong> <span style="color:var(--text-faint);font-size:11.5px">(${esc(r.user_email)})</span></div>
+        <div class="admin-row-meta">${r.pack_size} credits · ₹${(r.amount_paise / 100).toFixed(0)} · UTR: ${esc(r.utr)} · Submitted ${esc(formatIST(r.created_at))}</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-sm" data-admin-reject-credit="${r.id}">Reject</button>
+          <button class="btn btn-sm btn-primary" data-admin-approve-credit="${r.id}">Approve</button>
+        </div>
+      </div>`).join('');
+  }
+  function wireAdminScreen() {
+    document.querySelectorAll('[data-admin-tab]').forEach((btn) => btn.addEventListener('click', () => {
+      adminTab = btn.getAttribute('data-admin-tab');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-approve-waitlist]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-approve-waitlist');
+      btn.disabled = true; btn.textContent = 'Approving…';
+      const ok = await api.adminApproveWaitlist(id);
+      if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
+      adminData.applicants = adminData.applicants.filter((a) => a.id !== id);
+      toast('Approved — 10 credits granted');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-approve-credit]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-approve-credit');
+      const req = adminData.creditRequests.find((r) => r.id === id);
+      btn.disabled = true; btn.textContent = 'Approving…';
+      const ok = await api.adminApproveCreditRequest(id);
+      if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
+      adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
+      toast(req ? `${req.pack_size} credits added to ${req.user_name}` : 'Approved');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-reject-credit]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-reject-credit');
+      btn.disabled = true; btn.textContent = 'Rejecting…';
+      const ok = await api.adminRejectCreditRequest(id);
+      if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
+      adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
+      toast('Request rejected');
+      renderAdminScreenInto();
+    }));
   }
 
   // ---------- Projects screen ----------
@@ -5691,6 +6123,7 @@ ${e.rawResponse || '—'}`;
     const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
     state.paymentLinks = paymentLinkRes.stages || [];
+    if (state.user && paymentLinkRes.freeCreditsRemaining !== undefined) state.user.free_credits_remaining = paymentLinkRes.freeCreditsRemaining;
     const stageLocksRes = await api.getStageLocks(id);
     state.stageLocks = stageLocksRes.locks || [];
     // Goal Tracker data — used by the Set Amount modal to suggest this
@@ -5707,6 +6140,8 @@ ${e.rawResponse || '—'}`;
   async function renderApp() {
     const app = document.getElementById('app');
     if (state.screen === 'login') { app.style.cssText = ''; renderLoginScreen(); return; }
+    if (state.screen === 'waitlist') { app.style.cssText = ''; await renderWaitlistScreen(); return; }
+    if (state.screen === 'admin') { app.style.cssText = ''; await renderAdminScreen(); return; }
     if (state.screen === 'projects') { app.style.cssText = ''; await renderProjectsScreen(); return; }
     if (state.screen === 'goals') { app.style.cssText = ''; await renderGoalsScreen(); return; }
     if (state.screen === 'showcase') { app.style.cssText = ''; await renderShowcaseScreen(); return; }
@@ -5979,6 +6414,13 @@ ${e.rawResponse || '—'}`;
       app.innerHTML = `<div class="showcase-page"><p>This showcase isn't available.</p></div>`;
       return;
     }
+    if (data.unavailable) {
+      app.innerHTML = `<div class="showcase-page"><div class="showcase-page-inner" style="text-align:center;padding-top:60px">
+        <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit;justify-content:center"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span></div></a>
+        <p style="color:var(--text-faint)">Portfolio temporarily unavailable — check back soon.</p>
+      </div></div>`;
+      return;
+    }
     const { profile, items } = data;
     const grouped = groupPublicShowcaseItems(items);
     app.innerHTML = `
@@ -6015,6 +6457,18 @@ ${e.rawResponse || '—'}`;
     if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
+    if (new URLSearchParams(location.search).get('screen') === 'admin') {
+      state.screen = 'admin';
+      renderApp();
+      return;
+    }
+    // Gated before anything else — a not-yet-approved account can't reach
+    // any project, goal, or showcase content regardless of the URL.
+    if (state.user.status !== 'approved') {
+      state.screen = 'waitlist';
+      renderApp();
+      return;
+    }
     const projectId = new URLSearchParams(location.search).get('p');
     if (projectId) {
       try {

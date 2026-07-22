@@ -197,10 +197,15 @@ showcase.delete('/showcase/:itemId', async (c) => {
 // real id regardless of which URL form a visitor used.
 showcase.get('/showcase/:userId/public', async (c) => {
   const param = c.req.param('userId');
-  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url, contact_link FROM users WHERE id = ? OR showcase_slug = ?')
+  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url, contact_link, free_credits_remaining FROM users WHERE id = ? OR showcase_slug = ?')
     .bind(param, param)
-    .first<{ id: string; name: string; avatar_url: string | null; contact_link: string | null }>();
+    .first<{ id: string; name: string; avatar_url: string | null; contact_link: string | null; free_credits_remaining: number }>();
   if (!profile) return c.json({ error: 'not_found' }, 404);
+
+  // Paused rather than 404'd deliberately — this is the designer's own
+  // sales page, often visited by their own prospective client, so it reads
+  // as routine unavailability rather than exposing a billing lapse.
+  if (profile.free_credits_remaining <= 0) return c.json({ unavailable: true });
 
   // item_key (via the showcase item's source project item, if it has one)
   // lets the public page group by category (Storyboard/Characters/Scenes/

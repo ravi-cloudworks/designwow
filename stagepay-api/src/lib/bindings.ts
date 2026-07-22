@@ -6,6 +6,7 @@ export type Bindings = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_REDIRECT_URI: string;
+  ADMIN_EMAIL: string;
 };
 
 // Same plain, unsigned session=<user_id> cookie pattern design-wow-api

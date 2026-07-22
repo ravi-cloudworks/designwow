@@ -117,6 +117,8 @@ pay.get('/projects/:id/payment-link', async (c) => {
     .bind(projectId)
     .all<{ stage: number; amount_paise: number; paid_at: string }>();
 
+  const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?').bind(userId).first<{ free_credits_remaining: number }>();
+
   return c.json({
     token,
     url: `${c.env.FRONTEND_ORIGIN}/pay/${token}`,
@@ -132,6 +134,7 @@ pay.get('/projects/:id/payment-link', async (c) => {
       };
     }),
     totalEarnedPaise: totalRow?.total ?? 0,
+    freeCreditsRemaining: user?.free_credits_remaining ?? 0,
   });
 });
 
@@ -154,9 +157,24 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   if (!body.amountPaise || body.amountPaise <= 0) return c.json({ error: 'amount_required' }, 400);
 
   const token = await getOrCreateLink(c.env.DB, projectId);
-  const existing = await c.env.DB.prepare('SELECT amount_paise FROM payment_link_stages WHERE token = ? AND stage = ?')
+  const existing = await c.env.DB.prepare('SELECT amount_paise, paid FROM payment_link_stages WHERE token = ? AND stage = ?')
     .bind(token, stage)
-    .first<{ amount_paise: number }>();
+    .first<{ amount_paise: number; paid: number }>();
+
+  // A payment credit is spent opening a new receivable — either this stage
+  // has never been priced before, or its last round was already paid and
+  // this price starts a fresh one. Renegotiating a still-open, unpaid
+  // amount (the common case) is free — it's the same ask, not a new one.
+  // Charged here, not at payment-confirm, so a live customer transaction
+  // is never interrupted mid-sale by a designer running out of credits.
+  const isNewReceivable = !existing || !!existing.paid;
+  if (isNewReceivable) {
+    const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?').bind(userId).first<{ free_credits_remaining: number }>();
+    if (!user || user.free_credits_remaining <= 0) {
+      return c.json({ error: 'out_of_credits', message: "You're out of payment credits — buy more to price this stage." }, 402);
+    }
+    await c.env.DB.prepare('UPDATE users SET free_credits_remaining = free_credits_remaining - 1 WHERE id = ?').bind(userId).run();
+  }
 
   if (existing) {
     // Changing the amount invalidates any earlier "paid" confirmation — that
@@ -165,7 +183,7 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
     // touches this table at all, so it never resets payment — only a real
     // price change does.
     const amountChanged = existing.amount_paise !== body.amountPaise;
-    const resetClause = amountChanged ? ', paid = 0, paid_at = NULL' : '';
+    const resetClause = amountChanged || isNewReceivable ? ', paid = 0, paid_at = NULL' : '';
     await c.env.DB.prepare(`UPDATE payment_link_stages SET amount_paise = ?, updated_at = datetime('now')${resetClause} WHERE token = ? AND stage = ?`)
       .bind(body.amountPaise, token, stage)
       .run();
@@ -178,6 +196,7 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   const saved = await c.env.DB.prepare('SELECT paid, paid_at FROM payment_link_stages WHERE token = ? AND stage = ?')
     .bind(token, stage)
     .first<{ paid: number; paid_at: string | null }>();
+  const freshUser = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?').bind(userId).first<{ free_credits_remaining: number }>();
 
   return c.json({
     token,
@@ -186,6 +205,8 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
     amountPaise: body.amountPaise,
     paid: !!saved?.paid,
     paidAt: saved?.paid_at ?? null,
+    creditCharged: isNewReceivable,
+    freeCreditsRemaining: freshUser?.free_credits_remaining ?? 0,
   });
 });
 
