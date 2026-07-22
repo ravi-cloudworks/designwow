@@ -4296,7 +4296,18 @@ ${e.rawResponse || '—'}`;
       // Total across all 4 stages that month — a fixed row above the plot
       // area (never near any individual bar's own label) so it never reads
       // as a duplicate of whichever stage happens to be tallest that month.
-      const totalLabel = `<text x="${(groupStart + groupSlot / 2).toFixed(1)}" y="${TOTAL_Y}" font-size="9.5" font-weight="700" fill="#565b66" text-anchor="middle">${esc(formatCompactRupees(b.total))}</text>`;
+      // Drawn as a pill (rounded rect behind the text) rather than plain
+      // text so it visually stands out from the chart, same as every other
+      // pill-styled number elsewhere in the app — width is a rough estimate
+      // since SVG has no auto-sizing background, generous enough that the
+      // text never overflows it.
+      const totalCx = groupStart + groupSlot / 2;
+      const totalText = formatCompactRupees(b.total);
+      const totalPillW = Math.max(30, totalText.length * 6.2 + 12);
+      const totalPillH = 15;
+      const totalPillX = totalCx - totalPillW / 2;
+      const totalPillY = TOTAL_Y - totalPillH + 4;
+      const totalLabel = `<rect x="${totalPillX.toFixed(1)}" y="${totalPillY.toFixed(1)}" width="${totalPillW.toFixed(1)}" height="${totalPillH}" rx="${totalPillH / 2}" fill="#eef1f2" stroke="#d8dce0" stroke-width="1"/><text x="${totalCx.toFixed(1)}" y="${(totalPillY + totalPillH / 2 + 3.3).toFixed(1)}" font-size="9.5" font-weight="700" fill="#565b66" text-anchor="middle">${esc(totalText)}</text>`;
       return rects + monthLabel + totalLabel;
     }).join('');
     const legendCol = (s, x, y) => `<rect x="${x}" y="${y - 8}" width="8" height="8" rx="2" fill="${STAGE_COLORS[s]}"/><text x="${x + 12}" y="${y}" font-size="9" fill="#565b66">Stage ${s} — ${esc(STAGE_NAMES[s])}</text>`;
