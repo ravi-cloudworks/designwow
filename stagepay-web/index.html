@@ -58,6 +58,7 @@
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; flex-shrink: 0; }
   .topbar-title { display: flex; align-items: center; gap: 9px; }
   .topbar-title .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; }
+  .beta-badge { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); border: 1px solid var(--teal-line); vertical-align: middle; margin-left: 6px; }
   .topbar h1 { font-size: 15.5px; font-weight: 700; }
   .topbar p { margin: 1px 0 0; font-size: 11px; color: var(--text-faint); }
 
@@ -3745,7 +3746,7 @@ ${e.rawResponse || '—'}`;
     document.getElementById('topbar').innerHTML = `
       <div class="topbar-title" id="topbarHomeLink" style="cursor:pointer">
         <span class="mark">💸</span>
-        <div><h1>StagePay</h1><p>Get paid every stage. Never work for free.</p></div>
+        <div><h1>StagePay <span class="beta-badge">Beta</span></h1><p>Get paid every stage. Never work for free.</p></div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
@@ -4061,7 +4062,7 @@ ${e.rawResponse || '—'}`;
       <div class="landing">
         <div class="landing-header">
           <div>
-            <a class="wordmark" href="https://stagepay.pages.dev/"><span class="mark">💸</span><span>StagePay</span></a>
+            <a class="wordmark" href="https://stagepay.pages.dev/"><span class="mark">💸</span><span>StagePay</span><span class="beta-badge">Beta</span></a>
             <p class="landing-header-tagline">${t('headerTagline')}</p>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -4286,7 +4287,7 @@ ${e.rawResponse || '—'}`;
     app.innerHTML = `
       <div class="waitlist-screen">
         <div class="waitlist-card">
-          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong></div>
+          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong><span class="beta-badge">Beta</span></div>
           <h2 style="margin:0 0 6px">You're almost in</h2>
           <p style="color:var(--text-faint);font-size:13px;margin:0 0 18px">We review every application by hand to keep StagePay a great place for real UGC creators. Takes under a minute.</p>
           <div class="field">
@@ -4346,7 +4347,7 @@ ${e.rawResponse || '—'}`;
     app.innerHTML = `
       <div class="waitlist-screen">
         <div class="waitlist-card">
-          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong></div>
+          <div class="waitlist-brand"><span class="mark">💸</span><strong>StagePay</strong><span class="beta-badge">Beta</span></div>
           <h2 style="margin:0 0 6px">⏳ You're on the waitlist</h2>
           <p style="color:var(--text-faint);font-size:13px;margin:0">We review applications by hand — you'll hear from us soon.</p>
           <div class="waitlist-recap">
@@ -6343,7 +6344,7 @@ ${e.rawResponse || '—'}`;
 
     app.innerHTML = `
       <div class="pay-page">
-        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></div>
+        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></div>
         <div class="pay-card">
           <p class="pay-designer">${esc(info.designerName)}</p>
           <h1>${esc(info.projectName)}</h1>
@@ -6500,7 +6501,7 @@ ${e.rawResponse || '—'}`;
     }
     if (data.unavailable) {
       app.innerHTML = `<div class="showcase-page"><div class="showcase-page-inner" style="text-align:center;padding-top:60px">
-        <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit;justify-content:center"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span></div></a>
+        <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit;justify-content:center"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span></div></a>
         <p style="color:var(--text-faint)">Portfolio temporarily unavailable — check back soon.</p>
       </div></div>`;
       return;
@@ -6510,7 +6511,7 @@ ${e.rawResponse || '—'}`;
     app.innerHTML = `
       <div class="showcase-page">
         <div class="showcase-page-inner">
-          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></a>
+          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></a>
           <div class="public-showcase-header">
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <div>
