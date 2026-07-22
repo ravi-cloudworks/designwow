@@ -831,6 +831,7 @@ Rules:
     expandedItems: {},
     debugLog: [], debugPanelOpen: false, debugExpanded: {},
     briefOpenSection: 'brand', // Stage 1 accordion — one section open at a time
+    briefSampleKey: '', // which SAMPLE_BRIEFS entry was last loaded (so the selector keeps showing it, not resetting to the placeholder) — resets on project switch, not persisted server-side (it's just a UI convenience, not real brief data)
     renamingProject: false,
     renamingItemId: null,
     itemCardMode: {}, // { [itemId]: 'generate' | 'upload' } — per-item choice between the Generate flow and uploading your own file; defaults to 'generate' when unset
@@ -2348,13 +2349,14 @@ ${e.rawResponse || '—'}`;
         <p class="lane-tamil">திட்ட நோக்கம்</p>
         <p class="lane-desc">Given by the brand/customer. No versions — the raw input everything else builds from.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">
-          ${!locked ? `<select id="sampleBriefSelect" class="icon-select" title="Load sample data">
-            <option value="">🎲</option>
-            <option value="food">Food &amp; Beverage — TangyBite Pickles</option>
-            <option value="beauty">Beauty &amp; Skincare — PureGlow Serum</option>
-            <option value="fashion">Fashion &amp; Apparel — FitFlex Activewear</option>
-            <option value="home">Home &amp; Kitchen — ChopEasy Chopper</option>
-            <option value="wellness">Health &amp; Wellness — VitaBoost Gummies</option>
+          ${!locked ? `<span style="font-size:11.5px;color:var(--text-faint);font-weight:600">🎲 Sample data (for testing — replace before sending to a real customer):</span>
+          <select id="sampleBriefSelect" class="icon-select" title="Load sample data">
+            <option value="" ${!state.briefSampleKey ? 'selected' : ''}>Choose one to try…</option>
+            <option value="food" ${state.briefSampleKey === 'food' ? 'selected' : ''}>Food &amp; Beverage — TangyBite Pickles</option>
+            <option value="beauty" ${state.briefSampleKey === 'beauty' ? 'selected' : ''}>Beauty &amp; Skincare — PureGlow Serum</option>
+            <option value="fashion" ${state.briefSampleKey === 'fashion' ? 'selected' : ''}>Fashion &amp; Apparel — FitFlex Activewear</option>
+            <option value="home" ${state.briefSampleKey === 'home' ? 'selected' : ''}>Home &amp; Kitchen — ChopEasy Chopper</option>
+            <option value="wellness" ${state.briefSampleKey === 'wellness' ? 'selected' : ''}>Health &amp; Wellness — VitaBoost Gummies</option>
           </select>` : ''}
         </div>
       </div>
@@ -2415,6 +2417,7 @@ ${e.rawResponse || '—'}`;
       if (!key || !SAMPLE_BRIEFS[key]) return;
       const sample = SAMPLE_BRIEFS[key];
       Object.assign(state.brief, sample);
+      state.briefSampleKey = key;
       const patch = {};
       Object.keys(sample).forEach(k => { patch[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = sample[k]; });
       await api.updateBrief(state.project.id, patch);
@@ -5251,6 +5254,7 @@ ${e.rawResponse || '—'}`;
     const full = await api.getProject(id);
     state.project = full.project; state.brief = full.brief; state.items = full.items;
     state.expandedItems = {};
+    state.briefSampleKey = '';
     // Story is the one always-exists-exactly-once item — open it by default
     // so a designer lands straight on it in Stage 2 instead of an empty-looking
     // collapsed card.
