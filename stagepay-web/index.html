@@ -100,7 +100,6 @@
   .project-earned-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 122px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
   .project-earned-pill.lg { font-size: 16px; padding: 7px 16px; }
   .project-pending-pill { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line); white-space: nowrap; }
-  .lane-tamil { font-size: 11px; color: var(--text-faint); margin: 3px 0 0 38px; }
   .lane-desc { font-size: 11px; color: var(--text-faint); margin: 6px 0 0 38px; line-height: 1.4; }
 
   .trail-accordion { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; background: var(--surface); }
@@ -2458,7 +2457,6 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">1</span><span class="lane-title">Client Brief</span></div>
-        <p class="lane-tamil">திட்ட நோக்கம்</p>
         <p class="lane-desc">Given by the brand/customer. No versions — the raw input everything else builds from.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">
           ${!locked ? `<span style="font-size:11.5px;color:var(--text-faint);font-weight:600">🎲 Sample data (for testing — replace before sending to a real customer):</span>
@@ -2684,7 +2682,6 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">2</span><span class="lane-title">Story Board</span>${earnedPillHtml(2)}${pendingPillHtml(2)}</div>
-        <p class="lane-tamil">கதைக்களம்</p>
         <p class="lane-desc">Pitch a few storyline directions, then approve the one that becomes the ad's spine.</p>
         </div>
       ${renderStoryCard()}`;
@@ -2956,7 +2953,6 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Visual &amp; Music</span>${earnedPillHtml(3)}${pendingPillHtml(3)}</div>
-        <p class="lane-tamil">கதாபாத்திரங்கள், பொருள்கள் மற்றும் இசை</p>
         <p class="lane-desc">Characters, properties, backgrounds, sounds — add as many as the story needs.</p>
         ${stageItemCapReached(3) ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(3))}</p>` : ''}
         </div>
@@ -3249,7 +3245,6 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Scene Blueprint</span>${earnedPillHtml(4)}${pendingPillHtml(4)}</div>
-        <p class="lane-tamil">திரைக்கதை</p>
         <p class="lane-desc">Add a scene for every beat in your storyboard — content and camera/shot direction together.</p>
         ${capReached4 ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(4))}</p>` : ''}
         </div>
@@ -3318,7 +3313,6 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="lane-header">
         <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}${pendingPillHtml(5)}</div>
-        <p class="lane-tamil">திரைப்படம்</p>
         <p class="lane-desc">Stitch the approved scene clips into one finished video — that's the only thing the customer downloads.</p>
         </div>
       ${body}
