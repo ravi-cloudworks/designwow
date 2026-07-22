@@ -302,6 +302,19 @@
   .showcase-page { min-height: 100vh; background: var(--paper); padding: 20px 16px 56px; }
   .showcase-page-inner { max-width: 900px; margin: 0 auto; }
   .showcase-page-brand { display: flex; align-items: center; gap: 8px; color: var(--text); margin-bottom: 22px; }
+
+  /* ---------- Moodboard (internal, fullscreen project snapshot) ---------- */
+  .moodboard-page { min-height: 100vh; background: var(--paper); padding: 20px 24px 48px; overflow-y: auto; }
+  .moodboard-header { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .moodboard-header h1 { margin: 0; font-size: 21px; font-family: var(--display); }
+  .moodboard-brief { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; max-width: 900px; }
+  .moodboard-brief h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); }
+  .moodboard-brief p { margin: 0; font-size: 13.5px; line-height: 1.6; }
+  .moodboard-section { border: 2px solid; border-radius: 12px; padding: 18px; margin-bottom: 20px; max-width: 1400px; background: var(--surface); }
+  .moodboard-section-title { display: inline-block; font-size: 12px; font-weight: 800; color: #fff; padding: 4px 12px; border-radius: 999px; margin-bottom: 14px; }
+  .moodboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .moodboard-tile img, .moodboard-tile video { width: 100%; max-height: 260px; object-fit: cover; border-radius: 8px; display: block; background: var(--surface-2); }
+  .moodboard-tile-caption { margin: 6px 0 0; font-size: 11.5px; color: var(--text-faint); }
   .public-showcase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
   .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
   .public-showcase-category { margin-bottom: 22px; }
@@ -3657,6 +3670,7 @@ ${e.rawResponse || '—'}`;
         <span>Created: <strong>${formatISTWithRelative(p.created_at)}</strong></span>
         <span>Updated: <strong>${formatISTWithRelative(p.updated_at)}</strong></span>
         ${total > 0 ? `<span class="project-earned-pill lg">💰 ${formatRupees(total)} earned</span>` : ''}
+        <button type="button" class="btn btn-sm" id="projectInfoMoodboardBtn">🖼 Moodboard</button>
         <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Open customer payment link</button>
       </div>`;
     if (state.renamingProject) {
@@ -3683,6 +3697,11 @@ ${e.rawResponse || '—'}`;
     }
     const payLinkBtn = document.getElementById('projectInfoPayLinkBtn');
     if (payLinkBtn) payLinkBtn.addEventListener('click', openCustomerPaymentLink);
+    const moodboardBtn = document.getElementById('projectInfoMoodboardBtn');
+    if (moodboardBtn) moodboardBtn.addEventListener('click', () => {
+      state.screen = 'moodboard';
+      renderApp();
+    });
   }
 
   // ---------- Settings modal (UPI ID, used on every payment link's QR) ----------
@@ -5297,6 +5316,7 @@ ${e.rawResponse || '—'}`;
     if (state.screen === 'projects') { app.style.cssText = ''; await renderProjectsScreen(); return; }
     if (state.screen === 'goals') { app.style.cssText = ''; await renderGoalsScreen(); return; }
     if (state.screen === 'showcase') { app.style.cssText = ''; await renderShowcaseScreen(); return; }
+    if (state.screen === 'moodboard') { app.style.cssText = ''; renderMoodboardScreen(); return; }
     // Fixed-height flex column so the swimlane is the only thing that ever
     // scrolls — topbar/project-info-bar/legend size themselves naturally and
     // never move, instead of relying on a hardcoded "subtract N px" height
@@ -5317,6 +5337,65 @@ ${e.rawResponse || '—'}`;
     renderProjectInfoBar();
     await renderTool();
     renderDebugPanel();
+  }
+
+  // ---------- Moodboard (fullscreen, internal-only, one-page project snapshot) ----------
+  // Not a new route/page — just a fullscreen state.screen swap over the same
+  // already-loaded state.project/items/brief, so "back" is just returning to
+  // state.screen = 'tool'. Deliberately simple (project name + Stage 1's
+  // Story+Scene+Dialogues up top, then every uploaded file from Stages 2-5
+  // in one plain grid) — for the designer's own review/internal
+  // presentation, not a customer-facing or shareable page.
+  function renderMoodboardScreen() {
+    const app = document.getElementById('app');
+    const b = state.brief || {};
+    function tilesForItems(items) {
+      return items.flatMap((item) => {
+        const files = theVersion(item).media_files || [];
+        return files.map((f) => {
+          const url = api.mediaUrl(f.key);
+          const media = f.kind === 'video'
+            ? `<video src="${esc(url)}" controls></video>`
+            : f.kind === 'audio'
+              ? `<audio src="${esc(url)}" controls style="width:100%"></audio>`
+              : `<img src="${esc(url)}" alt="${esc(f.fileName)}">`;
+          return `<div class="moodboard-tile">
+            ${media}
+            <p class="moodboard-tile-caption">${esc(MEDIA_LABELS[item.item_key] || item.item_key)}${item.name ? ' — ' + esc(item.name) : ''}</p>
+          </div>`;
+        });
+      });
+    }
+    const stageGroups = [
+      { stage: 2, items: itemsFor(2, 'story') },
+      { stage: 3, items: [...itemsFor(3, 'character'), ...itemsFor(3, 'property'), ...itemsFor(3, 'background'), ...itemsFor(3, 'sound')] },
+      { stage: 4, items: itemsFor(4, 'scene') },
+      { stage: 5, items: [...itemsFor(5, 'movie'), ...itemsFor(5, 'final_video')] },
+    ]
+      .map(({ stage, items }) => ({ stage, tiles: tilesForItems(items) }))
+      .filter((g) => g.tiles.length);
+    app.innerHTML = `
+      <div class="moodboard-page">
+        <div class="moodboard-header">
+          <button class="btn btn-sm" id="moodboardBackBtn">← Back to project</button>
+          <h1>${esc(state.project.name)}</h1>
+        </div>
+        ${b.storyboard ? `<div class="moodboard-brief">
+          <h2>Story+Scene+Dialogues (Stage 1)</h2>
+          <p>${esc(b.storyboard).replace(/\n/g, '<br>')}</p>
+        </div>` : ''}
+        ${stageGroups.length
+          ? stageGroups.map(({ stage, tiles }) => `
+              <div class="moodboard-section" style="border-color:${STAGE_COLORS[stage]}">
+                <div class="moodboard-section-title" style="background:${STAGE_COLORS[stage]}">Stage ${stage} — ${esc(STAGE_NAMES[stage])}</div>
+                <div class="moodboard-grid">${tiles.join('')}</div>
+              </div>`).join('')
+          : '<p class="empty-note">No uploaded files yet.</p>'}
+      </div>`;
+    document.getElementById('moodboardBackBtn').addEventListener('click', () => {
+      state.screen = 'tool';
+      renderApp();
+    });
   }
 
   // ---------- Public payment page (/pay/:token) — no login, token is the access control ----------
