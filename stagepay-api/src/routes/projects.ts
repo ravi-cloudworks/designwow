@@ -92,7 +92,13 @@ projects.get('/', async (c) => {
 
   const projectsWithStage = results.map(({ top_stage, top_stage_locked, ...rest }) => ({
     ...rest,
+    // The Math.min clamp below (avoiding a nonexistent "Stage 6" once Stage 5
+    // locks) used to conflate two different states into the same value:
+    // "Stage 4 done, now on Stage 5" and "Stage 5 done, project complete"
+    // both produced current_stage 5. completed distinguishes them so the
+    // frontend can show a real "done" state instead of just "Stage 5" forever.
     current_stage: top_stage == null ? 1 : top_stage_locked ? Math.min(top_stage + 1, 5) : top_stage,
+    completed: top_stage === 5 && !!top_stage_locked,
   }));
   return c.json({ projects: projectsWithStage, max: MAX_PROJECTS });
 });

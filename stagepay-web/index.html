@@ -95,6 +95,7 @@
   .project-info-meta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-faint); }
   .project-info-meta strong { color: var(--text-soft); font-weight: 700; }
   .project-stage-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 62px; font-size: 10.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--ink); color: var(--paper); white-space: nowrap; }
+  .project-stage-pill.completed { background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); }
   .project-earned-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 122px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
   .project-earned-pill.lg { font-size: 16px; padding: 7px 16px; }
   .lane-tamil { font-size: 11px; color: var(--text-faint); margin: 3px 0 0 38px; }
@@ -5097,7 +5098,9 @@ ${e.rawResponse || '—'}`;
           return `<div class="project-list-item" data-open-project="${p.id}">
           <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">updated ${esc(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
-            <span class="project-stage-pill" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>
+            ${p.completed
+              ? `<span class="project-stage-pill completed" title="All 5 stages locked and paid">✅ Completed</span>`
+              : `<span class="project-stage-pill" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>`}
             ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : `<span class="project-earned-pill" style="visibility:hidden"></span>`}
             <button class="btn btn-sm btn-danger" data-delete-project="${p.id}">Delete</button>
           </div>
