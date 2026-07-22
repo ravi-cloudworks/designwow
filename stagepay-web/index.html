@@ -498,6 +498,11 @@
   .landing-tool-chip { font-size: 13px; font-weight: 600; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
   .landing-result-list { list-style: none; display: flex; flex-direction: column; gap: 9px; max-width: 380px; margin: 22px auto 0; }
   .landing-result-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; background: var(--moss-soft); border: 1px solid var(--moss-line); color: var(--moss); border-radius: 8px; padding: 10px 14px; }
+  .landing-pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 560px; margin: 24px auto 0; }
+  .landing-pricing-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px 16px; text-align: center; }
+  .landing-pricing-value { font-size: 24px; font-weight: 800; color: var(--teal); }
+  .landing-pricing-label { font-size: 12.5px; color: var(--text-faint); margin-top: 6px; line-height: 1.4; }
+  @media (max-width: 640px) { .landing-pricing-grid { grid-template-columns: 1fr 1fr; gap: 10px; } }
   .landing-final { text-align: center; background: var(--ink); color: var(--paper); padding: 64px 22px; }
   .landing-final .landing-h2 { color: var(--paper); }
   .landing-final .landing-punch { font-size: 17px; font-weight: 700; margin-bottom: 6px; opacity: 0.85; }
@@ -3962,6 +3967,13 @@ ${e.rawResponse || '—'}`;
       resultTitle: 'The Result',
       result1: '✅ Every stage is approved.', result2: '✅ Every stage is paid.', result3: '✅ Every stage builds on the last.', result4: '✅ You get richer every stage — never poorer.',
       punchline: 'Working for free — or gambling away AI credits — will make you poor.',
+      pricingTitle: 'Simple, Honest Pricing',
+      pricingLead: 'We never take a cut of your income. Whether you charge ₹1,000 or ₹50,000, it costs the same — never a percentage.',
+      pricingStat1Value: '10', pricingStat1Label: 'free income credits to start',
+      pricingStat2Value: '₹49', pricingStat2Label: 'per income credit — any amount',
+      pricingStat3Value: '0%', pricingStat3Label: 'commission on your income, ever',
+      pricingStat4Value: '₹0', pricingStat4Label: 'subscription or app usage fee',
+      pricingNote: 'Your income goes straight to your own UPI ID — we never touch, hold, or route your money.',
       footer: 'StagePay — projects are private to your account.',
     },
     hi: {
@@ -3994,6 +4006,13 @@ ${e.rawResponse || '—'}`;
       resultTitle: 'नतीजा',
       result1: '✅ हर स्टेज अप्रूव होती है।', result2: '✅ हर स्टेज की पेमेंट मिलती है।', result3: '✅ हर स्टेज पिछली पर बनती है।', result4: '✅ हर स्टेज पर आप अमीर बनते हैं — कभी गरीब नहीं।',
       punchline: 'मुफ़्त में काम करना — या AI क्रेडिट बर्बाद करना — आपको गरीब बना देगा।',
+      pricingTitle: 'सरल, ईमानदार प्राइसिंग',
+      pricingLead: 'हम आपकी इनकम में से कभी कोई हिस्सा नहीं लेते। चाहे आप ₹1,000 चार्ज करें या ₹50,000 — कीमत हमेशा एक जैसी रहती है, कभी प्रतिशत में नहीं।',
+      pricingStat1Value: '10', pricingStat1Label: 'शुरुआत के लिए मुफ़्त इनकम क्रेडिट',
+      pricingStat2Value: '₹49', pricingStat2Label: 'प्रति इनकम क्रेडिट — किसी भी राशि के लिए',
+      pricingStat3Value: '0%', pricingStat3Label: 'आपकी इनकम पर कमीशन, कभी नहीं',
+      pricingStat4Value: '₹0', pricingStat4Label: 'सब्सक्रिप्शन या ऐप इस्तेमाल फीस',
+      pricingNote: 'आपकी इनकम सीधे आपके अपने UPI ID पर जाती है — हम कभी भी आपके पैसे को छूते, रोकते या रूट नहीं करते।',
       footer: 'StagePay — प्रोजेक्ट्स आपके अकाउंट तक निजी रहते हैं।',
     },
     ta: {
@@ -4026,6 +4045,13 @@ ${e.rawResponse || '—'}`;
       resultTitle: 'விளைவு',
       result1: '✅ ஒவ்வொரு நிலையும் ஒப்புதல் பெறுகிறது.', result2: '✅ ஒவ்வொரு நிலைக்கும் பணம் கிடைக்கிறது.', result3: '✅ ஒவ்வொரு நிலையும் முந்தையதன் மீது கட்டமைக்கப்படுகிறது.', result4: '✅ ஒவ்வொரு நிலையிலும் நீங்கள் பணக்காரராகிறீர்கள் — ஒருபோதும் ஏழையாக மாட்டீர்கள்.',
       punchline: 'இலவசமாக வேலை செய்வது — அல்லது AI கிரெடிட்களை வீணடிப்பது — உங்களை ஏழையாக்கும்.',
+      pricingTitle: 'எளிமையான, நேர்மையான விலை நிர்ணயம்',
+      pricingLead: 'உங்கள் வருமானத்தில் நாங்கள் ஒருபோதும் பங்கு எடுப்பதில்லை. நீங்கள் ₹1,000 வசூலித்தாலும் ₹50,000 வசூலித்தாலும், செலவு எப்போதும் ஒரே மாதிரியே — சதவீதமாக ஒருபோதும் இல்லை.',
+      pricingStat1Value: '10', pricingStat1Label: 'தொடங்குவதற்கு இலவச இன்கம் கிரெடிட்கள்',
+      pricingStat2Value: '₹49', pricingStat2Label: 'ஒரு இன்கம் கிரெடிட்டுக்கு — எந்த தொகையாக இருந்தாலும்',
+      pricingStat3Value: '0%', pricingStat3Label: 'உங்கள் வருமானத்தின் மீது கமிஷன், ஒருபோதும் இல்லை',
+      pricingStat4Value: '₹0', pricingStat4Label: 'சந்தா அல்லது ஆப் பயன்பாட்டு கட்டணம்',
+      pricingNote: 'உங்கள் வருமானம் நேரடியாக உங்கள் சொந்த UPI ID-க்கு செல்கிறது — உங்கள் பணத்தை நாங்கள் ஒருபோதும் தொடுவதில்லை, வைத்திருப்பதில்லை, அல்லது வழிநடத்துவதில்லை.',
       footer: 'StagePay — திட்டங்கள் உங்கள் கணக்கிற்கு மட்டுமே தனிப்பட்டவை.',
     },
   };
@@ -4165,6 +4191,18 @@ ${e.rawResponse || '—'}`;
             <li>${t('result3')}</li>
             <li>${t('result4')}</li>
           </ul>
+        </div>
+
+        <div class="landing-section">
+          <h2 class="landing-h2">${t('pricingTitle')}</h2>
+          <p class="landing-lead">${t('pricingLead')}</p>
+          <div class="landing-pricing-grid">
+            <div class="landing-pricing-card"><div class="landing-pricing-value">${t('pricingStat1Value')}</div><div class="landing-pricing-label">${t('pricingStat1Label')}</div></div>
+            <div class="landing-pricing-card"><div class="landing-pricing-value">${t('pricingStat2Value')}</div><div class="landing-pricing-label">${t('pricingStat2Label')}</div></div>
+            <div class="landing-pricing-card"><div class="landing-pricing-value">${t('pricingStat3Value')}</div><div class="landing-pricing-label">${t('pricingStat3Label')}</div></div>
+            <div class="landing-pricing-card"><div class="landing-pricing-value">${t('pricingStat4Value')}</div><div class="landing-pricing-label">${t('pricingStat4Label')}</div></div>
+          </div>
+          <p class="landing-lead" style="margin-top:18px">${t('pricingNote')}</p>
         </div>
 
         <div class="landing-final">
