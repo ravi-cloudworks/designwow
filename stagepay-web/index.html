@@ -339,11 +339,6 @@
   .goal-range-toggle { display: flex; gap: 6px; margin: 10px 0 10px; }
   .goal-range-toggle button { flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; cursor: pointer; color: var(--text); }
   .goal-range-toggle button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-  /* Segmented-switch look for the 3/6 month toggle — a single rounded
-     track with the active side highlighted, rather than two loose buttons. */
-  .goal-switch { display: flex; gap: 2px; margin: 0 0 14px; background: var(--surface-2); border-radius: 999px; padding: 3px; width: fit-content; max-width: 100%; }
-  .goal-switch button { flex: 1; min-width: 90px; padding: 6px 14px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: var(--text-soft); transition: background 0.15s, color 0.15s; }
-  .goal-switch button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
   .item-mode-toggle { display: flex; gap: 2px; margin-bottom: 12px; background: var(--surface-2); border-radius: 999px; padding: 3px; width: fit-content; max-width: 100%; }
   .item-mode-toggle button { padding: 6px 14px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: var(--text-soft); transition: background 0.15s, color 0.15s; white-space: nowrap; }
   .item-mode-toggle button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
@@ -402,7 +397,6 @@
   .goal-alloc-total { font-size: 16px; font-weight: 800; margin: 0 0 12px; line-height: 1.4; }
   @media (max-width: 480px) {
     .goal-past-total { font-size: 20px; }
-    .goal-switch button { min-width: 0; padding: 6px 10px; }
     .stage-alloc-price-pills .pill { padding: 5px 9px; font-size: 12px; }
     .slider-ticks span { font-size: 7.5px; }
   }
@@ -849,8 +843,7 @@ Rules:
     renamingItemId: null,
     itemCardMode: {}, // { [itemId]: 'generate' | 'upload' } — per-item choice between the Generate flow and uploading your own file; defaults to 'generate' when unset
     earningsSummary: null, // { entries, goalAmountPaise, goalSetAt, stagePricesPaise, stageTargetCounts, avgStagesPerProject, historicalProjectCount }
-    goalTab: 'past', // Goal Tracker's Past/Future top-level tab
-    goalPastRangeMonths: 3, // Goal Tracker's inner "3 / 6 months" toggle, shared by both tabs
+    goalTab: 'past', // Goal Tracker's Work History/Goals top-level tab
     goalSliderDraft: null, // uncommitted slider value, until "Set Goal" is clicked
     stagePricesDraft: null, // {2:paise,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     stageCountsDraft: null, // {2:count,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
@@ -4097,54 +4090,83 @@ ${e.rawResponse || '—'}`;
     });
     return { stats, months, neededCompletions };
   }
-  // Renders a clean 9:16 (Instagram/WhatsApp Status shaped) PNG summarizing
-  // past + future + the month-by-month todos, and triggers a real file
-  // download — built with plain Canvas 2D, no library, same zero-dependency
-  // approach as the SVG chart above.
-  function downloadGoalShareImage() {
-    const summary = state.earningsSummary;
-    if (!summary) return;
-    const months = state.goalPastRangeMonths;
-    const pastTotal = earningsInRange(summary.entries, months);
-    const buckets = monthlyBuckets(summary.entries, months);
-    const suggested = suggestedGoalPaise(summary.entries);
-    const effectiveGoal = state.goalSliderDraft != null ? state.goalSliderDraft : (summary.goalAmountPaise || suggested);
-    const progress = goalProgress(summary);
-    const earnedSoFar = progress ? progress.earnedSince : 0;
-    const bp = buildBlueprint(effectiveGoal, earnedSoFar, summary.entries);
-
-    const W = 1080, H = 1920;
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    const F = (weight, size) => `${weight} ${size}px -apple-system, "Segoe UI", sans-serif`;
-
-    ctx.fillStyle = '#14161b';
-    ctx.fillRect(0, 0, W, H);
+  // Shared canvas-share helpers — one focused image per tab (Work History
+  // vs. Goals) instead of the one combined image both used to produce,
+  // built with plain Canvas 2D, no library, same zero-dependency approach
+  // as the SVG chart above. Both share the same branded header/footer.
+  const SHARE_F = (weight, size) => `${weight} ${size}px -apple-system, "Segoe UI", sans-serif`;
+  // Returns the y position to continue drawing from — brand mark + tagline
+  // + the per-image heading, so every shared image is clearly StagePay's,
+  // not just a bare chart screenshot.
+  function drawShareHeader(ctx, W, heading) {
     ctx.textAlign = 'left';
-
     ctx.fillStyle = '#eef1f2';
-    ctx.font = F(700, 36);
+    ctx.font = SHARE_F(700, 36);
     ctx.fillText('💸 StagePay', 64, 100);
 
-    ctx.font = F(800, 52);
-    ctx.fillText(`🎯 ${state.user && state.user.name ? state.user.name.split(' ')[0] + "'s" : 'My'} Goal Tracker`, 64, 180, W - 128);
+    ctx.fillStyle = '#8b92a1';
+    ctx.font = SHARE_F(500, 22);
+    ctx.fillText('Get paid every stage. Never waste AI credits.', 64, 128);
+
+    ctx.fillStyle = '#eef1f2';
+    ctx.font = SHARE_F(800, 52);
+    ctx.fillText(heading, 64, 202, W - 128);
 
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(64, 224); ctx.lineTo(W - 64, 224); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(64, 246); ctx.lineTo(W - 64, 246); ctx.stroke();
+    return 322;
+  }
+  function drawShareFooter(ctx, W, H) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#565b66';
+    ctx.font = SHARE_F(500, 22);
+    ctx.fillText('Generated with StagePay', W / 2, H - 56);
+  }
+  function downloadCanvasPng(canvas, filename) {
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast('Downloaded');
+    }, 'image/png');
+  }
+  function downloadWorkHistoryShareImage() {
+    const summary = state.earningsSummary;
+    if (!summary) return;
+    const months = WORK_HISTORY_MONTHS;
+    const pastTotal = earningsInRange(summary.entries, months);
+    const buckets = monthlyBuckets(summary.entries, months);
+    const stageBuckets = monthlyStageBuckets(summary.entries, months);
 
-    let y = 300;
+    // Tall enough for both on-screen charts (monthly total, then the
+    // by-stage breakdown) — this used to only include the first one.
+    const W = 1080, H = 1700;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#14161b';
+    ctx.fillRect(0, 0, W, H);
+
+    const name = state.user && state.user.name ? state.user.name.split(' ')[0] + "'s" : 'My';
+    let y = drawShareHeader(ctx, W, `📈 ${name} Work History`);
+
     ctx.fillStyle = '#8fd9c4';
-    ctx.font = F(700, 28);
-    ctx.fillText(`PAST — LAST ${months} MONTHS`, 64, y);
+    ctx.font = SHARE_F(700, 28);
+    ctx.fillText(`LAST ${months} MONTHS`, 64, y);
     y += 66;
     ctx.fillStyle = '#eef1f2';
-    ctx.font = F(800, 66);
+    ctx.font = SHARE_F(800, 66);
     ctx.fillText(`${formatRupees(pastTotal)} earned`, 64, y);
 
     y += 50;
-    const barAreaTop = y, barAreaH = 200;
+    const barAreaTop = y, barAreaH = 280;
     const maxBucket = Math.max(1, ...buckets.map(b => b.paise));
     const barSlot = (W - 128) / buckets.length;
     const barW = Math.min(64, barSlot * 0.5);
@@ -4153,69 +4175,236 @@ ${e.rawResponse || '—'}`;
       const bh = Math.max(6, (b.paise / maxBucket) * barAreaH);
       ctx.fillStyle = '#4fb3a2';
       ctx.fillRect(bx - barW / 2, barAreaTop + barAreaH - bh, barW, bh);
-      ctx.fillStyle = '#8b92a1';
-      ctx.font = F(600, 22);
       ctx.textAlign = 'center';
+      ctx.fillStyle = '#eef1f2';
+      ctx.font = SHARE_F(700, 20);
+      ctx.fillText(formatCompactRupees(b.paise), bx, barAreaTop + barAreaH - bh - 12);
+      ctx.fillStyle = '#8b92a1';
+      ctx.font = SHARE_F(600, 22);
       ctx.fillText(b.label, bx, barAreaTop + barAreaH + 34);
     });
     ctx.textAlign = 'left';
     y = barAreaTop + barAreaH + 90;
 
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(64, y); ctx.lineTo(W - 64, y); ctx.stroke();
-    y += 70;
+    y += 60;
+
+    ctx.fillStyle = '#eef1f2';
+    ctx.font = SHARE_F(700, 30);
+    ctx.fillText('BY STAGE', 64, y);
+    y += 50;
+
+    const legendItem = (stage, x, yy) => {
+      ctx.fillStyle = STAGE_COLORS[stage];
+      ctx.fillRect(x, yy - 14, 16, 16);
+      ctx.fillStyle = '#c7ccd3';
+      ctx.font = SHARE_F(500, 20);
+      ctx.fillText(`Stage ${stage} — ${STAGE_NAMES[stage]}`, x + 24, yy);
+    };
+    legendItem(2, 64, y); legendItem(3, 64 + (W - 128) / 2, y);
+    y += 34;
+    legendItem(4, 64, y); legendItem(5, 64 + (W - 128) / 2, y);
+    y += 100;
+
+    const stageBarAreaTop = y, stageBarAreaH = 380;
+    const maxStageValue = Math.max(1, ...stageBuckets.flatMap(b => STAGE_ORDER.map(s => b.byStage[s] || 0)));
+    const groupSlot = (W - 128) / stageBuckets.length;
+    const stageBarSlot = groupSlot / STAGE_ORDER.length;
+    const stageBarW = Math.max(6, stageBarSlot * 0.7);
+    stageBuckets.forEach((b, i) => {
+      const groupStart = 64 + groupSlot * i;
+      STAGE_ORDER.forEach((s, k) => {
+        const v = b.byStage[s] || 0;
+        const bx = groupStart + stageBarSlot * k + stageBarSlot / 2;
+        const bh = v ? Math.max((v / maxStageValue) * stageBarAreaH, 8) : 2;
+        ctx.fillStyle = v ? STAGE_COLORS[s] : 'rgba(255,255,255,0.08)';
+        ctx.fillRect(bx - stageBarW / 2, stageBarAreaTop + stageBarAreaH - bh, stageBarW, bh);
+        if (v) {
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#c7ccd3';
+          ctx.font = SHARE_F(600, 15);
+          ctx.fillText(formatCompactRupees(v), bx, stageBarAreaTop + stageBarAreaH - bh - 8);
+        }
+      });
+      const cx = groupStart + groupSlot / 2;
+      const totalText = formatRupees(b.total);
+      ctx.font = SHARE_F(700, 20);
+      ctx.textAlign = 'center';
+      const totalW = ctx.measureText(totalText).width + 24;
+      const pillY = stageBarAreaTop - 46;
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(cx - totalW / 2, pillY, totalW, 30, 15);
+      else ctx.rect(cx - totalW / 2, pillY, totalW, 30);
+      ctx.fill();
+      ctx.fillStyle = '#eef1f2';
+      ctx.fillText(totalText, cx, pillY + 21);
+      ctx.fillStyle = '#8b92a1';
+      ctx.font = SHARE_F(600, 22);
+      ctx.fillText(b.label, cx, stageBarAreaTop + stageBarAreaH + 34);
+    });
+    ctx.textAlign = 'left';
+
+    drawShareFooter(ctx, W, H);
+    downloadCanvasPng(canvas, 'stagepay-work-history.png');
+  }
+  // Canvas re-implementation of renderWaterfallSvg's layout (Goal + Planned
+  // as independent bars, then Stage 2-5 floating between running totals,
+  // connected by dashed guides) — for the downloaded image, which has no
+  // SVG to reuse directly.
+  function drawWaterfallCanvas(ctx, x0, y0, w, h, prices, counts, goalPaise) {
+    let cum = 0;
+    const segments = STAGE_ORDER.map((s) => {
+      const count = counts[s] || 0, price = prices[s] || 0;
+      const value = price * count;
+      const start = cum; cum += value;
+      return { stage: s, start, end: cum, count, price, value };
+    });
+    const total = cum;
+    const { niceMax } = niceAxisScale(Math.max(total, goalPaise, 1), 4);
+    const columnCount = segments.length + 2;
+    const slot = w / columnCount;
+    const barW = Math.min(70, slot * 0.55);
+    const plotH = h - 50;
+    const labelY1 = y0 + h - 26, labelY2 = y0 + h - 8;
+    function barLabels(x, l1, l2) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#c7ccd3';
+      ctx.font = SHARE_F(700, 15);
+      ctx.fillText(l1, x, labelY1);
+      ctx.fillStyle = '#8b92a1';
+      ctx.font = SHARE_F(500, 13);
+      ctx.fillText(l2, x, labelY2);
+    }
+    function standaloneBar(index, value, color, label) {
+      const x = x0 + slot * index + slot / 2;
+      const barH = Math.max(3, (Math.min(value, niceMax) / niceMax) * plotH);
+      const y = y0 + plotH - barH;
+      ctx.fillStyle = color;
+      ctx.fillRect(x - barW / 2, y, barW, barH);
+      barLabels(x, label, formatCompactRupees(value));
+    }
+    standaloneBar(0, goalPaise, '#b23a37', 'Goal');
+    standaloneBar(1, total, total > goalPaise ? '#a05f10' : total === goalPaise && goalPaise ? '#2f7a4f' : '#8b92a1', 'Planned');
+    const points = segments.map((seg, i) => {
+      const index = i + 2;
+      const x = x0 + slot * index + slot / 2;
+      const yTop = y0 + plotH - (seg.end / niceMax) * plotH;
+      const yBottom = y0 + plotH - (seg.start / niceMax) * plotH;
+      const barH = Math.max(3, yBottom - yTop);
+      ctx.fillStyle = STAGE_COLORS[seg.stage];
+      ctx.fillRect(x - barW / 2, yTop, barW, barH);
+      const sub = seg.count && seg.price ? `${seg.count}×${formatCompactRupees(seg.price)}` : '—';
+      barLabels(x, `Stage ${seg.stage}`, sub);
+      return { x, yTop };
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.setLineDash([4, 4]);
+    for (let i = 0; i < points.length - 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(points[i].x + barW / 2, points[i].yTop);
+      ctx.lineTo(points[i + 1].x - barW / 2, points[i].yTop);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.textAlign = 'left';
+  }
+  function downloadGoalsShareImage() {
+    const summary = state.earningsSummary;
+    if (!summary) return;
+    const suggested = suggestedGoalPaise(summary.entries);
+    const effectiveGoal = state.goalSliderDraft != null ? state.goalSliderDraft : (summary.goalAmountPaise || suggested);
+    const progress = goalProgress(summary);
+    const earnedSoFar = progress ? progress.earnedSince : 0;
+    const bp = buildBlueprint(effectiveGoal, earnedSoFar, summary.entries);
+    const monthLines = Math.max(1, (bp && bp.months && bp.months.length) || 1);
+    // Same manual plan the "Plan it yourself" section shows on-screen —
+    // this used to never make it into the downloaded image at all.
+    const { prices, counts } = stageAllocationDraft(summary);
+    const planTotal = stageAllocationTotal(prices, counts);
+
+    const W = 1080, H = 780 + monthLines * 50 + 850;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#14161b';
+    ctx.fillRect(0, 0, W, H);
+
+    const name = state.user && state.user.name ? state.user.name.split(' ')[0] + "'s" : 'My';
+    let y = drawShareHeader(ctx, W, `🎯 ${name} Goal`);
 
     ctx.fillStyle = '#f2c98a';
-    ctx.font = F(700, 28);
+    ctx.font = SHARE_F(700, 28);
     ctx.fillText('NEXT 3 MONTHS GOAL', 64, y);
     y += 66;
     ctx.fillStyle = '#eef1f2';
-    ctx.font = F(800, 66);
+    ctx.font = SHARE_F(800, 66);
     ctx.fillText(formatRupees(effectiveGoal), 64, y);
     y += 44;
     ctx.fillStyle = '#8b92a1';
-    ctx.font = F(600, 28);
+    ctx.font = SHARE_F(600, 28);
     if (progress) ctx.fillText(`${progress.pct}% there — ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left`, 64, y);
     else ctx.fillText('Preview — set this goal in StagePay to start tracking', 64, y, W - 128);
     y += 70;
 
     ctx.fillStyle = '#eef1f2';
-    ctx.font = F(700, 30);
+    ctx.font = SHARE_F(700, 30);
     ctx.fillText('📋 TO REACH IT', 64, y);
     y += 56;
     if (bp && bp.neededCompletions) {
       bp.months.forEach((month, i) => {
         ctx.fillStyle = '#4fb3a2';
-        ctx.font = F(700, 27);
+        ctx.font = SHARE_F(700, 27);
         ctx.fillText(`Month ${i + 1}`, 64, y);
         ctx.fillStyle = '#eef1f2';
-        ctx.font = F(500, 27);
+        ctx.font = SHARE_F(500, 27);
         ctx.fillText(month.length ? month.map(m => `${m.count}× Stage ${m.stage}`).join(', ') : '—', 220, y, W - 284);
         y += 50;
       });
     } else {
       ctx.fillStyle = '#8b92a1';
-      ctx.font = F(500, 27);
+      ctx.font = SHARE_F(500, 27);
       ctx.fillText(bp ? "Already on track from what's earned so far! 🎉" : 'Complete a few paid stages to unlock this.', 64, y, W - 128);
     }
+    y += 70;
 
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#565b66';
-    ctx.font = F(500, 22);
-    ctx.fillText('Generated with StagePay', W / 2, H - 56);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(64, y); ctx.lineTo(W - 64, y); ctx.stroke();
+    y += 60;
 
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'stagepay-goal-tracker.png';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast('Downloaded');
-    }, 'image/png');
+    ctx.fillStyle = '#eef1f2';
+    ctx.font = SHARE_F(700, 30);
+    ctx.fillText('🎚 PLAN IT YOURSELF', 64, y);
+    y += 44;
+    ctx.fillStyle = '#8b92a1';
+    ctx.font = SHARE_F(600, 24);
+    ctx.fillText(allocationStatusText(planTotal, effectiveGoal), 64, y, W - 128);
+    y += 40;
+
+    drawWaterfallCanvas(ctx, 64, y, W - 128, 260, prices, counts, effectiveGoal);
+    y += 300;
+
+    const stage1Count = counts[2] || 0;
+    ctx.fillStyle = '#c7ccd3';
+    ctx.font = SHARE_F(600, 24);
+    ctx.fillText(`Stage 1 — ${STAGE_NAMES[1]}: ${stage1Count} (always ₹0, same as Stage 2)`, 64, y);
+    y += 40;
+    STAGE_ORDER.forEach((s) => {
+      const price = prices[s] || 0, count = counts[s] || 0;
+      const subtotal = price && count ? formatRupees(price * count) : '₹0';
+      ctx.fillStyle = STAGE_COLORS[s];
+      ctx.fillRect(64, y - 18, 14, 14);
+      ctx.fillStyle = '#c7ccd3';
+      ctx.font = SHARE_F(600, 24);
+      ctx.fillText(`Stage ${s} — ${STAGE_NAMES[s]}: ${count} × ${formatRupees(price)} = ${subtotal}`, 90, y);
+      y += 40;
+    });
+
+    drawShareFooter(ctx, W, H);
+    downloadCanvasPng(canvas, 'stagepay-goals.png');
   }
   // Short axis labels ("₹5k", "₹1.2L") — the full formatRupees() output is
   // too wide to sit down the left edge of the chart without crowding it.
@@ -4246,7 +4435,7 @@ ${e.rawResponse || '—'}`;
     const buckets = monthlyBuckets(summary.entries, months);
     const n = buckets.length;
     const maxPast = Math.max(1, ...buckets.map(b => b.paise));
-    const W = 600, H = 180, PAD_L = 46, PAD_R = 14, PAD_T = 22, PAD_B = 22;
+    const W = 600, H = 180, PAD_L = 46, PAD_R = 14, PAD_T = 34, PAD_B = 22;
     const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
     const { niceMax, ticks } = niceAxisScale(maxPast, 4);
     const slot = plotW / n;
@@ -4264,8 +4453,12 @@ ${e.rawResponse || '—'}`;
     const bars = points.map(p => `<rect x="${(p.x - barW / 2).toFixed(1)}" y="${p.y.toFixed(1)}" width="${barW.toFixed(1)}" height="${(PAD_T + plotH - p.y).toFixed(1)}" rx="4" fill="#176b5e"></rect>`).join('');
     const line = `<polyline points="${points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#a05f10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
     const dots = points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#a05f10"/>`).join('');
+    // Each bar's own amount, directly above it — same reasoning as the "By
+    // stage" chart below, which already labels every bar rather than making
+    // you read values off the Y-axis gridlines.
+    const valueLabels = points.map(p => `<text x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" font-size="9.5" font-weight="700" fill="#565b66" text-anchor="middle">${esc(formatCompactRupees(p.b.paise))}</text>`).join('');
     const labels = points.map(p => `<text x="${p.x.toFixed(1)}" y="${H - 6}" font-size="10" fill="#8b92a1" text-anchor="middle">${esc(p.b.label)}</text>`).join('');
-    return `<svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="xMidYMid meet">${grid}${bars}${line}${dots}${labels}</svg>`;
+    return `<svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="xMidYMid meet">${grid}${bars}${line}${dots}${valueLabels}${labels}</svg>`;
   }
   // Same months as the chart above, but 4 separate bars per month — one per
   // stage, side by side — rather than stacked into one, since the point is
@@ -4363,6 +4556,7 @@ ${e.rawResponse || '—'}`;
   // "Stage 2" alone doesn't mean anything to the designer day-to-day.
   const STAGE_NAMES = { 1: 'Client Brief', 2: 'Story Board', 3: 'Visual & Music', 4: 'Scene Blueprint', 5: 'Final Movie' };
   const GOAL_STEP_PAISE = 500000; // ₹5,000 — the goal slider only ever lands on this grid
+  const WORK_HISTORY_MONTHS = 6; // Work History tab's fixed window — used to be a 3/6-month toggle, now just always 6
   // Positions each label where a native range thumb would actually sit for
   // that value — inset from both edges by half the thumb's width, not
   // spread edge-to-edge — so labels line up with the real tick/thumb
@@ -4609,7 +4803,7 @@ ${e.rawResponse || '—'}`;
     const summary = state.earningsSummary;
     if (!summary) return '';
     const tab = state.goalTab;
-    const months = state.goalPastRangeMonths;
+    const months = WORK_HISTORY_MONTHS;
     const pastTotal = earningsInRange(summary.entries, months);
     const suggested = suggestedGoalPaise(summary.entries);
     const currentGoal = summary.goalAmountPaise || suggested;
@@ -4627,18 +4821,14 @@ ${e.rawResponse || '—'}`;
     return `
       <div class="section-head-row">
         <span class="section-title">🎯 Goal Tracker</span>
-        <button class="icon-btn" id="goalShareBtn" title="Download a shareable image">⬇ Share</button>
+        <button class="icon-btn" id="goalShareBtn" title="${tab === 'future' ? 'Download your Goal as a shareable image' : 'Download your Work History as a shareable image'}">⬇ Share</button>
       </div>
       <p class="section-subtitle">Set your goals — plan how you'll get there.</p>
       <div class="goal-range-toggle">
-        <button data-goal-tab="past" class="${tab === 'past' ? 'active' : ''}">Past</button>
-        <button data-goal-tab="future" class="${tab === 'future' ? 'active' : ''}">Future</button>
+        <button data-goal-tab="past" class="${tab === 'past' ? 'active' : ''}">Work History</button>
+        <button data-goal-tab="future" class="${tab === 'future' ? 'active' : ''}">Goals</button>
       </div>
       ${tab === 'past' ? `
-        <div class="goal-switch">
-          <button data-goal-range="3" class="${months === 3 ? 'active' : ''}">3 months</button>
-          <button data-goal-range="6" class="${months === 6 ? 'active' : ''}">6 months</button>
-        </div>
         <div class="goal-past-total">${formatRupees(pastTotal)}<span>earned</span></div>
         <div class="trend-chart-wrap">${renderTrendSvg(months, summary)}</div>
         <div class="goal-alloc-title" style="margin-top:32px">By stage</div>
@@ -4674,10 +4864,6 @@ ${e.rawResponse || '—'}`;
   function wireGoalTrackerCard() {
     document.querySelectorAll('[data-goal-tab]').forEach(btn => btn.addEventListener('click', () => {
       state.goalTab = btn.getAttribute('data-goal-tab');
-      renderGoalTrackerCardInto();
-    }));
-    document.querySelectorAll('[data-goal-range]').forEach(btn => btn.addEventListener('click', () => {
-      state.goalPastRangeMonths = Number(btn.getAttribute('data-goal-range'));
       renderGoalTrackerCardInto();
     }));
     const slider = document.getElementById('goalSlider');
@@ -4721,7 +4907,8 @@ ${e.rawResponse || '—'}`;
     });
     const shareBtn = document.getElementById('goalShareBtn');
     if (shareBtn) shareBtn.addEventListener('click', () => {
-      downloadGoalShareImage();
+      if (state.goalTab === 'future') downloadGoalsShareImage();
+      else downloadWorkHistoryShareImage();
     });
     if (state.goalTab === 'future') {
       const summary = state.earningsSummary;
