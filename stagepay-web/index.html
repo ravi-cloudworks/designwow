@@ -273,6 +273,7 @@
 
   .empty-note { font-size: 12px; color: var(--text-faint); font-style: italic; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); max-width: min(480px, calc(100vw - 32px)); background: var(--ink); color: var(--paper); padding: 9px 16px; border-radius: 14px; font-size: 12.5px; font-weight: 600; z-index: 2000; box-shadow: var(--shadow-card); text-align: center; }
+  .toast.error { background: var(--crimson); color: #fff; }
 
   .project-list-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; cursor: pointer; background: var(--surface); }
   .project-list-item:hover { border-color: var(--teal-line); background: var(--teal-soft); }
@@ -909,9 +910,9 @@ Rules:
     const rel = daysDiff <= 0 ? 'Today' : daysDiff === 1 ? 'Yesterday' : `${daysDiff}d before`;
     return `${formatIST(sqliteUtcString)} (${rel})`;
   }
-  function toast(msg) {
+  function toast(msg, isError) {
     const t = document.createElement('div');
-    t.className = 'toast'; t.textContent = msg;
+    t.className = isError ? 'toast error' : 'toast'; t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 2200);
   }
@@ -3744,12 +3745,12 @@ ${e.rawResponse || '—'}`;
       const btn = document.getElementById('settingsSaveBtn');
       const name = document.getElementById('settingsName').value.trim();
       const upiId = document.getElementById('settingsUpiId').value.trim();
-      if (!name) { toast('Name cannot be empty'); return; }
+      if (!name) { toast('Name cannot be empty', true); return; }
       btn.disabled = true; btn.textContent = 'Saving…';
       const res = await api.updateMe({ name, upiId });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(body.message || 'Failed to save settings');
+        toast(body.message || 'Failed to save settings', true);
         btn.disabled = false; btn.textContent = 'Save';
         return;
       }
@@ -5370,10 +5371,10 @@ ${e.rawResponse || '—'}`;
       <div class="showcase-field-section">
         <div class="showcase-field-label">"Get in touch" button (optional)</div>
         <div class="showcase-field-row">
-          <input type="text" id="showcaseContactInput" placeholder="https://instagram.com/you or mailto:you@example.com" value="${esc(customValue)}" maxlength="300">
+          <input type="text" id="showcaseContactInput" placeholder="https://instagram.com/you" value="${esc(customValue)}" maxlength="300">
           <button class="btn btn-sm" id="showcaseContactSaveBtn">Save</button>
         </div>
-        <p class="showcase-field-note">Instagram, LinkedIn, your website, or a mailto: address. Leave blank to hide the button entirely.</p>
+        <p class="showcase-field-note">Your Instagram, LinkedIn, or website profile URL. Leave blank to hide the button entirely.</p>
         <div class="showcase-field-row" style="margin-top:8px">
           <div class="input-with-prefix">
             <span class="input-prefix">or WhatsApp:</span>
@@ -5429,7 +5430,7 @@ ${e.rawResponse || '—'}`;
       btn.disabled = true; btn.textContent = 'Adding…';
       const result = await api.addShowcase(sourceItemId, key, fileName);
       if (result.error) {
-        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase');
+        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase', true);
         btn.disabled = false; btn.textContent = '+ Add';
         return;
       }
@@ -5443,7 +5444,7 @@ ${e.rawResponse || '—'}`;
     wireShowcaseThumbFallbacks();
     document.getElementById('showcaseCopyLinkBtn').addEventListener('click', () => {
       const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
-      navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link'));
+      navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link', true));
     });
     // Flashes the button green with a checkmark before the card re-renders,
     // so a save gives visible confirmation beyond the toast alone.
@@ -5463,14 +5464,14 @@ ${e.rawResponse || '—'}`;
       const btn = document.getElementById('showcaseSlugSaveBtn');
       const value = input.value.trim().toLowerCase();
       if (value && (value.length < 3 || value.length > 30)) {
-        toast('Use 3-30 lowercase letters, numbers, or hyphens.');
+        toast('Use 3-30 lowercase letters, numbers, or hyphens.', true);
         return;
       }
       btn.disabled = true; btn.textContent = 'Saving…';
       const res = await api.updateMe({ showcaseSlug: value });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(body.message || 'Failed to save link');
+        toast(body.message || 'Failed to save link', true);
         btn.disabled = false; btn.textContent = 'Save';
         return;
       }
@@ -5489,7 +5490,7 @@ ${e.rawResponse || '—'}`;
       const res = await api.updateMe({ contactLink: value });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(body.message || 'Failed to save contact link');
+        toast(body.message || 'Failed to save contact link', true);
         btn.disabled = false; btn.textContent = 'Save';
         return;
       }
@@ -5509,13 +5510,13 @@ ${e.rawResponse || '—'}`;
       const input = document.getElementById('showcaseWhatsappInput');
       const btn = document.getElementById('showcaseWhatsappSaveBtn');
       const digits = input.value.replace(/\D/g, '');
-      if (digits && digits.length < 8) { toast('That number looks too short — include the country code, e.g. 91 for India.'); return; }
+      if (digits && digits.length < 8) { toast('That number looks too short — include the country code, e.g. 91 for India.', true); return; }
       const value = digits ? `https://wa.me/${digits}` : '';
       btn.disabled = true; btn.textContent = 'Saving…';
       const res = await api.updateMe({ contactLink: value });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(body.message || 'Failed to save WhatsApp link');
+        toast(body.message || 'Failed to save WhatsApp link', true);
         btn.disabled = false; btn.textContent = 'Save';
         return;
       }
@@ -5566,7 +5567,7 @@ ${e.rawResponse || '—'}`;
       promoBtn.disabled = true; promoBtn.textContent = 'Uploading…';
       const result = await api.uploadShowcasePromo(file);
       if (result.error) {
-        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Upload failed');
+        toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Upload failed', true);
         promoBtn.disabled = false; promoBtn.textContent = 'Upload your Creative Portfolio';
         return;
       }
@@ -5988,7 +5989,7 @@ ${e.rawResponse || '—'}`;
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <div>
               <h1 style="margin:0">${esc(profile.name)}</h1>
-              ${profile.contact_link ? `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">${whatsappNumberFromLink(profile.contact_link) ? '💬 WhatsApp' : '✉ Get in touch'}</a>` : ''}
+              ${profile.contact_link ? `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">${whatsappNumberFromLink(profile.contact_link) ? '💬 WhatsApp' : '🔗 Get in touch'}</a>` : ''}
             </div>
           </div>
           ${items.length

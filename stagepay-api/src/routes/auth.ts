@@ -76,10 +76,11 @@ auth.get('/me', async (c) => {
 // in a URL).
 const SHOWCASE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 
-// Restricted to these schemes deliberately — this value is rendered as a
-// raw href on the public showcase page, so anything other than a real link
-// (e.g. a javascript: URI) must be rejected here, not just HTML-escaped.
-const CONTACT_LINK_RE = /^(https?:\/\/|mailto:)/i;
+// Restricted to http(s) deliberately — this value is rendered as a raw href
+// on the public showcase page, so anything other than a real link (e.g. a
+// javascript: URI) must be rejected here, not just HTML-escaped. mailto: was
+// dropped — this is meant for a social/profile URL, not an email address.
+const CONTACT_LINK_RE = /^https?:\/\//i;
 
 auth.patch('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
@@ -128,7 +129,7 @@ auth.patch('/me', async (c) => {
     if (trimmed === '') {
       await c.env.DB.prepare('UPDATE users SET contact_link = NULL WHERE id = ?').bind(sessionUserId).run();
     } else if (!CONTACT_LINK_RE.test(trimmed)) {
-      return c.json({ error: 'invalid_contact_link', message: 'Must start with https://, http://, or mailto: — e.g. your Instagram/LinkedIn URL or a mailto: address.' }, 400);
+      return c.json({ error: 'invalid_contact_link', message: 'Must be a link starting with https:// or http:// — e.g. your Instagram, LinkedIn, or website URL.' }, 400);
     } else {
       await c.env.DB.prepare('UPDATE users SET contact_link = ? WHERE id = ?').bind(trimmed, sessionUserId).run();
     }
