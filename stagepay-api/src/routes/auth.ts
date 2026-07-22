@@ -64,7 +64,7 @@ auth.get('/google/callback', async (c) => {
 auth.get('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ user: null });
-  const user = await c.env.DB.prepare('SELECT id, email, name, avatar_url, upi_id, showcase_slug FROM users WHERE id = ?')
+  const user = await c.env.DB.prepare('SELECT id, email, name, avatar_url, upi_id, showcase_slug, contact_link FROM users WHERE id = ?')
     .bind(sessionUserId)
     .first();
   return c.json({ user: user ?? null });
@@ -76,11 +76,20 @@ auth.get('/me', async (c) => {
 // in a URL).
 const SHOWCASE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 
+// Restricted to these schemes deliberately — this value is rendered as a
+// raw href on the public showcase page, so anything other than a real link
+// (e.g. a javascript: URI) must be rejected here, not just HTML-escaped.
+const CONTACT_LINK_RE = /^(https?:\/\/|mailto:)/i;
+
 auth.patch('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
-  const body = await c.req.json<{ upiId?: string; showcaseSlug?: string | null }>().catch(() => ({}) as { upiId?: string; showcaseSlug?: string | null });
-  if (body.upiId === undefined && body.showcaseSlug === undefined) return c.json({ error: 'nothing_to_update' }, 400);
+  const body = await c.req
+    .json<{ upiId?: string; showcaseSlug?: string | null; contactLink?: string | null }>()
+    .catch(() => ({}) as { upiId?: string; showcaseSlug?: string | null; contactLink?: string | null });
+  if (body.upiId === undefined && body.showcaseSlug === undefined && body.contactLink === undefined) {
+    return c.json({ error: 'nothing_to_update' }, 400);
+  }
 
   if (body.upiId !== undefined) {
     await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(body.upiId, sessionUserId).run();
@@ -101,6 +110,17 @@ auth.patch('/me', async (c) => {
         // Only failure mode here is the UNIQUE index — someone else already has this slug.
         return c.json({ error: 'slug_taken', message: 'That link is already taken — try another.' }, 409);
       }
+    }
+  }
+
+  if (body.contactLink !== undefined) {
+    const trimmed = (body.contactLink || '').trim();
+    if (trimmed === '') {
+      await c.env.DB.prepare('UPDATE users SET contact_link = NULL WHERE id = ?').bind(sessionUserId).run();
+    } else if (!CONTACT_LINK_RE.test(trimmed)) {
+      return c.json({ error: 'invalid_contact_link', message: 'Must start with https://, http://, or mailto: — e.g. your Instagram/LinkedIn URL or a mailto: address.' }, 400);
+    } else {
+      await c.env.DB.prepare('UPDATE users SET contact_link = ? WHERE id = ?').bind(trimmed, sessionUserId).run();
     }
   }
 

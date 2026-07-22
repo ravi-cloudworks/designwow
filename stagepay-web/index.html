@@ -4938,6 +4938,14 @@ ${e.rawResponse || '—'}`;
     }
     return html;
   }
+  // The two contact-link inputs (custom URL vs. WhatsApp number) both save
+  // into the same contact_link column — this just recognizes a wa.me link
+  // on load so the WhatsApp field shows the plain number back instead of
+  // the raw URL, and the custom-link field shows blank instead of it.
+  function whatsappNumberFromLink(link) {
+    const match = /^https:\/\/wa\.me\/(\d+)$/.exec(link || '');
+    return match ? match[1] : null;
+  }
   function renderShowcaseCard() {
     const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
     const items = state.showcaseItems;
@@ -4961,6 +4969,23 @@ ${e.rawResponse || '—'}`;
         <button class="btn btn-sm" id="showcaseSlugSaveBtn">Save</button>
       </div>
       <p style="margin:0 0 18px;font-size:11px;color:var(--text-faint)">Customize your public link — 3-30 lowercase letters, numbers, or hyphens. Leave blank to use the default link above.</p>
+
+      ${(() => {
+        const waNumber = whatsappNumberFromLink(state.user.contact_link);
+        const customValue = waNumber ? '' : (state.user.contact_link || '');
+        return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input type="text" id="showcaseContactInput" placeholder="https://instagram.com/you or mailto:you@example.com" value="${esc(customValue)}" style="flex:1;font-size:12.5px">
+        <button class="btn btn-sm" id="showcaseContactSaveBtn">Save</button>
+      </div>
+      <p style="margin:0 0 12px;font-size:11px;color:var(--text-faint)">Optional "Get in touch" link on your public page — Instagram, LinkedIn, your website, or a mailto: address. Leave blank to hide the button entirely.</p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-faint)">or WhatsApp:</span>
+        <input type="text" id="showcaseWhatsappInput" placeholder="919876543210 — country code, no + or spaces" value="${esc(waNumber || '')}" style="flex:1;font-size:12.5px">
+        <button class="btn btn-sm" id="showcaseWhatsappSaveBtn">Save</button>
+      </div>
+      <p style="margin:0 0 18px;font-size:11px;color:var(--text-faint)">Builds a proper wa.me link for you — just the digits, country code first, no +/spaces/dashes. This is the one case where a number is involved; it's entirely your choice to use it, same as the link above.</p>`;
+      })()}
 
       ${items.length
         ? `<div class="showcase-grid" style="margin-bottom:18px">${items.map(showcaseTileHtml).join('')}</div>`
@@ -5036,6 +5061,42 @@ ${e.rawResponse || '—'}`;
       }
       state.user.showcase_slug = value || null;
       toast(value ? 'Public link updated' : 'Reverted to your default link');
+      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+      wireShowcaseCard();
+    });
+    document.getElementById('showcaseContactSaveBtn').addEventListener('click', async () => {
+      const input = document.getElementById('showcaseContactInput');
+      const btn = document.getElementById('showcaseContactSaveBtn');
+      const value = input.value.trim();
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await api.updateMe({ contactLink: value });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(body.message || 'Failed to save contact link');
+        btn.disabled = false; btn.textContent = 'Save';
+        return;
+      }
+      state.user.contact_link = value || null;
+      toast(value ? 'Contact link updated' : 'Contact button removed from your public page');
+      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+      wireShowcaseCard();
+    });
+    document.getElementById('showcaseWhatsappSaveBtn').addEventListener('click', async () => {
+      const input = document.getElementById('showcaseWhatsappInput');
+      const btn = document.getElementById('showcaseWhatsappSaveBtn');
+      const digits = input.value.replace(/\D/g, '');
+      if (digits && digits.length < 8) { toast('That number looks too short — include the country code, e.g. 91 for India.'); return; }
+      const value = digits ? `https://wa.me/${digits}` : '';
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await api.updateMe({ contactLink: value });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(body.message || 'Failed to save WhatsApp link');
+        btn.disabled = false; btn.textContent = 'Save';
+        return;
+      }
+      state.user.contact_link = value || null;
+      toast(value ? 'WhatsApp link updated' : 'Contact button removed from your public page');
       document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
       wireShowcaseCard();
     });
@@ -5439,7 +5500,10 @@ ${e.rawResponse || '—'}`;
           <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay</span><span class="pay-brand-tagline">Get paid every stage. Never waste AI credits.</span></div></a>
           <div class="public-showcase-header">
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
-            <h1 style="margin:0">${esc(profile.name)}</h1>
+            <div>
+              <h1 style="margin:0">${esc(profile.name)}</h1>
+              ${profile.contact_link ? `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">${whatsappNumberFromLink(profile.contact_link) ? '💬 WhatsApp' : '✉ Get in touch'}</a>` : ''}
+            </div>
           </div>
           ${items.length
             ? [...grouped.entries()].map(([label, groupItems]) => `

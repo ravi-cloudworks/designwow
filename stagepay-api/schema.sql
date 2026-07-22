@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   stage_prices_paise TEXT NOT NULL DEFAULT '{}', -- Goal Tracker manual allocation: {"2":.., "3":.., "4":.., "5":..} — durable, survives across goals
   stage_target_counts TEXT NOT NULL DEFAULT '{}', -- Goal Tracker manual allocation: target count per stage for the CURRENT goal — reset whenever a new goal is set
   showcase_slug TEXT, -- optional custom handle for a nicer /showcase/{slug} URL — nullable, falls back to the raw id
+  contact_link TEXT, -- optional public contact link (Instagram/LinkedIn/site/mailto:) shown on the showcase page — an alternative to publishing a personal phone number
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_showcase_slug ON users(showcase_slug);
