@@ -156,9 +156,11 @@ auth.patch('/me', async (c) => {
 
   if (body.upiId !== undefined) {
     const trimmedUpi = body.upiId.trim();
-    // Clearing it (e.g. temporarily, while switching banks) stays allowed —
-    // only a non-empty value has to actually look like a UPI ID.
-    if (trimmedUpi && !UPI_ID_RE.test(trimmedUpi)) {
+    // Never allowed empty — customers can't pay at all without one, so a
+    // cleared UPI ID is worse than a stale one. Switching banks means
+    // replacing it with a new valid value, not blanking it in between.
+    if (!trimmedUpi) return c.json({ error: 'upi_id_required', message: 'UPI ID cannot be empty.' }, 400);
+    if (!UPI_ID_RE.test(trimmedUpi)) {
       return c.json({ error: 'invalid_upi_id', message: 'That doesn’t look like a valid UPI ID — expected format: name@bank.' }, 400);
     }
     await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(trimmedUpi, sessionUserId).run();

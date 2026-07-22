@@ -3573,8 +3573,7 @@ ${e.rawResponse || '—'}`;
         <div class="modal-card" style="max-width:400px">
           <div class="modal-head"><strong>💰 Your Income — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
           <div style="padding:16px">
-            <p style="font-size:12.5px;font-weight:700;color:${creditColor};margin:0 0 6px">💳 ${credits} income credit${credits === 1 ? '' : 's'} remaining</p>
-            <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 12px">${maskedUpi ? `UPI: ${esc(maskedUpi)}` : '⚠ No UPI ID set'}</p>
+            <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 14px">${maskedUpi ? `Your income goes to this UPI ID: <strong style="color:var(--text)">${esc(maskedUpi)}</strong>` : '⚠ No UPI ID set'}</p>
             ${blocked ? `
               <p style="font-size:13px;margin-bottom:14px">You're out of income credits — buy more to price this stage.</p>
               <button class="btn btn-primary" id="stageAmountBuyCreditsBtn" style="width:100%">Buy Income Credits</button>
@@ -3592,6 +3591,7 @@ ${e.rawResponse || '—'}`;
               ${isNewReceivable && credits > 0 && credits <= 2 ? `<p style="font-size:11px;color:var(--amber);margin-top:4px">⚠ Only ${credits} credit${credits === 1 ? '' : 's'} left — buy more before you run out.</p>` : ''}
               <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update Income' : 'Set Income'}</button>
             `}
+            <p style="font-size:11px;font-weight:700;color:${creditColor};text-align:right;margin:14px 0 0">💳 ${credits} income credit${credits === 1 ? '' : 's'} remaining</p>
           </div>
         </div>
       </div>`;
@@ -3884,7 +3884,8 @@ ${e.rawResponse || '—'}`;
       const name = document.getElementById('settingsName').value.trim();
       const upiId = document.getElementById('settingsUpiId').value.trim();
       if (!name) { toast('Name cannot be empty', true); return; }
-      if (upiId && !/^[\w.-]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
+      if (!upiId) { toast('UPI ID cannot be empty', true); return; }
+      if (!/^[\w.-]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
         toast('That doesn’t look like a valid UPI ID — expected format: name@bank', true);
         return;
       }
