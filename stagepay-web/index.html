@@ -412,6 +412,9 @@
   .landing-header .wordmark { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; text-decoration: none; color: var(--text); }
   .landing-header .wordmark .mark { font-size: 18px; }
   .landing-header-tagline { margin: 2px 0 0 26px; font-size: 11px; font-weight: 500; color: var(--text-faint); }
+  .landing-lang-switch { display: flex; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+  .landing-lang-switch button { padding: 5px 11px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: var(--text-soft); }
+  .landing-lang-switch button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
   .landing-section { max-width: 760px; margin: 0 auto; padding: 56px 22px; }
   .landing-section + .landing-section { border-top: 1px solid var(--line-soft); }
   .landing-hero { text-align: center; padding: 72px 22px 60px; }
@@ -848,6 +851,7 @@ Rules:
     stagePricesDraft: null, // {2:paise,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     stageCountsDraft: null, // {2:count,3:..,4:..,5:..} — uncommitted, until "Save my plan" is clicked
     projectsTab: 'in-period', // 'in-period' | 'others' — only shown once a goal is set
+    landingLang: (function () { try { return localStorage.getItem('stagepayLandingLang') || 'en'; } catch { return 'en'; } })(), // logged-out landing page only — English/Hindi/Tamil, remembered per browser
     showcaseItems: [], // designer's own curated public-showcase items
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
@@ -3732,102 +3736,213 @@ ${e.rawResponse || '—'}`;
 
   // ---------- Login screen ----------
   // ---------- Landing page (logged-out) ----------
+  // Landing page only (English/Hindi/Tamil) — the authenticated tool itself,
+  // and the customer-facing pay/showcase pages, stay English-only for now.
+  // Proper nouns (Google Flow, Veo, Runway, Kling, Pika, Midjourney, ChatGPT)
+  // are never translated — they're brand names, identical in every language.
+  const LANDING_I18N = {
+    en: {
+      headerTagline: 'Get paid every stage. Never work for free.', login: 'Login',
+      eyebrow: 'The Income Engine for UGC Creators',
+      heroH1: 'Get Paid Every Stage.<br>Never Work for Free.',
+      heroSub: 'The UGC production workflow that protects your time, your money, and your creative work — whether you generate it with AI or shoot it yourself. Start every project with confidence.',
+      heroCta: 'Sign in with Google →',
+      problemTitle: 'The Problem',
+      problemLead: "Creating UGC videos — with AI, or filming it yourself — costs you real time before you ever see a rupee. Because clients disappear. Because revisions never end. Because you generate scenes that are never approved. Because you finish the entire project... ...and only then find out the client doesn't want it.",
+      problemResultLabel: 'The result?',
+      problemBullet1: '❌ Unpaid hours', problemBullet2: '❌ Wasted AI credits', problemBullet3: '❌ Endless revisions', problemBullet4: '❌ Scope creep', problemBullet5: '❌ Client ghosting',
+      problemClosing: 'Every project becomes a gamble. StagePay changes the workflow.',
+      flowTitle: 'Instead of creating an entire video first...', flowSub: '...you build it one paid stage at a time.',
+      flowClientBrief: 'Client Brief', flowStoryboard: 'Storyboard', flowCustomerApproves: '↓ Customer approves ↓', flowYouGetPaid: 'You get paid',
+      flowCharactersMusic: 'Characters &amp; Music', flowSceneBlueprint: 'Scene Blueprint', flowFinalMovie: 'Final Movie', flowYouGetPaidFinal: 'You get paid — project complete',
+      flowNote: 'No approval. No payment. No generation.',
+      poorTitle: 'Why This Keeps You From Staying Poor',
+      poorLead: "Most creators build hours of work — AI generations or full shoots — before the client even approves the idea. StagePay flips that: every next stage only starts once the last one is approved and paid. Generating with AI? Your prompts stay aligned from start to finish — no rebuilding, no burned credits. Filming it yourself? No reshoots for a version nobody signed off on. Either way, you're never working past what's already been approved and paid for.",
+      howTitle: 'How it Works',
+      step1Title: 'Client Brief', step1Desc: 'Collect everything once. Brand. Product. Campaign. Goals.',
+      step2Title: 'Storyboard', step2Desc: 'Write it, generate it, or upload one you built elsewhere. Customer approves it. Lock it.', step2Tag: 'Get paid',
+      step3Title: 'Visual &amp; Music', step3Desc: 'Upload your reference characters, props, backgrounds and sounds — locked to the approved storyboard. No guessing. Everything stays consistent.', step3Tag: 'Get paid',
+      step4Title: 'Scene Blueprint', step4Desc: 'Convert the approved story into production-ready scenes. Every prompt already knows the approved assets.', step4Tag: 'Get paid',
+      step5Title: 'Final Movie', step5Desc: 'Only now generate — or upload — the final videos. No surprises. No wasted work. Deliver.', step5Tag: 'Get paid — project complete',
+      howeverTitle: 'Built for However You Create',
+      aiLead: 'Generating with AI? Whether you use', aiClosing: '...StagePay makes sure you never generate expensive AI content before the client says "Yes."',
+      filmLead: 'Shooting it yourself instead? Whether you create', filmClosing: '...same protection: nothing gets filmed, or paid for, until the client says yes.',
+      cat1: 'Tech UGC', cat2: 'Fashion', cat3: 'Beauty &amp; Cosmetics', cat4: 'Fitness', cat5: 'Food', cat6: 'Home &amp; Lifestyle', cat7: 'Parenting',
+      resultTitle: 'The Result',
+      result1: '✅ Every stage is approved.', result2: '✅ Every stage is paid.', result3: '✅ Every stage builds on the last.', result4: '✅ You get richer every stage — never poorer.',
+      punchline: 'Working for free — or gambling away AI credits — will make you poor.',
+      footer: 'StagePay — projects are private to your account.',
+    },
+    hi: {
+      headerTagline: 'हर स्टेज पर पेमेंट पाएं। कभी मुफ़्त में काम न करें।', login: 'लॉगिन',
+      eyebrow: 'UGC क्रिएटर्स के लिए इनकम इंजन',
+      heroH1: 'हर स्टेज पर पेमेंट पाएं।<br>कभी मुफ़्त में काम न करें।',
+      heroSub: 'यह UGC प्रोडक्शन वर्कफ़्लो आपके समय, पैसे और आपकी क्रिएटिव मेहनत — तीनों की रक्षा करता है, चाहे आप AI से बनाएं या खुद शूट करें। हर प्रोजेक्ट भरोसे के साथ शुरू करें।',
+      heroCta: 'Google से साइन इन करें →',
+      problemTitle: 'समस्या',
+      problemLead: 'UGC वीडियो बनाना — AI से हो या खुद शूट करके — आपका असली समय लेता है, इससे पहले कि आपको एक रुपया भी मिले। क्योंकि क्लाइंट गायब हो जाते हैं। क्योंकि रिवीज़न कभी खत्म नहीं होते। क्योंकि आप ऐसे सीन बनाते हैं जो कभी अप्रूव ही नहीं होते। क्योंकि आप पूरा प्रोजेक्ट खत्म करते हैं... ...और तब पता चलता है कि क्लाइंट को यह चाहिए ही नहीं था।',
+      problemResultLabel: 'नतीजा?',
+      problemBullet1: '❌ बिना पैसे के घंटों काम', problemBullet2: '❌ बर्बाद हुए AI क्रेडिट', problemBullet3: '❌ खत्म न होने वाले रिवीज़न', problemBullet4: '❌ बढ़ता हुआ स्कोप', problemBullet5: '❌ क्लाइंट का गायब हो जाना',
+      problemClosing: 'हर प्रोजेक्ट एक जुआ बन जाता है। StagePay यह तरीका बदल देता है।',
+      flowTitle: 'पूरा वीडियो पहले बनाने की बजाय...', flowSub: '...आप इसे एक-एक पेड स्टेज करके बनाते हैं।',
+      flowClientBrief: 'क्लाइंट ब्रीफ़', flowStoryboard: 'स्टोरीबोर्ड', flowCustomerApproves: '↓ ग्राहक अप्रूव करता है ↓', flowYouGetPaid: 'आपको पेमेंट मिलती है',
+      flowCharactersMusic: 'किरदार और संगीत', flowSceneBlueprint: 'सीन ब्लूप्रिंट', flowFinalMovie: 'फाइनल मूवी', flowYouGetPaidFinal: 'आपको पेमेंट मिलती है — प्रोजेक्ट पूरा',
+      flowNote: 'न अप्रूवल, न पेमेंट, न जनरेशन।',
+      poorTitle: 'यह आपको गरीब होने से कैसे बचाता है',
+      poorLead: 'ज़्यादातर क्रिएटर्स क्लाइंट के आइडिया अप्रूव करने से पहले ही घंटों की मेहनत लगा देते हैं — चाहे AI जनरेशन हो या पूरी शूटिंग। StagePay इसे उल्टा कर देता है: अगली स्टेज तभी शुरू होती है जब पिछली स्टेज अप्रूव और पेड हो चुकी हो। AI से बना रहे हैं? आपके प्रॉम्प्ट शुरू से आखिर तक एक जैसे रहते हैं — न दोबारा बनाना, न क्रेडिट बर्बाद करना। खुद शूट कर रहे हैं? किसी ऐसे वर्ज़न के लिए दोबारा शूट नहीं करना जिसे किसी ने अप्रूव ही नहीं किया। दोनों ही तरह से, आप कभी उससे आगे काम नहीं करते जो पहले से अप्रूव और पेड है।',
+      howTitle: 'यह कैसे काम करता है',
+      step1Title: 'क्लाइंट ब्रीफ़', step1Desc: 'एक बार में सब कुछ इकट्ठा करें। ब्रांड। प्रोडक्ट। कैंपेन। लक्ष्य।',
+      step2Title: 'स्टोरीबोर्ड', step2Desc: 'खुद लिखें, जनरेट करें, या कहीं और बनाया हुआ अपलोड करें। ग्राहक इसे अप्रूव करता है। लॉक करें।', step2Tag: 'पेमेंट पाएं',
+      step3Title: 'विज़ुअल और संगीत', step3Desc: 'अपने रेफरेंस किरदार, प्रॉप्स, बैकग्राउंड और साउंड अपलोड करें — अप्रूव्ड स्टोरीबोर्ड से जुड़े हुए। कोई अंदाज़ा नहीं। सब कुछ एक जैसा रहता है।', step3Tag: 'पेमेंट पाएं',
+      step4Title: 'सीन ब्लूप्रिंट', step4Desc: 'अप्रूव्ड कहानी को प्रोडक्शन-रेडी सीन में बदलें। हर प्रॉम्प्ट को अप्रूव्ड एसेट्स पहले से पता होते हैं।', step4Tag: 'पेमेंट पाएं',
+      step5Title: 'फाइनल मूवी', step5Desc: 'अब ही फाइनल वीडियो जनरेट करें — या अपलोड करें। कोई सरप्राइज़ नहीं। कोई बर्बाद मेहनत नहीं। डिलीवर करें।', step5Tag: 'पेमेंट पाएं — प्रोजेक्ट पूरा',
+      howeverTitle: 'आप जैसे भी बनाएं, इसके लिए बना है',
+      aiLead: 'AI से बना रहे हैं? चाहे आप इस्तेमाल करें', aiClosing: '...StagePay तय करता है कि क्लाइंट के "हां" कहने से पहले आप महंगा AI कंटेंट कभी न बनाएं।',
+      filmLead: 'खुद शूट कर रहे हैं? चाहे आप बनाएं', filmClosing: '...वही सुरक्षा: जब तक क्लाइंट "हां" नहीं कहता, न कुछ शूट होता है, न पेमेंट।',
+      cat1: 'टेक UGC', cat2: 'फैशन', cat3: 'ब्यूटी और कॉस्मेटिक्स', cat4: 'फिटनेस', cat5: 'फ़ूड', cat6: 'होम और लाइफस्टाइल', cat7: 'पेरेंटिंग',
+      resultTitle: 'नतीजा',
+      result1: '✅ हर स्टेज अप्रूव होती है।', result2: '✅ हर स्टेज की पेमेंट मिलती है।', result3: '✅ हर स्टेज पिछली पर बनती है।', result4: '✅ हर स्टेज पर आप अमीर बनते हैं — कभी गरीब नहीं।',
+      punchline: 'मुफ़्त में काम करना — या AI क्रेडिट बर्बाद करना — आपको गरीब बना देगा।',
+      footer: 'StagePay — प्रोजेक्ट्स आपके अकाउंट तक निजी रहते हैं।',
+    },
+    ta: {
+      headerTagline: 'ஒவ்வொரு நிலையிலும் பணம் பெறுங்கள். இலவசமாக வேலை செய்ய வேண்டாம்.', login: 'உள்நுழைய',
+      eyebrow: 'UGC உருவாக்குநர்களுக்கான வருமான இயந்திரம்',
+      heroH1: 'ஒவ்வொரு நிலையிலும் பணம் பெறுங்கள்.<br>இலவசமாக வேலை செய்ய வேண்டாம்.',
+      heroSub: 'இந்த UGC தயாரிப்பு பணிமுறை உங்கள் நேரத்தையும், பணத்தையும், உங்கள் படைப்பாற்றல் வேலையையும் பாதுகாக்கிறது — AI மூலம் உருவாக்கினாலும் சரி, நீங்களே படமெடுத்தாலும் சரி. நம்பிக்கையுடன் ஒவ்வொரு திட்டத்தையும் தொடங்குங்கள்.',
+      heroCta: 'Google மூலம் உள்நுழையவும் →',
+      problemTitle: 'பிரச்சனை',
+      problemLead: 'UGC வீடியோக்களை உருவாக்குவது — AI மூலமாகவோ, நீங்களே படமெடுத்தோ — நீங்கள் ஒரு ரூபாய் பார்ப்பதற்கு முன்பே உங்கள் நேரத்தை எடுத்துக் கொள்கிறது. வாடிக்கையாளர்கள் மறைந்துவிடுவதால். திருத்தங்கள் முடிவே இல்லாமல் இருப்பதால். ஒப்புதல் பெறாத காட்சிகளை உருவாக்குவதால். முழு திட்டத்தையும் முடித்த பின்னரே... ...வாடிக்கையாளருக்கு அது வேண்டாம் என்று தெரிந்துகொள்வதால்.',
+      problemResultLabel: 'விளைவு?',
+      problemBullet1: '❌ சம்பளமில்லா மணிநேரங்கள்', problemBullet2: '❌ வீணான AI கிரெடிட்கள்', problemBullet3: '❌ முடிவில்லா திருத்தங்கள்', problemBullet4: '❌ வேலை எல்லை மீறல்', problemBullet5: '❌ வாடிக்கையாளர் மறைதல்',
+      problemClosing: 'ஒவ்வொரு திட்டமும் ஒரு சூதாட்டமாக மாறுகிறது. StagePay இந்த பணிமுறையை மாற்றுகிறது.',
+      flowTitle: 'முழு வீடியோவையும் முதலில் உருவாக்குவதற்குப் பதிலாக...', flowSub: '...ஒரு நேரத்தில் ஒரு பணம் பெறும் நிலையாக அதை உருவாக்குகிறீர்கள்.',
+      flowClientBrief: 'வாடிக்கையாளர் விவரம்', flowStoryboard: 'கதைப்பலகை', flowCustomerApproves: '↓ வாடிக்கையாளர் ஒப்புதல் ↓', flowYouGetPaid: 'உங்களுக்கு பணம் கிடைக்கும்',
+      flowCharactersMusic: 'கதாபாத்திரங்கள் &amp; இசை', flowSceneBlueprint: 'காட்சி வடிவமைப்பு', flowFinalMovie: 'இறுதி திரைப்படம்', flowYouGetPaidFinal: 'உங்களுக்கு பணம் கிடைக்கும் — திட்டம் முடிந்தது',
+      flowNote: 'ஒப்புதல் இல்லை. பணம் இல்லை. உருவாக்கமும் இல்லை.',
+      poorTitle: 'இது உங்களை ஏழையாக இருந்து காப்பாற்றுவது எப்படி',
+      poorLead: 'பெரும்பாலான உருவாக்குநர்கள் வாடிக்கையாளர் யோசனையை ஒப்புக்கொள்வதற்கு முன்பே மணிநேரக் கணக்கில் வேலையை உருவாக்குகிறார்கள் — AI உருவாக்கங்களோ முழு படப்பிடிப்போ. StagePay அதை தலைகீழாக்குகிறது: முந்தைய நிலை ஒப்புதல் பெற்று பணம் பெற்ற பின்னரே அடுத்த நிலை தொடங்கும். AI மூலம் உருவாக்குகிறீர்களா? உங்கள் ப்ராம்ப்ட்கள் தொடக்கத்திலிருந்து முடிவு வரை ஒத்திசைவாக இருக்கும் — மீண்டும் கட்டமைக்க வேண்டாம், கிரெடிட் வீணாக்க வேண்டாம். நீங்களே படமெடுக்கிறீர்களா? யாரும் ஒப்புக்கொள்ளாத பதிப்புக்காக மீண்டும் படமெடுக்க வேண்டாம். எப்படியிருந்தாலும், ஏற்கனவே ஒப்புதல் பெற்று பணம் பெற்றதற்கு மேல் நீங்கள் ஒருபோதும் வேலை செய்வதில்லை.',
+      howTitle: 'இது எப்படி செயல்படுகிறது',
+      step1Title: 'வாடிக்கையாளர் விவரம்', step1Desc: 'எல்லாவற்றையும் ஒரே முறை சேகரிக்கவும். பிராண்ட். தயாரிப்பு. பிரச்சாரம். இலக்குகள்.',
+      step2Title: 'கதைப்பலகை', step2Desc: 'நீங்களே எழுதுங்கள், உருவாக்குங்கள், அல்லது வேறு இடத்தில் உருவாக்கியதை பதிவேற்றுங்கள். வாடிக்கையாளர் ஒப்புக்கொள்கிறார். பூட்டவும்.', step2Tag: 'பணம் பெறுங்கள்',
+      step3Title: 'காட்சி &amp; இசை', step3Desc: 'உங்கள் குறிப்பு கதாபாத்திரங்கள், பொருட்கள், பின்னணிகள் மற்றும் ஒலிகளை பதிவேற்றுங்கள் — ஒப்புதல் பெற்ற கதைப்பலகையுடன் இணைக்கப்பட்டுள்ளது. யூகிக்க வேண்டாம். எல்லாமே சீராக இருக்கும்.', step3Tag: 'பணம் பெறுங்கள்',
+      step4Title: 'காட்சி வடிவமைப்பு', step4Desc: 'ஒப்புதல் பெற்ற கதையை தயாரிப்புக்கு தயாரான காட்சிகளாக மாற்றுங்கள். ஒவ்வொரு ப்ராம்ப்ட்டுக்கும் ஒப்புதல் பெற்ற உள்ளடக்கங்கள் ஏற்கனவே தெரியும்.', step4Tag: 'பணம் பெறுங்கள்',
+      step5Title: 'இறுதி திரைப்படம்', step5Desc: 'இப்போது மட்டுமே இறுதி வீடியோக்களை உருவாக்குங்கள் — அல்லது பதிவேற்றுங்கள். எந்த ஆச்சரியமும் இல்லை. வீணான வேலையும் இல்லை. வழங்குங்கள்.', step5Tag: 'பணம் பெறுங்கள் — திட்டம் முடிந்தது',
+      howeverTitle: 'நீங்கள் எப்படி உருவாக்கினாலும் அதற்காக கட்டமைக்கப்பட்டது',
+      aiLead: 'AI மூலம் உருவாக்குகிறீர்களா? நீங்கள் பயன்படுத்தினாலும்', aiClosing: '...வாடிக்கையாளர் "சரி" என்று சொல்வதற்கு முன் விலையுயர்ந்த AI உள்ளடக்கத்தை நீங்கள் ஒருபோதும் உருவாக்காதபடி StagePay உறுதி செய்கிறது.',
+      filmLead: 'நீங்களே படமெடுக்கிறீர்களா? நீங்கள் உருவாக்கினாலும்', filmClosing: '...அதே பாதுகாப்பு: வாடிக்கையாளர் சரி என்று சொல்லும் வரை எதுவும் படமெடுக்கப்படாது, பணமும் செலுத்தப்படாது.',
+      cat1: 'டெக் UGC', cat2: 'ஃபேஷன்', cat3: 'அழகு &amp; ஒப்பனை', cat4: 'உடற்பயிற்சி', cat5: 'உணவு', cat6: 'வீடு &amp; வாழ்க்கை முறை', cat7: 'பெற்றோர்',
+      resultTitle: 'விளைவு',
+      result1: '✅ ஒவ்வொரு நிலையும் ஒப்புதல் பெறுகிறது.', result2: '✅ ஒவ்வொரு நிலைக்கும் பணம் கிடைக்கிறது.', result3: '✅ ஒவ்வொரு நிலையும் முந்தையதன் மீது கட்டமைக்கப்படுகிறது.', result4: '✅ ஒவ்வொரு நிலையிலும் நீங்கள் பணக்காரராகிறீர்கள் — ஒருபோதும் ஏழையாக மாட்டீர்கள்.',
+      punchline: 'இலவசமாக வேலை செய்வது — அல்லது AI கிரெடிட்களை வீணடிப்பது — உங்களை ஏழையாக்கும்.',
+      footer: 'StagePay — திட்டங்கள் உங்கள் கணக்கிற்கு மட்டுமே தனிப்பட்டவை.',
+    },
+  };
   // Positioned as "The Operating System for AI UGC Creators" — the product
   // grew well past a prompt-drafting tool (real payments, stage locks, per-
   // project persistence), so the old "Independent UGC Prompt Studio" framing
   // undersold it. Login stays reachable at every scroll depth via the sticky
   // header, not just buried at the bottom of the page.
   function renderLoginScreen() {
+    const lang = LANDING_I18N[state.landingLang] ? state.landingLang : 'en';
+    const t = (key) => LANDING_I18N[lang][key];
     document.getElementById('app').innerHTML = `
       <div class="landing">
         <div class="landing-header">
           <div>
             <a class="wordmark" href="https://stagepay.pages.dev/"><span class="mark">💸</span><span>StagePay</span></a>
-            <p class="landing-header-tagline">Get paid every stage. Never work for free.</p>
+            <p class="landing-header-tagline">${t('headerTagline')}</p>
           </div>
-          <a class="btn btn-primary btn-sm" href="/api/auth/google" data-login-link>Login</a>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="landing-lang-switch">
+              <button type="button" class="${lang === 'en' ? 'active' : ''}" data-landing-lang="en">EN</button>
+              <button type="button" class="${lang === 'hi' ? 'active' : ''}" data-landing-lang="hi">हिं</button>
+              <button type="button" class="${lang === 'ta' ? 'active' : ''}" data-landing-lang="ta">த</button>
+            </div>
+            <a class="btn btn-primary btn-sm" href="/api/auth/google" data-login-link>${t('login')}</a>
+          </div>
         </div>
 
         <div class="landing-hero">
-          <span class="landing-eyebrow">The Income Engine for UGC Creators</span>
-          <h1>Get Paid Every Stage.<br>Never Work for Free.</h1>
-          <p class="landing-sub">The UGC production workflow that protects your time, your money, and your creative work — whether you generate it with AI or shoot it yourself. Start every project with confidence.</p>
-          <a class="landing-cta" href="/api/auth/google" data-login-link>Sign in with Google →</a>
+          <span class="landing-eyebrow">${t('eyebrow')}</span>
+          <h1>${t('heroH1')}</h1>
+          <p class="landing-sub">${t('heroSub')}</p>
+          <a class="landing-cta" href="/api/auth/google" data-login-link>${t('heroCta')}</a>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">The Problem</h2>
-          <p class="landing-lead">Creating UGC videos — with AI, or filming it yourself — costs you real time before you ever see a rupee. Because clients disappear. Because revisions never end. Because you generate scenes that are never approved. Because you finish the entire project... ...and only then find out the client doesn't want it.</p>
-          <p class="landing-lead" style="margin-bottom:6px"><strong>The result?</strong></p>
+          <h2 class="landing-h2">${t('problemTitle')}</h2>
+          <p class="landing-lead">${esc(t('problemLead'))}</p>
+          <p class="landing-lead" style="margin-bottom:6px"><strong>${t('problemResultLabel')}</strong></p>
           <ul class="landing-problem-list">
-            <li>❌ Unpaid hours</li>
-            <li>❌ Wasted AI credits</li>
-            <li>❌ Endless revisions</li>
-            <li>❌ Scope creep</li>
-            <li>❌ Client ghosting</li>
+            <li>${t('problemBullet1')}</li>
+            <li>${t('problemBullet2')}</li>
+            <li>${t('problemBullet3')}</li>
+            <li>${t('problemBullet4')}</li>
+            <li>${t('problemBullet5')}</li>
           </ul>
-          <p class="landing-lead" style="margin-top:20px">Every project becomes a gamble. StagePay changes the workflow.</p>
+          <p class="landing-lead" style="margin-top:20px">${t('problemClosing')}</p>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">Instead of creating an entire video first...</h2>
-          <p class="landing-lead">...you build it one paid stage at a time.</p>
+          <h2 class="landing-h2">${t('flowTitle')}</h2>
+          <p class="landing-lead">${t('flowSub')}</p>
           <div class="landing-flow">
-            <div class="landing-flow-step"><strong>Client Brief</strong></div>
+            <div class="landing-flow-step"><strong>${t('flowClientBrief')}</strong></div>
             <div class="landing-flow-arrow">↓</div>
-            <div class="landing-flow-step"><strong>Storyboard</strong></div>
-            <div class="landing-flow-arrow">↓ Customer approves ↓</div>
-            <div class="landing-flow-step paid"><strong>You get paid</strong></div>
+            <div class="landing-flow-step"><strong>${t('flowStoryboard')}</strong></div>
+            <div class="landing-flow-arrow">${t('flowCustomerApproves')}</div>
+            <div class="landing-flow-step paid"><strong>${t('flowYouGetPaid')}</strong></div>
             <div class="landing-flow-arrow">↓</div>
-            <div class="landing-flow-step"><strong>Characters &amp; Music</strong></div>
-            <div class="landing-flow-arrow">↓ Customer approves ↓</div>
-            <div class="landing-flow-step paid"><strong>You get paid</strong></div>
+            <div class="landing-flow-step"><strong>${t('flowCharactersMusic')}</strong></div>
+            <div class="landing-flow-arrow">${t('flowCustomerApproves')}</div>
+            <div class="landing-flow-step paid"><strong>${t('flowYouGetPaid')}</strong></div>
             <div class="landing-flow-arrow">↓</div>
-            <div class="landing-flow-step"><strong>Scene Blueprint</strong></div>
-            <div class="landing-flow-arrow">↓ Customer approves ↓</div>
-            <div class="landing-flow-step paid"><strong>You get paid</strong></div>
+            <div class="landing-flow-step"><strong>${t('flowSceneBlueprint')}</strong></div>
+            <div class="landing-flow-arrow">${t('flowCustomerApproves')}</div>
+            <div class="landing-flow-step paid"><strong>${t('flowYouGetPaid')}</strong></div>
             <div class="landing-flow-arrow">↓</div>
-            <div class="landing-flow-step"><strong>Final Movie</strong></div>
-            <div class="landing-flow-arrow">↓ Customer approves ↓</div>
-            <div class="landing-flow-step paid final"><strong>You get paid — project complete</strong></div>
+            <div class="landing-flow-step"><strong>${t('flowFinalMovie')}</strong></div>
+            <div class="landing-flow-arrow">${t('flowCustomerApproves')}</div>
+            <div class="landing-flow-step paid final"><strong>${t('flowYouGetPaidFinal')}</strong></div>
           </div>
-          <p class="landing-flow-note">No approval. No payment. No generation.</p>
+          <p class="landing-flow-note">${t('flowNote')}</p>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">Why This Keeps You From Staying Poor</h2>
-          <p class="landing-lead">Most creators build hours of work — AI generations or full shoots — before the client even approves the idea. StagePay flips that: every next stage only starts once the last one is approved and paid. Generating with AI? Your prompts stay aligned from start to finish — no rebuilding, no burned credits. Filming it yourself? No reshoots for a version nobody signed off on. Either way, you're never working past what's already been approved and paid for.</p>
+          <h2 class="landing-h2">${t('poorTitle')}</h2>
+          <p class="landing-lead">${esc(t('poorLead'))}</p>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">How it Works</h2>
+          <h2 class="landing-h2">${t('howTitle')}</h2>
           <div class="landing-steps-grid">
             <div class="landing-step-card">
               <div class="landing-step-num">1</div>
-              <div><h3>Client Brief</h3><p>Collect everything once. Brand. Product. Campaign. Goals.</p></div>
+              <div><h3>${t('step1Title')}</h3><p>${t('step1Desc')}</p></div>
             </div>
             <div class="landing-step-card">
               <div class="landing-step-num">2</div>
-              <div><h3>Storyboard</h3><p>Write it, generate it, or upload one you built elsewhere. Customer approves it. Lock it.</p><span class="paid-tag">Get paid</span></div>
+              <div><h3>${t('step2Title')}</h3><p>${t('step2Desc')}</p><span class="paid-tag">${t('step2Tag')}</span></div>
             </div>
             <div class="landing-step-card">
               <div class="landing-step-num">3</div>
-              <div><h3>Visual &amp; Music</h3><p>Upload your reference characters, props, backgrounds and sounds — locked to the approved storyboard. No guessing. Everything stays consistent.</p><span class="paid-tag">Get paid</span></div>
+              <div><h3>${t('step3Title')}</h3><p>${t('step3Desc')}</p><span class="paid-tag">${t('step3Tag')}</span></div>
             </div>
             <div class="landing-step-card">
               <div class="landing-step-num">4</div>
-              <div><h3>Scene Blueprint</h3><p>Convert the approved story into production-ready scenes. Every prompt already knows the approved assets.</p><span class="paid-tag">Get paid</span></div>
+              <div><h3>${t('step4Title')}</h3><p>${t('step4Desc')}</p><span class="paid-tag">${t('step4Tag')}</span></div>
             </div>
             <div class="landing-step-card">
               <div class="landing-step-num">5</div>
-              <div><h3>Final Movie</h3><p>Only now generate — or upload — the final videos. No surprises. No wasted work. Deliver.</p><span class="paid-tag">Get paid — project complete</span></div>
+              <div><h3>${t('step5Title')}</h3><p>${t('step5Desc')}</p><span class="paid-tag">${t('step5Tag')}</span></div>
             </div>
           </div>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">Built for However You Create</h2>
-          <p class="landing-lead">Generating with AI? Whether you use</p>
+          <h2 class="landing-h2">${t('howeverTitle')}</h2>
+          <p class="landing-lead">${t('aiLead')}</p>
           <div class="landing-tools-row">
             <span class="landing-tool-chip">Google Flow</span>
             <span class="landing-tool-chip">Veo</span>
@@ -3837,37 +3952,37 @@ ${e.rawResponse || '—'}`;
             <span class="landing-tool-chip">Midjourney</span>
             <span class="landing-tool-chip">ChatGPT</span>
           </div>
-          <p class="landing-lead">...StagePay makes sure you never generate expensive AI content before the client says "Yes."</p>
-          <p class="landing-lead">Shooting it yourself instead? Whether you create</p>
+          <p class="landing-lead">${esc(t('aiClosing'))}</p>
+          <p class="landing-lead">${t('filmLead')}</p>
           <div class="landing-tools-row">
-            <span class="landing-tool-chip">Tech UGC</span>
-            <span class="landing-tool-chip">Fashion</span>
-            <span class="landing-tool-chip">Beauty &amp; Cosmetics</span>
-            <span class="landing-tool-chip">Fitness</span>
-            <span class="landing-tool-chip">Food</span>
-            <span class="landing-tool-chip">Home &amp; Lifestyle</span>
-            <span class="landing-tool-chip">Parenting</span>
+            <span class="landing-tool-chip">${t('cat1')}</span>
+            <span class="landing-tool-chip">${t('cat2')}</span>
+            <span class="landing-tool-chip">${t('cat3')}</span>
+            <span class="landing-tool-chip">${t('cat4')}</span>
+            <span class="landing-tool-chip">${t('cat5')}</span>
+            <span class="landing-tool-chip">${t('cat6')}</span>
+            <span class="landing-tool-chip">${t('cat7')}</span>
           </div>
-          <p class="landing-lead">...same protection: nothing gets filmed, or paid for, until the client says yes.</p>
+          <p class="landing-lead">${t('filmClosing')}</p>
         </div>
 
         <div class="landing-section">
-          <h2 class="landing-h2">The Result</h2>
+          <h2 class="landing-h2">${t('resultTitle')}</h2>
           <ul class="landing-result-list">
-            <li>✅ Every stage is approved.</li>
-            <li>✅ Every stage is paid.</li>
-            <li>✅ Every stage builds on the last.</li>
-            <li>✅ You get richer every stage — never poorer.</li>
+            <li>${t('result1')}</li>
+            <li>${t('result2')}</li>
+            <li>${t('result3')}</li>
+            <li>${t('result4')}</li>
           </ul>
         </div>
 
         <div class="landing-final">
-          <p class="landing-punch">Working for free — or gambling away AI credits — will make you poor.</p>
-          <h2 class="landing-h2">Get Paid Every Stage.<br>Never Work for Free.</h2>
-          <a class="landing-cta" href="/api/auth/google" data-login-link>Sign in with Google →</a>
+          <p class="landing-punch">${t('punchline')}</p>
+          <h2 class="landing-h2">${t('heroH1')}</h2>
+          <a class="landing-cta" href="/api/auth/google" data-login-link>${t('heroCta')}</a>
         </div>
 
-        <div class="landing-footer">StagePay — projects are private to your account.</div>
+        <div class="landing-footer">${t('footer')}</div>
       </div>
       <div id="modalRoot"></div>`;
     wireLoginScreen();
@@ -3883,6 +3998,13 @@ ${e.rawResponse || '—'}`;
           e.preventDefault();
           showDesktopOnlyModal();
         }
+      });
+    });
+    document.querySelectorAll('[data-landing-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.landingLang = btn.getAttribute('data-landing-lang');
+        try { localStorage.setItem('stagepayLandingLang', state.landingLang); } catch {}
+        renderLoginScreen();
       });
     });
   }
