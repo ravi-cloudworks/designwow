@@ -161,7 +161,7 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
     .bind(token, stage)
     .first<{ amount_paise: number; paid: number }>();
 
-  // A payment credit is spent opening a new receivable — either this stage
+  // An income credit is spent opening a new receivable — either this stage
   // has never been priced before, or its last round was already paid and
   // this price starts a fresh one. Renegotiating a still-open, unpaid
   // amount (the common case) is free — it's the same ask, not a new one.
@@ -171,7 +171,7 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   if (isNewReceivable) {
     const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?').bind(userId).first<{ free_credits_remaining: number }>();
     if (!user || user.free_credits_remaining <= 0) {
-      return c.json({ error: 'out_of_credits', message: "You're out of payment credits — buy more to price this stage." }, 402);
+      return c.json({ error: 'out_of_credits', message: "You're out of income credits — buy more to price this stage." }, 402);
     }
     await c.env.DB.prepare('UPDATE users SET free_credits_remaining = free_credits_remaining - 1 WHERE id = ?').bind(userId).run();
   }

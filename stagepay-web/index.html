@@ -442,7 +442,7 @@
   .admin-row-meta { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
   .admin-row-meta a { color: var(--teal); }
 
-  /* ---------- Buy Credits ---------- */
+  /* ---------- Buy Income Credits ---------- */
   .credit-pack-row { display: flex; gap: 10px; margin: 12px 0; }
   .credit-pack { flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; }
   .credit-pack.selected { border-color: var(--teal); background: var(--teal-soft); }
@@ -1079,7 +1079,7 @@ Rules:
   function earnedPillHtml(stage) {
     const paise = stageEarnedPaise(stage);
     if (!paise) return '';
-    return `<span class="earned-pill" data-stage-earned-pill="${stage}" title="Click to see payment history">💰 ${formatRupees(paise)} earned</span>`;
+    return `<span class="earned-pill" data-stage-earned-pill="${stage}" title="Click to see income history">💰 ${formatRupees(paise)} earned</span>`;
   }
   // The pill only ever shows a total — this is the one place a designer can
   // actually see the individual rounds that add up to it (same idea as the
@@ -1092,7 +1092,7 @@ Rules:
     root.innerHTML = `
       <div class="modal-overlay" id="stageHistoryModalOverlay">
         <div class="modal-card" style="max-width:400px">
-          <div class="modal-head"><strong>💰 Stage ${stage} — Payment History</strong><button class="modal-close" id="stageHistoryModalCloseBtn">×</button></div>
+          <div class="modal-head"><strong>💰 Stage ${stage} — Income History</strong><button class="modal-close" id="stageHistoryModalCloseBtn">×</button></div>
           ${payments.length
             ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
                 ${payments.map(p => `<div class="pay-prior-payment">✓ ${formatRupees(p.amountPaise)} on ${esc(formatIST(p.paidAt))}</div>`).join('')}
@@ -1152,7 +1152,7 @@ Rules:
             <p class="modal-sub" style="margin-top:8px">This permanently deletes:</p>
             <ul class="affected-list">
               <li>Every uploaded file across all stages — references, scenes, movie clips, Final Video</li>
-              <li>Its full payment history — Income Tracker's past/future trends won't be accurate without it</li>
+              <li>Its full income history — Income Tracker's past/future trends won't be accurate without it</li>
               <li>Any of its work currently in your public Showcase</li>
             </ul>
             <p class="modal-sub">This cannot be undone. If you're not sure, keep the project instead of deleting it.</p>
@@ -2692,7 +2692,7 @@ ${e.rawResponse || '—'}`;
         <div class="story-step"><span class="story-step-num">2</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>⬇ Download artifacts</button></div></div>
         <div class="story-step"><span class="story-step-num">3</span><div class="story-step-body"><p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p></div></div>
         <div class="story-step"><span class="story-step-num">4</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>+ Upload storyboard image</button></div></div>
-        <div class="story-step"><span class="story-step-num">5</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>💰 Set amount</button></div></div>
+        <div class="story-step"><span class="story-step-num">5</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>💰 Set Income</button></div></div>
         <div class="story-step"><span class="story-step-num">6</span><div class="story-step-body"><p class="story-step-note">Set an amount first.</p></div></div>
         <div class="story-step"><span class="story-step-num">7</span><div class="story-step-body"><button class="btn btn-primary btn-guard-disabled" style="width:100%" data-story-placeholder-guard>✅ Lock this stage</button></div></div>
         ${previousStageGuardNote(2)}
@@ -2782,7 +2782,7 @@ ${e.rawResponse || '—'}`;
         <div class="story-step">
           <span class="story-step-num">${nextStepStart}</span>
           <div class="story-step-body">
-            <button type="button" class="btn btn-sm" id="storyAmountBtn" ${dis}>💰 ${amountEntry ? 'Update amount' : 'Set amount'}</button>
+            <button type="button" class="btn btn-sm" id="storyAmountBtn" ${dis}>💰 ${amountEntry ? 'Update Income' : 'Set Income'}</button>
             ${amountEntry ? `<span class="story-step-note">${formatRupees(amountEntry.amountPaise)}</span>` : ''}
           </div>
         </div>
@@ -3081,7 +3081,7 @@ ${e.rawResponse || '—'}`;
       <div class="story-step">
         <span class="story-step-num">5</span>
         <div class="story-step-body">
-          <button type="button" class="btn btn-sm${guardClass}" data-stage-amount-btn ${hardDis}>💰 ${amountEntry ? 'Update amount' : 'Set amount'}</button>
+          <button type="button" class="btn btn-sm${guardClass}" data-stage-amount-btn ${hardDis}>💰 ${amountEntry ? 'Update Income' : 'Set Income'}</button>
           ${amountEntry ? `<span class="story-step-note">${formatRupees(amountEntry.amountPaise)}</span>` : ''}
         </div>
       </div>
@@ -3517,6 +3517,11 @@ ${e.rawResponse || '—'}`;
       toast('Amount cannot be set for this stage — no deliverable uploaded yet');
       return;
     }
+    if (!state.user || !state.user.upi_id) {
+      toast('Add your UPI ID first — opening Settings', true);
+      openSettingsModal();
+      return;
+    }
     const existing = state.paymentLinks.find(l => l.stage === stage) || null;
     stageAmountDraft = { stage, entry: existing };
     renderStageAmountModal();
@@ -3525,6 +3530,18 @@ ${e.rawResponse || '—'}`;
     stageAmountDraft = null;
     const root = document.getElementById('modalRoot');
     if (root) root.innerHTML = '';
+  }
+  // A glanceable "is this still set, and roughly right" check right where a
+  // designer is about to price a stage — never the full value, same
+  // reasoning as the Show/Hide toggle in Settings.
+  function maskUpiId(upi) {
+    if (!upi) return '';
+    const at = upi.indexOf('@');
+    if (at === -1) return upi.length <= 2 ? upi : `${upi.slice(0, 2)}${'•'.repeat(Math.max(upi.length - 2, 3))}`;
+    const id = upi.slice(0, at);
+    const bank = upi.slice(at);
+    const visible = id.slice(0, Math.min(3, id.length));
+    return `${visible}${'•'.repeat(Math.max(id.length - visible.length, 3))}${bank}`;
   }
   function renderStageAmountModal() {
     const root = document.getElementById('modalRoot');
@@ -3550,15 +3567,17 @@ ${e.rawResponse || '—'}`;
     const isNewReceivable = !entry || !!entry.paid;
     const blocked = isNewReceivable && credits <= 0;
     const creditColor = credits <= 0 ? 'var(--crimson)' : credits <= 2 ? 'var(--amber)' : 'var(--teal)';
+    const maskedUpi = maskUpiId(state.user && state.user.upi_id);
     root.innerHTML = `
       <div class="modal-overlay" id="stageAmountModalOverlay">
         <div class="modal-card" style="max-width:400px">
-          <div class="modal-head"><strong>💰 Amount — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
+          <div class="modal-head"><strong>💰 Your Income — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
           <div style="padding:16px">
-            <p style="font-size:12.5px;font-weight:700;color:${creditColor};margin:0 0 12px">💳 ${credits} payment credit${credits === 1 ? '' : 's'} remaining</p>
+            <p style="font-size:12.5px;font-weight:700;color:${creditColor};margin:0 0 6px">💳 ${credits} income credit${credits === 1 ? '' : 's'} remaining</p>
+            <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 12px">${maskedUpi ? `UPI: ${esc(maskedUpi)}` : '⚠ No UPI ID set'}</p>
             ${blocked ? `
-              <p style="font-size:13px;margin-bottom:14px">You're out of payment credits — buy more to price this stage.</p>
-              <button class="btn btn-primary" id="stageAmountBuyCreditsBtn" style="width:100%">Buy Credits</button>
+              <p style="font-size:13px;margin-bottom:14px">You're out of income credits — buy more to price this stage.</p>
+              <button class="btn btn-primary" id="stageAmountBuyCreditsBtn" style="width:100%">Buy Income Credits</button>
             ` : `
               ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
                 <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
@@ -3569,9 +3588,9 @@ ${e.rawResponse || '—'}`;
               </div>
               ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
               ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
-              <p style="font-size:11px;color:var(--text-faint);margin-top:8px">${isNewReceivable ? 'Setting this amount uses 1 payment credit — used once you set the price, whether or not the customer actually pays it.' : "Renegotiating this still-open amount doesn't use another credit."}</p>
+              <p style="font-size:11px;color:var(--text-faint);margin-top:8px">${isNewReceivable ? 'Setting this amount uses 1 income credit — used once you set the price, whether or not the customer actually pays it.' : "Renegotiating this still-open amount doesn't use another credit."}</p>
               ${isNewReceivable && credits > 0 && credits <= 2 ? `<p style="font-size:11px;color:var(--amber);margin-top:4px">⚠ Only ${credits} credit${credits === 1 ? '' : 's'} left — buy more before you run out.</p>` : ''}
-              <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update amount' : 'Set amount'}</button>
+              <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update Income' : 'Set Income'}</button>
             `}
           </div>
         </div>
@@ -3597,7 +3616,7 @@ ${e.rawResponse || '—'}`;
       const res = await api.setStageAmount(state.project.id, stage, amountPaise);
       if (res.amountPaise === undefined) {
         toast(res.message || 'Could not save amount', true);
-        saveBtn.disabled = false; saveBtn.textContent = entry ? 'Update amount' : 'Set amount';
+        saveBtn.disabled = false; saveBtn.textContent = entry ? 'Update Income' : 'Set Income';
         if (res.error === 'out_of_credits') renderStageAmountModal();
         return;
       }
@@ -3625,7 +3644,8 @@ ${e.rawResponse || '—'}`;
   // ready to paste into a message to the customer if that's the actual goal).
   function openCustomerPaymentLink() {
     if (!state.user || !state.user.upi_id) {
-      toast('Add your UPI ID in ⚙ Settings first');
+      toast('Add your UPI ID first — opening Settings', true);
+      openSettingsModal();
       return;
     }
     if (!state.paymentLink) { toast('No payment link for this project yet'); return; }
@@ -3830,13 +3850,16 @@ ${e.rawResponse || '—'}`;
           </div>
           <div class="field" style="padding:16px">
             <label for="settingsUpiId">Your UPI ID</label>
-            <input id="settingsUpiId" type="text" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}" maxlength="50">
+            <div style="display:flex;gap:8px">
+              <input id="settingsUpiId" type="password" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}" maxlength="50" style="flex:1">
+              <button type="button" class="btn btn-sm" id="settingsUpiRevealBtn">👁 Show</button>
+            </div>
             <p style="font-size:11.5px;color:var(--text-faint);margin-top:6px">Used to build the payment QR code on every stage's payment link. One UPI ID per account.</p>
           </div>
           <div class="field" style="padding:0 16px 16px;border-top:1px solid var(--line-soft);padding-top:16px">
-            <label>Payment Credits</label>
+            <label>Income Credits</label>
             <p style="font-size:13px;font-weight:700;margin:2px 0 8px">💳 ${state.user.free_credits_remaining ?? 0} remaining</p>
-            <button class="btn btn-sm" id="settingsBuyCreditsBtn">Buy more credits</button>
+            <button class="btn btn-sm" id="settingsBuyCreditsBtn">Buy more income credits</button>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px">
             <button class="btn btn-primary" id="settingsSaveBtn">Save</button>
@@ -3849,11 +3872,22 @@ ${e.rawResponse || '—'}`;
       closeSettingsModal();
       openBuyCreditsModal();
     });
+    document.getElementById('settingsUpiRevealBtn').addEventListener('click', () => {
+      const input = document.getElementById('settingsUpiId');
+      const btn = document.getElementById('settingsUpiRevealBtn');
+      const revealed = input.type === 'text';
+      input.type = revealed ? 'password' : 'text';
+      btn.textContent = revealed ? '👁 Show' : '🙈 Hide';
+    });
     document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
       const btn = document.getElementById('settingsSaveBtn');
       const name = document.getElementById('settingsName').value.trim();
       const upiId = document.getElementById('settingsUpiId').value.trim();
       if (!name) { toast('Name cannot be empty', true); return; }
+      if (upiId && !/^[\w.-]{2,256}@[a-zA-Z]{2,64}$/.test(upiId)) {
+        toast('That doesn’t look like a valid UPI ID — expected format: name@bank', true);
+        return;
+      }
       btn.disabled = true; btn.textContent = 'Saving…';
       const res = await api.updateMe({ name, upiId });
       const body = await res.json().catch(() => ({}));
@@ -4309,7 +4343,7 @@ ${e.rawResponse || '—'}`;
     });
   }
 
-  // ---------- Buy Credits modal ----------
+  // ---------- Buy Income Credits modal ----------
   const CREDIT_PACKS = [[5, 24500], [10, 49000]];
   let buyCreditsDraft = null;
   async function openBuyCreditsModal() {
@@ -4329,7 +4363,7 @@ ${e.rawResponse || '—'}`;
     root.innerHTML = `
       <div class="modal-overlay" id="buyCreditsOverlay">
         <div class="modal-card" style="max-width:420px">
-          <div class="modal-head"><strong>💳 Buy Payment Credits</strong><button class="modal-close" id="buyCreditsCloseBtn">×</button></div>
+          <div class="modal-head"><strong>💳 Buy Income Credits</strong><button class="modal-close" id="buyCreditsCloseBtn">×</button></div>
           <div style="padding:16px">
             <p style="font-size:13px;margin:0 0 12px">You have <strong>${freeCreditsRemaining}</strong> credit${freeCreditsRemaining === 1 ? '' : 's'} remaining.</p>
             <div class="credit-pack-row">
@@ -4372,7 +4406,7 @@ ${e.rawResponse || '—'}`;
     const amountRupees = CREDIT_PACKS.find((p) => p[0] === selectedPack)[1] / 100;
     const qrWrap = document.getElementById('buyCreditsQrWrap');
     if (qrWrap && adminUpiId) {
-      const upiLink = buildUpiLink({ upiId: adminUpiId, payeeName: 'StagePay', amountRupees, note: `${selectedPack} payment credits` });
+      const upiLink = buildUpiLink({ upiId: adminUpiId, payeeName: 'StagePay', amountRupees, note: `${selectedPack} income credits` });
       import('https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm')
         .then(({ default: QRCode }) => QRCode.toDataURL(upiLink, { width: 200, margin: 1 }))
         .then((dataUrl) => { qrWrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" alt="UPI payment QR code">`; })
@@ -4421,7 +4455,7 @@ ${e.rawResponse || '—'}`;
         <div class="section-head-row"><span class="section-title">🗂 Admin Queue</span></div>
         <div class="admin-tabs">
           <button data-admin-tab="waitlist" class="${adminTab === 'waitlist' ? 'active' : ''}">Waitlist (${adminData.applicants.length})</button>
-          <button data-admin-tab="credits" class="${adminTab === 'credits' ? 'active' : ''}">Credit Requests (${adminData.creditRequests.length})</button>
+          <button data-admin-tab="credits" class="${adminTab === 'credits' ? 'active' : ''}">Income Credit Requests (${adminData.creditRequests.length})</button>
         </div>
         ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : renderAdminCreditsTab()}
       </div>`;
@@ -4445,7 +4479,7 @@ ${e.rawResponse || '—'}`;
       </div>`).join('');
   }
   function renderAdminCreditsTab() {
-    if (!adminData.creditRequests.length) return '<p class="empty-note">No pending credit requests.</p>';
+    if (!adminData.creditRequests.length) return '<p class="empty-note">No pending income credit requests.</p>';
     return adminData.creditRequests.map((r) => `
       <div class="admin-row">
         <div class="admin-row-head"><strong>${esc(r.user_name)}</strong> <span style="color:var(--text-faint);font-size:11.5px">(${esc(r.user_email)})</span></div>
@@ -4467,7 +4501,7 @@ ${e.rawResponse || '—'}`;
       const ok = await api.adminApproveWaitlist(id);
       if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
       adminData.applicants = adminData.applicants.filter((a) => a.id !== id);
-      toast('Approved — 10 credits granted');
+      toast('Approved — 10 income credits granted');
       renderAdminScreenInto();
     }));
     document.querySelectorAll('[data-admin-approve-credit]').forEach((btn) => btn.addEventListener('click', async () => {
@@ -4477,7 +4511,7 @@ ${e.rawResponse || '—'}`;
       const ok = await api.adminApproveCreditRequest(id);
       if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
       adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
-      toast(req ? `${req.pack_size} credits added to ${req.user_name}` : 'Approved');
+      toast(req ? `${req.pack_size} income credits added to ${req.user_name}` : 'Approved');
       renderAdminScreenInto();
     }));
     document.querySelectorAll('[data-admin-reject-credit]').forEach((btn) => btn.addEventListener('click', async () => {

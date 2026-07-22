@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   ugc_description TEXT,
   applied_at TEXT,
   approved_at TEXT,
-  free_credits_remaining INTEGER NOT NULL DEFAULT 0, -- payment credits: spent when pricing a stage that isn't already an open, unpaid receivable
+  free_credits_remaining INTEGER NOT NULL DEFAULT 0, -- income credits: spent when pricing a stage that isn't already an open, unpaid receivable
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_showcase_slug ON users(showcase_slug);
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS earnings_log (
 
 CREATE INDEX IF NOT EXISTS idx_earnings_log_project ON earnings_log(project_id);
 
--- A pending/approved/rejected request to buy more payment credits — settled
+-- A pending/approved/rejected request to buy more income credits — settled
 -- by the designer paying the admin's own UPI ID directly (no gateway) and
 -- submitting the UTR here for manual verification via the admin queue.
 CREATE TABLE IF NOT EXISTS credit_purchase_requests (

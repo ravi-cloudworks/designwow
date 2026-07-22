@@ -129,6 +129,11 @@ const SHOWCASE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 // dropped — this is meant for a social/profile URL, not an email address.
 const CONTACT_LINK_RE = /^https?:\/\//i;
 
+// Loose UPI VPA shape: handle@bank-or-psp, e.g. 9876543210@ybl or
+// name@okhdfcbank. Not exhaustive of every real PSP suffix — just enough to
+// catch empty/garbage/typo'd values before they get saved.
+const UPI_ID_RE = /^[\w.-]{2,256}@[a-zA-Z]{2,64}$/;
+
 auth.patch('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
@@ -150,7 +155,13 @@ auth.patch('/me', async (c) => {
   }
 
   if (body.upiId !== undefined) {
-    await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(body.upiId, sessionUserId).run();
+    const trimmedUpi = body.upiId.trim();
+    // Clearing it (e.g. temporarily, while switching banks) stays allowed —
+    // only a non-empty value has to actually look like a UPI ID.
+    if (trimmedUpi && !UPI_ID_RE.test(trimmedUpi)) {
+      return c.json({ error: 'invalid_upi_id', message: 'That doesn’t look like a valid UPI ID — expected format: name@bank.' }, 400);
+    }
+    await c.env.DB.prepare('UPDATE users SET upi_id = ? WHERE id = ?').bind(trimmedUpi, sessionUserId).run();
   }
 
   if (body.showcaseSlug !== undefined) {
