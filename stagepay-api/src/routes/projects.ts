@@ -80,15 +80,29 @@ projects.get('/', async (c) => {
   // where the project actually is: locked means that stage is done and
   // work has moved on to the next one; unlocked means that's the stage
   // being worked on right now.
+  // earned_count/pending_*: same idea as earned_paise — lets the projects
+  // list show not just what's been paid, but how many priced-but-unpaid
+  // rounds are still sitting open (a lightweight receivables view), without
+  // a separate round trip per project. pending_* is sourced from
+  // payment_link_stages (via payment_links, its only link to project_id)
+  // rather than earnings_log, since an unpaid round has no earnings_log row
+  // yet — it only gets one once actually paid.
   const { results } = await c.env.DB.prepare(
     `SELECT p.id, p.name, p.mode, p.created_at, p.updated_at,
        COALESCE((SELECT SUM(amount_paise) FROM earnings_log WHERE project_id = p.id), 0) AS earned_paise,
+       (SELECT COUNT(*) FROM earnings_log WHERE project_id = p.id) AS earned_count,
+       COALESCE((SELECT SUM(pls.amount_paise) FROM payment_link_stages pls JOIN payment_links pl ON pl.token = pls.token WHERE pl.project_id = p.id AND pls.paid = 0), 0) AS pending_paise,
+       (SELECT COUNT(*) FROM payment_link_stages pls JOIN payment_links pl ON pl.token = pls.token WHERE pl.project_id = p.id AND pls.paid = 0) AS pending_count,
        (SELECT stage FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage,
        (SELECT locked FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage_locked
      FROM projects p WHERE p.user_id = ? ORDER BY p.updated_at DESC`
   )
     .bind(userId)
-    .all<{ id: string; name: string; mode: string; created_at: string; updated_at: string; earned_paise: number; top_stage: number | null; top_stage_locked: number | null }>();
+    .all<{
+      id: string; name: string; mode: string; created_at: string; updated_at: string;
+      earned_paise: number; earned_count: number; pending_paise: number; pending_count: number;
+      top_stage: number | null; top_stage_locked: number | null;
+    }>();
 
   const projectsWithStage = results.map(({ top_stage, top_stage_locked, ...rest }) => ({
     ...rest,

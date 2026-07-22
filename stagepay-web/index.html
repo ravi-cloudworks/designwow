@@ -88,6 +88,7 @@
   .lane-badge { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; flex-shrink: 0; font-family: var(--display); }
   .lane-title { font-size: 15px; font-weight: 700; }
   .earned-pill { margin-left: auto; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; cursor: pointer; }
+  .earned-pill.pending { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); cursor: default; }
   .project-info-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface-2); flex-shrink: 0; }
   .project-info-bar:empty { display: none; }
   .project-info-name { font-size: 16px; font-weight: 800; cursor: pointer; }
@@ -98,6 +99,7 @@
   .project-stage-pill.completed { background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); }
   .project-earned-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 122px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); white-space: nowrap; }
   .project-earned-pill.lg { font-size: 16px; padding: 7px 16px; }
+  .project-pending-pill { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line); white-space: nowrap; }
   .lane-tamil { font-size: 11px; color: var(--text-faint); margin: 3px 0 0 38px; }
   .lane-desc { font-size: 11px; color: var(--text-faint); margin: 6px 0 0 38px; line-height: 1.4; }
 
@@ -1080,6 +1082,15 @@ Rules:
     const paise = stageEarnedPaise(stage);
     if (!paise) return '';
     return `<span class="earned-pill" data-stage-earned-pill="${stage}" title="Click to see income history">💰 ${formatRupees(paise)} earned</span>`;
+  }
+  // Ambient "this stage is priced but the customer hasn't paid yet" —
+  // otherwise the only way to notice is opening the Your Income modal.
+  // Uses state.paymentLinks already loaded for the open project, no new
+  // fetch needed.
+  function pendingPillHtml(stage) {
+    const entry = state.paymentLinks.find(l => l.stage === stage);
+    if (!entry || entry.paid || !entry.amountPaise) return '';
+    return `<span class="earned-pill pending" title="Priced but not yet marked paid">⏳ ${formatRupees(entry.amountPaise)} pending</span>`;
   }
   // The pill only ever shows a total — this is the one place a designer can
   // actually see the individual rounds that add up to it (same idea as the
@@ -2667,7 +2678,7 @@ ${e.rawResponse || '—'}`;
   function renderLane2() {
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">2</span><span class="lane-title">Story Board</span>${earnedPillHtml(2)}</div>
+        <div class="lane-title-row"><span class="lane-badge">2</span><span class="lane-title">Story Board</span>${earnedPillHtml(2)}${pendingPillHtml(2)}</div>
         <p class="lane-tamil">கதைக்களம்</p>
         <p class="lane-desc">Pitch a few storyline directions, then approve the one that becomes the ad's spine.</p>
         </div>
@@ -2939,7 +2950,7 @@ ${e.rawResponse || '—'}`;
   function renderLane3() {
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Visual &amp; Music</span>${earnedPillHtml(3)}</div>
+        <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Visual &amp; Music</span>${earnedPillHtml(3)}${pendingPillHtml(3)}</div>
         <p class="lane-tamil">கதாபாத்திரங்கள், பொருள்கள் மற்றும் இசை</p>
         <p class="lane-desc">Characters, properties, backgrounds, sounds — add as many as the story needs.</p>
         ${stageItemCapReached(3) ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(3))}</p>` : ''}
@@ -3232,7 +3243,7 @@ ${e.rawResponse || '—'}`;
     const addTitleAttr = capReached4 ? ` title="${esc(stageItemCapMessage(4))}"` : '';
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Scene Blueprint</span>${earnedPillHtml(4)}</div>
+        <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Scene Blueprint</span>${earnedPillHtml(4)}${pendingPillHtml(4)}</div>
         <p class="lane-tamil">திரைக்கதை</p>
         <p class="lane-desc">Add a scene for every beat in your storyboard — content and camera/shot direction together.</p>
         ${capReached4 ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(4))}</p>` : ''}
@@ -3301,7 +3312,7 @@ ${e.rawResponse || '—'}`;
     }
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}</div>
+        <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}${pendingPillHtml(5)}</div>
         <p class="lane-tamil">திரைப்படம்</p>
         <p class="lane-desc">Stitch the approved scene clips into one finished video — that's the only thing the customer downloads.</p>
         </div>
@@ -3836,9 +3847,14 @@ ${e.rawResponse || '—'}`;
   }
 
   // ---------- Settings modal (UPI ID, used on every payment link's QR) ----------
-  function openSettingsModal() {
+  async function openSettingsModal() {
     const root = document.getElementById('modalRoot');
     if (!root) return;
+    // Credits can change server-side between page load and now (an admin
+    // approving a purchase request, e.g.) — refetch rather than trusting
+    // whatever balance was true when the app first booted.
+    const fresh = await api.me();
+    if (fresh) state.user = fresh;
     root.innerHTML = `
       <div class="modal-overlay" id="settingsModalOverlay">
         <div class="modal-card" style="max-width:420px">
@@ -6056,7 +6072,8 @@ ${e.rawResponse || '—'}`;
             ${p.completed
               ? `<span class="project-stage-pill completed" title="All 5 stages locked and paid">✅ Completed</span>`
               : `<span class="project-stage-pill" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>`}
-            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned</span>` : `<span class="project-earned-pill" style="visibility:hidden"></span>`}
+            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned (${p.earned_count})</span>` : `<span class="project-earned-pill" style="visibility:hidden"></span>`}
+            ${p.pending_paise > 0 ? `<span class="project-pending-pill">⏳ ${formatRupees(p.pending_paise)} pending (${p.pending_count})</span>` : ''}
             <button class="btn btn-sm btn-danger" data-delete-project="${p.id}">Delete</button>
           </div>
         </div>`;
