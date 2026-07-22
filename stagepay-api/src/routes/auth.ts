@@ -85,10 +85,20 @@ auth.patch('/me', async (c) => {
   const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
   const body = await c.req
-    .json<{ upiId?: string; showcaseSlug?: string | null; contactLink?: string | null }>()
-    .catch(() => ({}) as { upiId?: string; showcaseSlug?: string | null; contactLink?: string | null });
-  if (body.upiId === undefined && body.showcaseSlug === undefined && body.contactLink === undefined) {
+    .json<{ name?: string; upiId?: string; showcaseSlug?: string | null; contactLink?: string | null }>()
+    .catch(() => ({}) as { name?: string; upiId?: string; showcaseSlug?: string | null; contactLink?: string | null });
+  if (body.name === undefined && body.upiId === undefined && body.showcaseSlug === undefined && body.contactLink === undefined) {
     return c.json({ error: 'nothing_to_update' }, 400);
+  }
+
+  // Only ever set once at signup, from the Google profile at the time —
+  // never editable since, even though a Google account's display name can
+  // be wrong or change later. Same validation-free trim as showcase items'
+  // own name field; a display name has no format to enforce beyond "not empty".
+  if (body.name !== undefined) {
+    const trimmed = body.name.trim();
+    if (!trimmed) return c.json({ error: 'name_required', message: 'Name cannot be empty.' }, 400);
+    await c.env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(trimmed.slice(0, 100), sessionUserId).run();
   }
 
   if (body.upiId !== undefined) {

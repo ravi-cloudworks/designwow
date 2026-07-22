@@ -279,6 +279,20 @@
   .container { max-width: 900px; margin: 0 auto; padding: 22px 20px 60px; }
 
   /* ---------- Public Showcase ---------- */
+  .showcase-link-hero { background: var(--teal-soft); border: 1px solid var(--teal-line); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .showcase-link-hero-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); margin-bottom: 8px; }
+  .showcase-link-hero-row { display: flex; align-items: center; gap: 8px; }
+  .showcase-link-hero-row code { font-size: 13.5px; font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--teal-line); padding: 9px 12px; border-radius: 8px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .showcase-field-section { margin-bottom: 16px; }
+  .showcase-field-label { font-size: 11px; font-weight: 700; color: var(--text-soft); margin-bottom: 6px; }
+  .showcase-field-row { display: flex; align-items: center; gap: 8px; }
+  .showcase-field-note { margin: 6px 0 0; font-size: 11px; color: var(--text-faint); }
+  .input-with-prefix { display: flex; align-items: center; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  .input-with-prefix .input-prefix { padding-left: 10px; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+  .input-with-prefix input { flex: 1; min-width: 0; border: none; background: transparent; padding: 9px 10px; font-size: 12.5px; color: var(--text); }
+  .input-with-prefix input:focus { outline: none; }
+  .showcase-field-row > input[type="text"] { flex: 1; min-width: 0; font-size: 12.5px; }
+  .btn-saved { background: var(--moss) !important; border-color: var(--moss) !important; color: #fff !important; }
   .showcase-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
   .showcase-tile { position: relative; }
   .showcase-tile img, .showcase-tile video { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; display: block; background: var(--surface-2); }
@@ -1066,7 +1080,7 @@ Rules:
             <p class="modal-sub" style="margin-top:8px">This permanently deletes:</p>
             <ul class="affected-list">
               <li>Every uploaded file across all stages — references, scenes, movie clips, Final Video</li>
-              <li>Its full payment history — Goal Tracker's past/future trends won't be accurate without it</li>
+              <li>Its full payment history — Income Tracker's past/future trends won't be accurate without it</li>
               <li>Any of its work currently in your public Showcase</li>
             </ul>
             <p class="modal-sub">This cannot be undone. If you're not sure, keep the project instead of deleting it.</p>
@@ -3593,7 +3607,7 @@ ${e.rawResponse || '—'}`;
     // on — show "All Projects" there instead, same as the in-project view.
     const goalsOrHomeBtn = state.screen === 'goals'
       ? `<button class="btn btn-sm" id="goalsHomeBtn">All Projects</button>`
-      : `<button class="btn btn-sm" id="goalsNavBtn">🎯 Goals</button>`;
+      : `<button class="btn btn-sm" id="goalsNavBtn">💰 Income Tracker</button>`;
     // Same contextual pattern for the Showcase screen.
     const showcaseOrHomeBtn = state.screen === 'showcase'
       ? `<button class="btn btn-sm" id="showcaseHomeBtn">All Projects</button>`
@@ -3709,6 +3723,11 @@ ${e.rawResponse || '—'}`;
       <div class="modal-overlay" id="settingsModalOverlay">
         <div class="modal-card" style="max-width:420px">
           <div class="modal-head"><strong>⚙ Settings</strong><button class="modal-close" id="settingsModalCloseBtn">×</button></div>
+          <div class="field" style="padding:16px 16px 0">
+            <label for="settingsName">Your name</label>
+            <input id="settingsName" type="text" placeholder="Your name" value="${esc(state.user.name || '')}" maxlength="100">
+            <p style="font-size:11.5px;color:var(--text-faint);margin-top:6px">Only ever set once, from your Google account at signup — fix it here if it was wrong or has changed.</p>
+          </div>
           <div class="field" style="padding:16px">
             <label for="settingsUpiId">Your UPI ID</label>
             <input id="settingsUpiId" type="text" placeholder="yourname@bank" value="${esc(state.user.upi_id || '')}" maxlength="50">
@@ -3722,10 +3741,22 @@ ${e.rawResponse || '—'}`;
     document.getElementById('settingsModalCloseBtn').addEventListener('click', closeSettingsModal);
     document.getElementById('settingsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'settingsModalOverlay') closeSettingsModal(); });
     document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('settingsSaveBtn');
+      const name = document.getElementById('settingsName').value.trim();
       const upiId = document.getElementById('settingsUpiId').value.trim();
-      await api.updateMe({ upiId });
+      if (!name) { toast('Name cannot be empty'); return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await api.updateMe({ name, upiId });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(body.message || 'Failed to save settings');
+        btn.disabled = false; btn.textContent = 'Save';
+        return;
+      }
+      state.user.name = name;
       state.user.upi_id = upiId;
       closeSettingsModal();
+      renderTopbar();
       toast('Settings saved');
     });
   }
@@ -4105,8 +4136,8 @@ ${e.rawResponse || '—'}`;
     if (!progress) {
       return `<a class="goal-strip" href="#" id="goalStripLink">
         <div class="goal-strip-empty">
-          <div><strong>🎯 Your Goal &amp; Progress</strong><span>Make your money — because you are worth it. →</span></div>
-          <span class="btn btn-sm btn-primary">Set a goal</span>
+          <div><strong>🎯 Your Income Goal &amp; Progress</strong><span>Make your money — because you are worth it. →</span></div>
+          <span class="btn btn-sm btn-primary">Set an income goal</span>
         </div>
       </a>`;
     }
@@ -4116,9 +4147,9 @@ ${e.rawResponse || '—'}`;
     const stagePending = stagePendingSummary(summary);
     const goalReached = progress.pct >= 100;
     return `<a class="goal-strip" href="#" id="goalStripLink">
-      <div class="goal-strip-title">🎯 Your Goal &amp; Progress</div>
+      <div class="goal-strip-title">🎯 Your Income Goal &amp; Progress</div>
       ${goalReached
-        ? `<div class="goal-strip-celebrate">🎉 Goal reached — congratulations!</div>`
+        ? `<div class="goal-strip-celebrate">🎉 Income goal reached — congratulations!</div>`
         : `<div class="goal-strip-subtitle">Make your money — because you are worth it. →</div>`}
       <div class="goal-strip-sub">${formatRupees(progress.earnedSince)} of ${formatRupees(summary.goalAmountPaise)} · Duration: 3 Months (${esc(dateFmt(setAt))} → ${esc(dateFmt(deadline))}) · ${progress.daysLeft} day${progress.daysLeft === 1 ? '' : 's'} left</div>
       <div class="goal-strip-note">Projects paid before ${esc(dateFmt(setAt))} don't count toward this goal.</div>
@@ -4127,7 +4158,7 @@ ${e.rawResponse || '—'}`;
         <div class="goal-strip-value">${progress.pct}%</div>
       </div>
       ${stagePending.length ? `<div class="goal-strip-stages">
-        <div class="goal-strip-stages-sentence">${goalReached ? 'Your stage-by-stage breakdown:' : "Here's what's still pending to hit your goal:"}</div>
+        <div class="goal-strip-stages-sentence">${goalReached ? 'Your stage-by-stage breakdown:' : "Here's what's still pending to hit your income goal:"}</div>
         <div class="goal-strip-pills">
           ${stagePending.map(x => `<span class="goal-strip-pill ${x.pending > 0 ? 'pending' : 'done'}">Stage ${x.stage} — ${esc(x.name)} · ${x.done}/${x.target}${x.pending > 0 ? ` · ${x.pending} more needed` : ' ✓'}</span>`).join('')}
         </div>
@@ -4288,7 +4319,7 @@ ${e.rawResponse || '—'}`;
     ctx.fillRect(0, 0, W, H);
 
     const name = state.user && state.user.name ? state.user.name.split(' ')[0] + "'s" : 'My';
-    let y = drawShareHeader(ctx, W, `📈 ${name} Work History`);
+    let y = drawShareHeader(ctx, W, `📈 ${name} Income History`);
 
     ctx.fillStyle = '#8fd9c4';
     ctx.font = SHARE_F(700, 28);
@@ -4466,11 +4497,11 @@ ${e.rawResponse || '—'}`;
     ctx.fillRect(0, 0, W, H);
 
     const name = state.user && state.user.name ? state.user.name.split(' ')[0] + "'s" : 'My';
-    let y = drawShareHeader(ctx, W, `🎯 ${name} Goal`);
+    let y = drawShareHeader(ctx, W, `🎯 ${name} Income Goal`);
 
     ctx.fillStyle = '#f2c98a';
     ctx.font = SHARE_F(700, 28);
-    ctx.fillText('NEXT 3 MONTHS GOAL', 64, y);
+    ctx.fillText('NEXT 3 MONTHS INCOME GOAL', 64, y);
     y += 66;
     ctx.fillStyle = '#eef1f2';
     ctx.font = SHARE_F(800, 66);
@@ -4537,7 +4568,7 @@ ${e.rawResponse || '—'}`;
     });
 
     drawShareFooter(ctx, W, H);
-    downloadCanvasPng(canvas, 'stagepay-goals.png');
+    downloadCanvasPng(canvas, 'stagepay-income-goals.png');
   }
   // Short axis labels ("₹5k", "₹1.2L") — the full formatRupees() output is
   // too wide to sit down the left edge of the chart without crowding it.
@@ -4751,9 +4782,9 @@ ${e.rawResponse || '—'}`;
   function allocationStatusText(total, goalPaise) {
     if (!goalPaise) return `Planned: ${formatRupees(total)}`;
     const diff = total - goalPaise;
-    if (!diff) return `Goal ${formatRupees(goalPaise)} · Planned ${formatRupees(total)} — meets goal exactly 🎯`;
+    if (!diff) return `Income Goal ${formatRupees(goalPaise)} · Planned ${formatRupees(total)} — meets goal exactly 🎯`;
     const verb = diff > 0 ? 'above' : 'below';
-    return `Goal ${formatRupees(goalPaise)} · Planned ${formatRupees(total)} — ${formatRupees(Math.abs(diff))} ${verb} goal`;
+    return `Income Goal ${formatRupees(goalPaise)} · Planned ${formatRupees(total)} — ${formatRupees(Math.abs(diff))} ${verb} goal`;
   }
   // Waterfall, left to right: Goal and Actual sit first as two independent
   // full bars (0 to their own value, not floating), then Stage 2-5 follow,
@@ -4953,13 +4984,13 @@ ${e.rawResponse || '—'}`;
 
     return `
       <div class="section-head-row">
-        <span class="section-title">🎯 Goal Tracker</span>
-        <button class="icon-btn" id="goalShareBtn" title="${tab === 'future' ? 'Download your Goal as a shareable image' : 'Download your Work History as a shareable image'}">⬇ Share</button>
+        <span class="section-title">💰 Income Tracker</span>
+        <button class="icon-btn" id="goalShareBtn" title="${tab === 'future' ? 'Download your Income Goal as a shareable image' : 'Download your Income History as a shareable image'}">⬇ Share</button>
       </div>
-      <p class="section-subtitle">Set your goals — plan how you'll get there.</p>
+      <p class="section-subtitle">Track your income — plan how you'll grow it.</p>
       <div class="goal-range-toggle">
-        <button data-goal-tab="past" class="${tab === 'past' ? 'active' : ''}">Work History</button>
-        <button data-goal-tab="future" class="${tab === 'future' ? 'active' : ''}">Goals</button>
+        <button data-goal-tab="past" class="${tab === 'past' ? 'active' : ''}">Income History</button>
+        <button data-goal-tab="future" class="${tab === 'future' ? 'active' : ''}">Income Goals</button>
       </div>
       ${tab === 'past' ? `
         <div class="goal-past-total">${formatRupees(pastTotal)}<span>earned</span></div>
@@ -5311,33 +5342,47 @@ ${e.rawResponse || '—'}`;
       <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 14px">
         A public page you can share — pick which of your delivered work to feature. Nothing shows up here unless you add it.
       </p>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <code style="font-size:12px;background:var(--surface-2);padding:6px 10px;border-radius:6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(publicUrl)}</code>
-        <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
-        <a class="btn btn-sm" href="/showcase/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
+      <div class="showcase-link-hero">
+        <div class="showcase-link-hero-label">🔗 Your public showcase link</div>
+        <div class="showcase-link-hero-row">
+          <code>${esc(publicUrl)}</code>
+          <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
+          <a class="btn btn-sm" href="/showcase/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-faint)">${esc(location.origin)}/showcase/</span>
-        <input type="text" id="showcaseSlugInput" placeholder="your-name" value="${esc(state.user.showcase_slug || '')}" maxlength="30" style="flex:1;font-size:12.5px">
-        <button class="btn btn-sm" id="showcaseSlugSaveBtn">Save</button>
+
+      <div class="showcase-field-section">
+        <div class="showcase-field-label">Customize your link</div>
+        <div class="showcase-field-row">
+          <div class="input-with-prefix">
+            <span class="input-prefix">${esc(location.origin)}/showcase/</span>
+            <input type="text" id="showcaseSlugInput" placeholder="your-name" value="${esc(state.user.showcase_slug || '')}" maxlength="30">
+          </div>
+          <button class="btn btn-sm" id="showcaseSlugSaveBtn">Save</button>
+        </div>
+        <p class="showcase-field-note">3-30 lowercase letters, numbers, or hyphens. Leave blank to use the default link above.</p>
       </div>
-      <p style="margin:0 0 18px;font-size:11px;color:var(--text-faint)">Customize your public link — 3-30 lowercase letters, numbers, or hyphens. Leave blank to use the default link above.</p>
 
       ${(() => {
         const waNumber = whatsappNumberFromLink(state.user.contact_link);
         const customValue = waNumber ? '' : (state.user.contact_link || '');
         return `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <input type="text" id="showcaseContactInput" placeholder="https://instagram.com/you or mailto:you@example.com" value="${esc(customValue)}" style="flex:1;font-size:12.5px">
-        <button class="btn btn-sm" id="showcaseContactSaveBtn">Save</button>
-      </div>
-      <p style="margin:0 0 12px;font-size:11px;color:var(--text-faint)">Optional "Get in touch" link on your public page — Instagram, LinkedIn, your website, or a mailto: address. Leave blank to hide the button entirely.</p>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-faint)">or WhatsApp:</span>
-        <input type="text" id="showcaseWhatsappInput" placeholder="919876543210 — country code, no + or spaces" value="${esc(waNumber || '')}" style="flex:1;font-size:12.5px">
-        <button class="btn btn-sm" id="showcaseWhatsappSaveBtn">Save</button>
-      </div>
-      <p style="margin:0 0 18px;font-size:11px;color:var(--text-faint)">Builds a proper wa.me link for you — just the digits, country code first, no +/spaces/dashes. This is the one case where a number is involved; it's entirely your choice to use it, same as the link above.</p>`;
+      <div class="showcase-field-section">
+        <div class="showcase-field-label">"Get in touch" button (optional)</div>
+        <div class="showcase-field-row">
+          <input type="text" id="showcaseContactInput" placeholder="https://instagram.com/you or mailto:you@example.com" value="${esc(customValue)}" maxlength="300">
+          <button class="btn btn-sm" id="showcaseContactSaveBtn">Save</button>
+        </div>
+        <p class="showcase-field-note">Instagram, LinkedIn, your website, or a mailto: address. Leave blank to hide the button entirely.</p>
+        <div class="showcase-field-row" style="margin-top:8px">
+          <div class="input-with-prefix">
+            <span class="input-prefix">or WhatsApp:</span>
+            <input type="text" id="showcaseWhatsappInput" placeholder="919876543210" value="${esc(waNumber || '')}" maxlength="15" inputmode="numeric">
+          </div>
+          <button class="btn btn-sm" id="showcaseWhatsappSaveBtn">Save</button>
+        </div>
+        <p class="showcase-field-note">Just the digits, country code first — no +, spaces, or dashes. Builds a wa.me link for you.</p>
+      </div>`;
       })()}
 
       ${items.length
@@ -5400,10 +5445,27 @@ ${e.rawResponse || '—'}`;
       const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
       navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link'));
     });
+    // Flashes the button green with a checkmark before the card re-renders,
+    // so a save gives visible confirmation beyond the toast alone.
+    function flashSaved(btn, rerender) {
+      btn.disabled = true;
+      btn.textContent = '✓ Saved';
+      btn.classList.add('btn-saved');
+      setTimeout(rerender, 700);
+    }
+    const slugInput = document.getElementById('showcaseSlugInput');
+    slugInput.addEventListener('input', () => {
+      const cleaned = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (cleaned !== slugInput.value) slugInput.value = cleaned;
+    });
     document.getElementById('showcaseSlugSaveBtn').addEventListener('click', async () => {
       const input = document.getElementById('showcaseSlugInput');
       const btn = document.getElementById('showcaseSlugSaveBtn');
       const value = input.value.trim().toLowerCase();
+      if (value && (value.length < 3 || value.length > 30)) {
+        toast('Use 3-30 lowercase letters, numbers, or hyphens.');
+        return;
+      }
       btn.disabled = true; btn.textContent = 'Saving…';
       const res = await api.updateMe({ showcaseSlug: value });
       const body = await res.json().catch(() => ({}));
@@ -5414,8 +5476,10 @@ ${e.rawResponse || '—'}`;
       }
       state.user.showcase_slug = value || null;
       toast(value ? 'Public link updated' : 'Reverted to your default link');
-      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
-      wireShowcaseCard();
+      flashSaved(btn, () => {
+        document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+        wireShowcaseCard();
+      });
     });
     document.getElementById('showcaseContactSaveBtn').addEventListener('click', async () => {
       const input = document.getElementById('showcaseContactInput');
@@ -5431,8 +5495,15 @@ ${e.rawResponse || '—'}`;
       }
       state.user.contact_link = value || null;
       toast(value ? 'Contact link updated' : 'Contact button removed from your public page');
-      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
-      wireShowcaseCard();
+      flashSaved(btn, () => {
+        document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+        wireShowcaseCard();
+      });
+    });
+    const whatsappInput = document.getElementById('showcaseWhatsappInput');
+    whatsappInput.addEventListener('input', () => {
+      const cleaned = whatsappInput.value.replace(/\D/g, '');
+      if (cleaned !== whatsappInput.value) whatsappInput.value = cleaned;
     });
     document.getElementById('showcaseWhatsappSaveBtn').addEventListener('click', async () => {
       const input = document.getElementById('showcaseWhatsappInput');
@@ -5450,8 +5521,10 @@ ${e.rawResponse || '—'}`;
       }
       state.user.contact_link = value || null;
       toast(value ? 'WhatsApp link updated' : 'Contact button removed from your public page');
-      document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
-      wireShowcaseCard();
+      flashSaved(btn, () => {
+        document.getElementById('showcaseCardRoot').innerHTML = renderShowcaseCard();
+        wireShowcaseCard();
+      });
     });
     document.querySelectorAll('[data-remove-showcase]').forEach((btn) => btn.addEventListener('click', async () => {
       btn.disabled = true;
