@@ -430,6 +430,21 @@ projects.post('/:id/stages/:stage/unlock', async (c) => {
       .run();
   }
 
+  // Same leak project deletion already guards against: the R2 keys for
+  // these items' uploaded files (references, scene images, movie clips)
+  // aren't scoped by stage the way deletion's whole-project prefix sweep
+  // is, so they have to be looked up and deleted individually here, before
+  // the cascade below removes the item_versions rows that name them.
+  const { results: versionsToDelete } = await c.env.DB.prepare(
+    `SELECT iv.media_files FROM item_versions iv JOIN items i ON i.id = iv.item_id WHERE i.project_id = ? AND i.stage > ?`
+  )
+    .bind(id, stage)
+    .all<{ media_files: string }>();
+  for (const v of versionsToDelete) {
+    const files = JSON.parse(v.media_files || '[]') as { key: string }[];
+    for (const f of files) await c.env.MEDIA.delete(f.key);
+  }
+
   await c.env.DB.prepare('DELETE FROM items WHERE project_id = ? AND stage > ?').bind(id, stage).run();
   const link = await c.env.DB.prepare('SELECT token FROM payment_links WHERE project_id = ?').bind(id).first<{ token: string }>();
   if (link) {
