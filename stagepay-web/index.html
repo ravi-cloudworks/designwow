@@ -1226,6 +1226,32 @@ Rules:
       document.getElementById('unlockWarningOverlay').addEventListener('click', (e) => { if (e.target.id === 'unlockWarningOverlay') close(false); });
     });
   }
+  // Replaces the old "click again to confirm" toast (easy to miss, reads
+  // like an error) with a real acknowledgment: the designer is marking a
+  // stage paid themselves, on the customer's behalf, because the customer
+  // never clicked confirm on their own public payment link.
+  function showConfirmPaymentReceivedModal() {
+    return new Promise((resolve) => {
+      const root = document.getElementById('modalRoot');
+      if (!root) { resolve(true); return; }
+      root.innerHTML = `
+        <div class="modal-overlay" id="confirmPaymentReceivedOverlay">
+          <div class="modal-card" style="max-width:420px">
+            <div class="modal-head"><strong>Confirm payment received</strong><button class="modal-close" id="confirmPaymentReceivedCloseBtn">×</button></div>
+            <p class="modal-sub" style="margin-top:8px">I received this payment directly — the customer hasn't confirmed it on their own link. I'm marking it paid on their behalf.</p>
+            <div class="modal-footer confirm-actions" style="margin-top:16px">
+              <button class="btn btn-sm" id="confirmPaymentReceivedCancelBtn">Cancel</button>
+              <button class="btn btn-sm btn-primary" id="confirmPaymentReceivedConfirmBtn">✅ Yes, mark as paid</button>
+            </div>
+          </div>
+        </div>`;
+      const close = (result) => { root.innerHTML = ''; resolve(result); };
+      document.getElementById('confirmPaymentReceivedCloseBtn').addEventListener('click', () => close(false));
+      document.getElementById('confirmPaymentReceivedCancelBtn').addEventListener('click', () => close(false));
+      document.getElementById('confirmPaymentReceivedConfirmBtn').addEventListener('click', () => close(true));
+      document.getElementById('confirmPaymentReceivedOverlay').addEventListener('click', (e) => { if (e.target.id === 'confirmPaymentReceivedOverlay') close(false); });
+    });
+  }
   // Replaces the old native confirm() — same promise-resolves-true/false
   // pattern as showUnlockWarningModal, but spells out exactly what a
   // project delete actually wipes: every uploaded file (deletion now
@@ -2968,16 +2994,12 @@ ${e.rawResponse || '—'}`;
     const amountBtn = document.getElementById('storyAmountBtn');
     if (amountBtn) amountBtn.addEventListener('click', () => openStageAmountModal(2));
     const confirmPaidBtn = document.getElementById('storyConfirmPaidBtn');
-    // Same double-click confirmation as the shared stage payment card — this
-    // button only ever renders while paid is still false, so every click
-    // here is before the customer has confirmed anything on their own link.
-    let confirmArmed = false;
+    // This button only ever renders while paid is still false, so every
+    // click here is before the customer has confirmed anything on their
+    // own link — showConfirmPaymentReceivedModal makes that acknowledgment
+    // explicit instead of an easy-to-miss "click again" toast.
     if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
-      if (!confirmArmed) {
-        confirmArmed = true;
-        toast("Customer hasn't confirmed payment on their link yet — click again to confirm anyway");
-        return;
-      }
+      if (!(await showConfirmPaymentReceivedModal())) return;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, 2);
       if (res.ok) {
@@ -2988,7 +3010,6 @@ ${e.rawResponse || '—'}`;
         toast('Marked as paid');
         if (entry) celebratePayment(entry.amountPaise);
       } else {
-        confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
     });
@@ -3219,16 +3240,11 @@ ${e.rawResponse || '—'}`;
     const confirmPaidBtn = document.querySelector(`#${laneId} [data-stage-confirm-paid-btn]`);
     // This button only ever renders while paid is still false, so every
     // click here is, by definition, before the customer has confirmed
-    // anything on their own public link — require a second click so a
-    // designer doesn't mark a stage paid by an accidental single tap.
-    let confirmArmed = false;
+    // anything on their own public link — showConfirmPaymentReceivedModal
+    // makes that acknowledgment explicit instead of an easy-to-miss toast.
     if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before confirming payment here`); return; }
-      if (!confirmArmed) {
-        confirmArmed = true;
-        toast("Customer hasn't confirmed payment on their link yet — click again to confirm anyway");
-        return;
-      }
+      if (!(await showConfirmPaymentReceivedModal())) return;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, stage);
       if (res.ok) {
@@ -3239,7 +3255,6 @@ ${e.rawResponse || '—'}`;
         toast('Marked as paid');
         if (entry) celebratePayment(entry.amountPaise);
       } else {
-        confirmArmed = false;
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
     });
