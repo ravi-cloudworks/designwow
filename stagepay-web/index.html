@@ -7205,6 +7205,17 @@ ${e.rawResponse || '—'}`;
       soundOn = !video.muted;
       btn.textContent = video.muted ? 'Unmute' : 'Mute';
     });
+    // Tap anywhere on the card to pause/resume its video — except the mute
+    // button itself, which has its own handler above and shouldn't also
+    // toggle playback.
+    root.addEventListener('click', (e) => {
+      if (e.target.closest('[data-mute-toggle]')) return;
+      const card = e.target.closest('.swipe-card');
+      const video = card ? card.querySelector('video') : null;
+      if (!video || !video.currentSrc) return;
+      if (video.paused) video.play().catch(() => {});
+      else video.pause();
+    });
     // Backgrounding the tab shouldn't leave a video quietly playing (or
     // audibly playing, if they'd unmuted it) — stop and force it back to
     // muted so returning to the tab is never a surprise.
