@@ -4018,7 +4018,6 @@ ${e.rawResponse || '—'}`;
       faqA3_2: 'That’s exactly what this prevents — every stage is priced and approved before the next one starts, so you’re never building work nobody’s committed to paying for.',
       faqQ3_3: 'Isn’t ₹49 a lot to pay every time I charge my income?',
       faqA3_3: 'You only pay when you charge your income — whether it’s ₹1,000, ₹5,000, or ₹50,000, it’s just ₹49. No extra fees, no percentage of your income, no subscription.',
-      footer: 'StagePay — projects are private to your account.',
     },
     hi: {
       headerTagline: 'हर स्टेज पर पेमेंट पाएं। कभी मुफ़्त में काम न करें।', login: 'लॉगिन',
@@ -4077,7 +4076,6 @@ ${e.rawResponse || '—'}`;
       faqA3_2: 'यही तो यह रोकता है — हर स्टेज तभी शुरू होती है जब पिछली अप्रूव और पेड हो चुकी हो, तो आप कभी ऐसा काम नहीं करते जिसके लिए किसी ने पैसे देने का वादा ही न किया हो।',
       faqQ3_3: 'हर बार इनकम चार्ज करने पर ₹49 देना ज़्यादा नहीं है?',
       faqA3_3: 'आप सिर्फ तभी भुगतान करते हैं जब आप अपनी इनकम चार्ज करते हैं — चाहे वह ₹1,000 हो, ₹5,000 हो, या ₹50,000 — यह सिर्फ ₹49 है। कोई अतिरिक्त फीस नहीं, आपकी इनकम का कोई प्रतिशत नहीं, कोई सब्सक्रिप्शन नहीं।',
-      footer: 'StagePay — प्रोजेक्ट्स आपके अकाउंट तक निजी रहते हैं।',
     },
     ta: {
       headerTagline: 'ஒவ்வொரு நிலையிலும் பணம் பெறுங்கள். இலவசமாக வேலை செய்ய வேண்டாம்.', login: 'உள்நுழைய',
@@ -4136,7 +4134,6 @@ ${e.rawResponse || '—'}`;
       faqA3_2: 'இதைத்தான் இது தடுக்கிறது — முந்தைய நிலை ஒப்புதல் பெற்று பணம் செலுத்தப்பட்ட பிறகுதான் அடுத்த நிலை தொடங்கும், எனவே யாரும் உறுதியளிக்காத வேலையை நீங்கள் ஒருபோதும் செய்ய மாட்டீர்கள்.',
       faqQ3_3: 'ஒவ்வொரு முறையும் என் வருமானத்தை வசூலிக்கும்போது ₹49 அதிகமாக இல்லையா?',
       faqA3_3: 'நீங்கள் உங்கள் வருமானத்தை வசூலிக்கும்போது மட்டுமே பணம் செலுத்துகிறீர்கள் — அது ₹1,000 ஆனாலும், ₹5,000 ஆனாலும், அல்லது ₹50,000 ஆனாலும், அது வெறும் ₹49 தான். கூடுதல் கட்டணங்கள் இல்லை, உங்கள் வருமானத்தின் சதவீதம் இல்லை, சந்தா இல்லை.',
-      footer: 'StagePay — திட்டங்கள் உங்கள் கணக்கிற்கு மட்டுமே தனிப்பட்டவை.',
     },
   };
   // Positioned as "The Operating System for AI UGC Creators" — the product
@@ -4297,7 +4294,7 @@ ${e.rawResponse || '—'}`;
           <a class="landing-cta" href="/api/auth/google" data-login-link>${t('heroCta')}</a>
         </div>
 
-        <div class="landing-footer">${t('footer')}<br><a href="/terms">Terms &amp; Conditions</a> · <a href="/privacy">Privacy Policy</a></div>
+        <div class="landing-footer"><a href="/legal/terms">Terms &amp; Conditions</a> · <a href="/legal/privacy">Privacy Policy</a></div>
       </div>
       <div id="modalRoot"></div>`;
     renderFaqSectionInto();
@@ -4517,7 +4514,7 @@ ${e.rawResponse || '—'}`;
         <p>For questions, support, or grievances regarding these Terms or the Service, contact:</p>
         <p><strong>StagePay Support</strong><br>📧 stagepay.support@gmail.com</p>
 
-        <div class="legal-page-nav"><a href="/privacy">Privacy Policy</a> · <a href="/">Back to StagePay</a></div>
+        <div class="legal-page-nav"><a href="/legal/privacy">Privacy Policy</a> · <a href="/">Back to StagePay</a></div>
       </div></div>`;
   }
   function renderPrivacyPage() {
@@ -4526,7 +4523,7 @@ ${e.rawResponse || '—'}`;
         ${legalPageBrandHtml()}
         <h1>Privacy Policy</h1>
         <p class="legal-updated">Beta Version — Last updated: 23 July 2026</p>
-        <p class="legal-intro">This Privacy Policy explains what information StagePay ("we", "us", "our") collects from you when you use StagePay (the "Service"), how we use it, and your rights regarding it. This Policy applies to users in India and is intended to be read together with our <a href="/terms">Terms &amp; Conditions</a>.</p>
+        <p class="legal-intro">This Privacy Policy explains what information StagePay ("we", "us", "our") collects from you when you use StagePay (the "Service"), how we use it, and your rights regarding it. This Policy applies to users in India and is intended to be read together with our <a href="/legal/terms">Terms &amp; Conditions</a>.</p>
         <hr>
 
         <h2>1. Information We Collect</h2>
@@ -4599,7 +4596,7 @@ ${e.rawResponse || '—'}`;
         <h2>10. Changes to This Policy</h2>
         <p>We may update this Privacy Policy from time to time, particularly during the beta period. We encourage you to review this page periodically. Continued use of the Service after a change constitutes acceptance of the updated Policy.</p>
 
-        <div class="legal-page-nav"><a href="/terms">Terms &amp; Conditions</a> · <a href="/">Back to StagePay</a></div>
+        <div class="legal-page-nav"><a href="/legal/terms">Terms &amp; Conditions</a> · <a href="/">Back to StagePay</a></div>
       </div></div>`;
   }
 
@@ -4665,7 +4662,7 @@ ${e.rawResponse || '—'}`;
             <input id="waitlistDescription" type="text" placeholder="e.g. skincare demos, tech unboxings, comedy skits" value="${esc(d.ugcDescription)}" maxlength="200">
           </div>
           <button class="btn btn-primary" id="waitlistSubmitBtn" style="width:100%;margin-top:8px">Submit Application</button>
-          <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:10px">By continuing, you agree to StagePay's <a href="/terms" target="_blank" style="color:var(--teal)">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" style="color:var(--teal)">Privacy Policy</a>.</p>
+          <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:10px">By continuing, you agree to StagePay's <a href="/legal/terms" target="_blank" style="color:var(--teal)">Terms &amp; Conditions</a> and <a href="/legal/privacy" target="_blank" style="color:var(--teal)">Privacy Policy</a>.</p>
         </div>
       </div>`;
     document.querySelectorAll('[data-waitlist-role]').forEach((btn) => btn.addEventListener('click', () => {
@@ -6893,8 +6890,8 @@ ${e.rawResponse || '—'}`;
     if (payMatch) { await renderPublicPayPage(payMatch[1]); return; }
     const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
     if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
-    if (location.pathname === '/terms') { renderTermsPage(); return; }
-    if (location.pathname === '/privacy') { renderPrivacyPage(); return; }
+    if (location.pathname === '/legal/terms') { renderTermsPage(); return; }
+    if (location.pathname === '/legal/privacy') { renderPrivacyPage(); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
     if (new URLSearchParams(location.search).get('screen') === 'admin') {
