@@ -94,24 +94,31 @@ projects.get('/', async (c) => {
        COALESCE((SELECT SUM(pls.amount_paise) FROM payment_link_stages pls JOIN payment_links pl ON pl.token = pls.token WHERE pl.project_id = p.id AND pls.paid = 0), 0) AS pending_paise,
        (SELECT COUNT(*) FROM payment_link_stages pls JOIN payment_links pl ON pl.token = pls.token WHERE pl.project_id = p.id AND pls.paid = 0) AS pending_count,
        (SELECT stage FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage,
-       (SELECT locked FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage_locked
+       (SELECT locked FROM stage_locks WHERE project_id = p.id ORDER BY stage DESC LIMIT 1) AS top_stage_locked,
+       (SELECT locked FROM stage1_brief WHERE project_id = p.id) AS brief_locked
      FROM projects p WHERE p.user_id = ? ORDER BY p.updated_at DESC`
   )
     .bind(userId)
     .all<{
       id: string; name: string; mode: string; created_at: string; updated_at: string;
       earned_paise: number; earned_count: number; pending_paise: number; pending_count: number;
-      top_stage: number | null; top_stage_locked: number | null;
+      top_stage: number | null; top_stage_locked: number | null; brief_locked: number | null;
     }>();
 
-  const projectsWithStage = results.map(({ top_stage, top_stage_locked, ...rest }) => ({
+  const projectsWithStage = results.map(({ top_stage, top_stage_locked, brief_locked, ...rest }) => ({
     ...rest,
     // The Math.min clamp below (avoiding a nonexistent "Stage 6" once Stage 5
     // locks) used to conflate two different states into the same value:
     // "Stage 4 done, now on Stage 5" and "Stage 5 done, project complete"
     // both produced current_stage 5. completed distinguishes them so the
     // frontend can show a real "done" state instead of just "Stage 5" forever.
-    current_stage: top_stage == null ? 1 : top_stage_locked ? Math.min(top_stage + 1, 5) : top_stage,
+    //
+    // stage_locks only ever gets rows for stage >= 2 (Stage 1's own lock
+    // lives in stage1_brief.locked instead) — so a project that has locked
+    // its brief and moved into Stage 2, but not yet locked Stage 2 itself,
+    // has zero stage_locks rows and would otherwise wrongly fall back to
+    // Stage 1 forever.
+    current_stage: top_stage == null ? (brief_locked ? 2 : 1) : top_stage_locked ? Math.min(top_stage + 1, 5) : top_stage,
     completed: top_stage === 5 && !!top_stage_locked,
   }));
   return c.json({ projects: projectsWithStage, max: MAX_PROJECTS });

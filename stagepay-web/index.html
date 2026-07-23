@@ -339,7 +339,7 @@
   .showcase-cover-manage .showcase-cover { margin-bottom: 8px; }
   .showcase-cover-remove { position: absolute; top: 8px; right: 8px; border: none; border-radius: 999px; width: 26px; height: 26px; background: rgba(10,11,14,0.7); color: #f0f6f4; cursor: pointer; font-size: 14px; line-height: 1; }
 
-  /* ---------- Experimental swipeable showcase (/showcase-swipe/:userId) ---------- */
+  /* ---------- Swipeable showcase (/showcase/:userId) ---------- */
   .swipe-page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; position: relative; transition: background-color 0.5s ease; }
   .swipe-topbar { flex-shrink: 0; padding: 12px 12px 6px; text-align: center; position: relative; z-index: 2; }
   .swipe-brand { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: rgba(20,22,27,0.6); text-decoration: none; }
@@ -743,6 +743,7 @@ Rules:
   // other item type (and Stage 1's logo/product photos) shares one default.
   const DEFAULT_MEDIA_MAX_MB = 20;
   const MEDIA_MAX_MB = { movie: 100 };
+  const STORY_MAX_FILES = 2; // Storyboard is the one item type allowed more than 1 file — capped at 2, not unlimited
   function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
   function checkFileSize(file, maxMb) {
     if (file.size > maxMb * 1024 * 1024) {
@@ -2181,13 +2182,22 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // Setup form (its content/shot fields only ever feed the compiled Flow
     // prompt) — only "Featured in this scene" still matters here, so it
     // gets its own small standalone modal instead (see openSceneRefsModal).
+    // Picking refs in the modal used to leave zero trace on this card — the
+    // button/note text never changed, so there was no way to tell what (if
+    // anything) was selected without reopening the modal. Show the picked
+    // names right here instead.
+    const sceneRefNames = item.item_key === 'scene'
+      ? (Array.isArray((version.fields || {}).refs) ? version.fields.refs : []).map(id => itemById(id)).filter(Boolean).map(it => it.name || itemLabel(it.stage, it.item_key))
+      : [];
     const uploadOnlyStep = `
       <div class="story-step">
         <span class="story-step-num">1</span>
         <div class="story-step-body">
           ${item.item_key === 'scene'
             ? `<button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
-               <p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`
+               ${sceneRefNames.length
+                 ? `<p class="story-step-note" style="margin-top:6px">Featured: ${sceneRefNames.map(esc).join(', ')}</p>`
+                 : `<p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`}`
             : `<button class="btn btn-sm" data-open-generate="${item.id}" ${dis}>📋 ${esc(itemLabel(item.stage, item.item_key))} Details</button>
                <p class="story-step-note" style="margin-top:6px">Fill in the details above so later scenes can describe this consistently.</p>`}
         </div>
@@ -2805,14 +2815,15 @@ ${e.rawResponse || '—'}`;
     // (ChatGPT, hand-drawn, etc.) and just want to attach it — this mirrors
     // Scene/Movie's Generate/Upload toggle so that's an explicit choice
     // instead of a hidden shortcut buried in step 4 of a numbered list.
-    // Story allows several storyboard images (unlike single-file item
-    // types), so unlike those, the toggle stays visible even after a file
-    // exists — more can still be added either way.
+    // Story allows up to STORY_MAX_FILES storyboard images (unlike
+    // single-file item types) — the upload button hides once that cap is
+    // hit, same as every other item type hides once it has its one file.
     const mode = state.itemCardMode[story.id] || (version.fields || {})._uiMode || 'generate';
+    const atStoryFileCap = mediaFiles.length >= STORY_MAX_FILES;
     const uploadWidget = `
       <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
-      <button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload storyboard image</button>
-      <p class="story-step-note" style="margin-top:4px">Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
+      ${atStoryFileCap ? '' : `<button type="button" class="btn btn-sm" data-media-upload-btn="${story.id}" ${dis}>+ Upload storyboard image</button>`}
+      <p class="story-step-note" style="margin-top:4px">Max ${STORY_MAX_FILES} storyboard images allowed. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
       <div class="attach-chip-row" style="margin-top:7px">
         ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
       </div>`;
@@ -2921,11 +2932,16 @@ ${e.rawResponse || '—'}`;
       uploadInput.addEventListener('change', async () => {
         const files = Array.from(uploadInput.files);
         if (!files.length) return;
+        const version = theVersion(story);
+        const mediaFiles = version.media_files ? [...version.media_files] : [];
+        if (mediaFiles.length + files.length > STORY_MAX_FILES) {
+          toast(`Storyboard allows max ${STORY_MAX_FILES} images — you already have ${mediaFiles.length}.`);
+          uploadInput.value = '';
+          return;
+        }
         const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
         if (oversized) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
-        const version = theVersion(story);
-        const mediaFiles = version.media_files ? [...version.media_files] : [];
         for (const file of files) {
           const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
           const cleanName = cleanUploadFileName(story, file.name, mediaFiles.length);
@@ -3805,6 +3821,11 @@ ${e.rawResponse || '—'}`;
     state.screen = 'showcase';
     renderApp();
   }
+  function goToAdminScreen() {
+    history.replaceState(null, '', `${location.pathname}?screen=admin`);
+    state.screen = 'admin';
+    renderApp();
+  }
   function renderTopbar() {
     // Contextual: show "🎯 Goals" everywhere EXCEPT on the Goals screen
     // itself, where it'd be a no-op link back to the page you're already
@@ -3816,6 +3837,11 @@ ${e.rawResponse || '—'}`;
     const showcaseOrHomeBtn = state.screen === 'showcase'
       ? `<button class="btn btn-sm" id="showcaseHomeBtn">All Projects</button>`
       : `<button class="btn btn-sm" id="showcaseNavBtn">🖼 Showcase</button>`;
+    // Admin-only nav link — same contextual on/off-screen pattern, but only
+    // shown at all when /me flagged this session as the admin account.
+    const adminOrHomeBtn = !state.user?.isAdmin ? '' : state.screen === 'admin'
+      ? `<button class="btn btn-sm" id="adminHomeBtn">All Projects</button>`
+      : `<button class="btn btn-sm" id="adminNavBtn">🛠 Admin</button>`;
     document.getElementById('topbar').innerHTML = `
       <div class="topbar-title" id="topbarHomeLink" style="cursor:pointer">
         <span class="mark">💸</span>
@@ -3823,7 +3849,7 @@ ${e.rawResponse || '—'}`;
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
-        ${state.user ? `${goalsOrHomeBtn}${showcaseOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
+        ${state.user ? `${goalsOrHomeBtn}${showcaseOrHomeBtn}${adminOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>`;
     const topbarHomeLink = document.getElementById('topbarHomeLink');
     if (topbarHomeLink && state.user) topbarHomeLink.addEventListener('click', goToProjectsScreen);
@@ -3835,6 +3861,10 @@ ${e.rawResponse || '—'}`;
     if (showcaseNavBtn) showcaseNavBtn.addEventListener('click', goToShowcaseScreen);
     const showcaseHomeBtn = document.getElementById('showcaseHomeBtn');
     if (showcaseHomeBtn) showcaseHomeBtn.addEventListener('click', goToProjectsScreen);
+    const adminNavBtn = document.getElementById('adminNavBtn');
+    if (adminNavBtn) adminNavBtn.addEventListener('click', goToAdminScreen);
+    const adminHomeBtn = document.getElementById('adminHomeBtn');
+    if (adminHomeBtn) adminHomeBtn.addEventListener('click', goToProjectsScreen);
     if (state.project) {
       document.getElementById('backToProjectsBtn').addEventListener('click', goToProjectsScreen);
     }
@@ -4882,10 +4912,11 @@ ${e.rawResponse || '—'}`;
   async function renderAdminScreen() {
     const app = document.getElementById('app');
     app.style.cssText = '';
-    app.innerHTML = `<div class="admin-page"><p>Loading…</p></div>`;
+    app.innerHTML = `<div id="topbar" class="topbar"></div><div class="admin-page"><p>Loading…</p></div>`;
+    renderTopbar();
     const [waitlistRes, creditsRes] = await Promise.all([api.adminListWaitlist(), api.adminListCreditRequests()]);
     if (!waitlistRes.ok || !creditsRes.ok) {
-      app.innerHTML = `<div class="admin-page"><p>You don't have access to this page.</p></div>`;
+      document.querySelector('.admin-page').innerHTML = `<p>You don't have access to this page.</p>`;
       return;
     }
     adminData.applicants = waitlistRes.body.applicants || [];
@@ -4895,6 +4926,7 @@ ${e.rawResponse || '—'}`;
   function renderAdminScreenInto() {
     const app = document.getElementById('app');
     app.innerHTML = `
+      <div id="topbar" class="topbar"></div>
       <div class="admin-page">
         <div class="section-head-row"><span class="section-title">🗂 Admin Queue</span></div>
         <div class="admin-tabs">
@@ -4903,6 +4935,7 @@ ${e.rawResponse || '—'}`;
         </div>
         ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : renderAdminCreditsTab()}
       </div>`;
+    renderTopbar();
     wireAdminScreen();
   }
   function renderAdminWaitlistTab() {
@@ -6541,7 +6574,7 @@ ${e.rawResponse || '—'}`;
             ${p.completed
               ? `<span class="project-stage-pill completed" title="All 5 stages locked and paid">✅ Completed</span>`
               : `<span class="project-stage-pill" title="${esc(STAGE_NAMES[stage])}">Stage ${stage}</span>`}
-            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned (${p.earned_count})</span>` : `<span class="project-earned-pill" style="visibility:hidden"></span>`}
+            ${p.earned_paise > 0 ? `<span class="project-earned-pill">💰 ${formatRupees(p.earned_paise)} earned (${p.earned_count})</span>` : ''}
             ${p.pending_paise > 0 ? `<span class="project-pending-pill">⏳ ${formatRupees(p.pending_paise)} pending (${p.pending_count})</span>` : ''}
             <button class="btn btn-sm btn-danger" data-delete-project="${p.id}">Delete</button>
           </div>
@@ -6995,7 +7028,7 @@ ${e.rawResponse || '—'}`;
     wireShowcaseThumbFallbacks();
   }
 
-  // ---------- Experimental: swipeable showcase (/showcase-swipe/:userId) ----------
+  // ---------- Swipeable showcase (/showcase/:userId) ----------
   // A throwaway alternate presentation, built alongside the real showcase
   // page rather than replacing it — same public data (getPublicShowcase),
   // just a different shell, so it can be judged on its own and discarded
@@ -7110,9 +7143,9 @@ ${e.rawResponse || '—'}`;
     // behind, pre-warmed for a smooth swipe). Fetching all 14+ files eagerly
     // on open would fight the one video that actually matters right now —
     // whatever's first — for the same limited mobile bandwidth.
-    const slideHtml = (s, i) => {
+    const slideHtml = (s) => {
       if (s.kind === 'cover') {
-        return `<div class="swiper-slide" data-slide-idx="${i}"><div class="swipe-card"><img data-src="${esc(api.showcaseCoverUrl(profile.id))}" alt="" style="background:${cardColorForCategory(null)}">${overlayHtml('')}</div></div>`;
+        return `<div class="swiper-slide"><div class="swipe-card"><img data-src="${esc(api.showcaseCoverUrl(profile.id))}" alt="" style="background:${cardColorForCategory(null)}">${overlayHtml('')}</div></div>`;
       }
       const it = s.item;
       const isVideo = (it.mime_type || '').startsWith('video/');
@@ -7125,9 +7158,9 @@ ${e.rawResponse || '—'}`;
       // a wait on the actual video file — so there's always something on
       // screen the moment this slide becomes active, not a blank card.
       const media = isVideo
-        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" data-slide-idx="${i}" poster="${esc(api.showcaseThumbnailUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><div class="swipe-video-loading" data-video-loading>Loading…</div><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
+        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" poster="${esc(api.showcaseThumbnailUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><div class="swipe-video-loading" data-video-loading>Loading…</div><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
         : `<img data-src="${esc(api.showcaseFileUrl(it.id))}" alt="${esc(it.file_name || '')}" style="background:${bg}">`;
-      return `<div class="swiper-slide" data-slide-idx="${i}"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
+      return `<div class="swiper-slide"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
     };
     // Assigns data-src -> src exactly once per element — safe to call
     // repeatedly on the same slide as the user swipes back and forth.
@@ -7135,8 +7168,6 @@ ${e.rawResponse || '—'}`;
       if (!slideEl) return;
       const el = slideEl.querySelector('img[data-src], video[data-src]');
       if (!el) return;
-      const idx = slideEl.getAttribute('data-slide-idx');
-      console.log(`[SWIPE] loadSlideMedia: assigning src for slide ${idx} (${el.tagName})`, el.dataset.src);
       el.src = el.dataset.src;
       delete el.dataset.src;
       if (el.tagName === 'VIDEO') {
@@ -7153,21 +7184,13 @@ ${e.rawResponse || '—'}`;
         if (indicator) {
           el.addEventListener('waiting', () => {
             if (hasPlayedOnce) return;
-            console.log(`[SWIPE] video waiting: slide ${idx}`);
             indicator.style.display = 'flex';
           });
           el.addEventListener('playing', () => {
-            console.log(`[SWIPE] video playing: slide ${idx}`);
             indicator.style.display = 'none';
             hasPlayedOnce = true;
           });
         }
-        // loop should mean this never fires at all — if it does, that's the bug.
-        el.addEventListener('ended', () => { console.log(`[SWIPE] ⚠️ video ENDED fired: slide ${idx} — loop should have prevented this`); });
-        el.addEventListener('emptied', () => { console.log(`[SWIPE] ⚠️ video EMPTIED (src reset): slide ${idx}`); });
-        el.addEventListener('play', () => { console.log(`[SWIPE] video play(): slide ${idx}, currentSrc=${el.currentSrc}`); });
-        el.addEventListener('pause', () => { console.log(`[SWIPE] video pause(): slide ${idx}`); });
-        el.addEventListener('seeked', () => { console.log(`[SWIPE] video seeked (loop restart likely): slide ${idx}, currentTime=${el.currentTime.toFixed(2)}`); });
       }
     }
 
@@ -7180,7 +7203,7 @@ ${e.rawResponse || '—'}`;
         <div class="swipe-stage">
           ${slides.length ? `
             <div class="swiper swipe-swiper" id="swipeSwiper">
-              <div class="swiper-wrapper">${slides.map((s, i) => slideHtml(s, i)).join('')}</div>
+              <div class="swiper-wrapper">${slides.map(slideHtml).join('')}</div>
             </div>
           ` : '<p style="color:var(--text-faint)">No showcased work yet.</p>'}
         </div>
@@ -7249,7 +7272,6 @@ ${e.rawResponse || '—'}`;
     // so loading/playing media through the DOM element Swiper hands us
     // works the same either way — only the data lookup needs the real index.
     function updateForSlide(realIdx, domIdx) {
-      console.log(`[SWIPE] updateForSlide called: realIdx=${realIdx}, domIdx=${domIdx}, activeSlide data-slide-idx=${swiper && swiper.slides[domIdx] ? swiper.slides[domIdx].getAttribute('data-slide-idx') : 'n/a'}`);
       const s = slides[realIdx];
       const cat = s.category || 'Cover';
       root.style.backgroundColor = SWIPE_CATEGORY_PALETTE[categories.indexOf(s.category) % SWIPE_CATEGORY_PALETTE.length] || '';
@@ -7276,13 +7298,12 @@ ${e.rawResponse || '—'}`;
         loadSlideMedia(swiper.slides[domIdx - 1]);
       }
       const activeVideo = activeSlideEl ? activeSlideEl.querySelector('video') : null;
-      if (activeVideo) console.log(`[SWIPE] active video for domIdx=${domIdx}: currentSrc=${activeVideo.currentSrc || '(not yet loaded)'}`);
       pauseAllVideosExcept(activeVideo || null);
       if (activeVideo) {
         activeVideo.muted = !soundOn;
         const muteBtn = activeSlideEl.querySelector('[data-mute-toggle]');
         if (muteBtn) muteBtn.textContent = activeVideo.muted ? 'Unmute' : 'Mute';
-        activeVideo.play().catch((err) => console.log('[SWIPE] play() rejected', err));
+        activeVideo.play().catch(() => {});
       }
     }
 
@@ -7296,12 +7317,7 @@ ${e.rawResponse || '—'}`;
         loop: slides.length > 1,
         mousewheel: { forceToAxis: true },
         cardsEffect: { perSlideOffset: 8, perSlideRotate: 3, slideShadows: false },
-        on: {
-          slideChange(sw) {
-            console.log(`[SWIPE] Swiper slideChange event: realIndex=${sw.realIndex}, activeIndex=${sw.activeIndex}, previousIndex=${sw.previousIndex}`);
-            updateForSlide(sw.realIndex, sw.activeIndex);
-          },
-        },
+        on: { slideChange(sw) { updateForSlide(sw.realIndex, sw.activeIndex); } },
       });
       updateForSlide(swiper.realIndex, swiper.activeIndex);
     } catch {
@@ -7318,8 +7334,6 @@ ${e.rawResponse || '—'}`;
     // again rather than having to rebuild it.
     const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
     if (showcaseMatch) { await renderPublicShowcaseSwipePage(showcaseMatch[1]); return; }
-    const showcaseSwipeMatch = location.pathname.match(/^\/showcase-swipe\/([^/]+)/);
-    if (showcaseSwipeMatch) { await renderPublicShowcaseSwipePage(showcaseSwipeMatch[1]); return; }
     if (location.pathname === '/legal/terms') { renderTermsPage(); return; }
     if (location.pathname === '/legal/privacy') { renderPrivacyPage(); return; }
     state.user = await api.me();

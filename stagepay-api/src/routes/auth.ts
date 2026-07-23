@@ -70,8 +70,12 @@ auth.get('/me', async (c) => {
      FROM users WHERE id = ?`
   )
     .bind(sessionUserId)
-    .first();
-  return c.json({ user: user ?? null });
+    .first<{ email: string }>();
+  if (!user) return c.json({ user: null });
+  // Only used to decide whether to show the Admin nav link — the admin
+  // routes themselves independently re-check email against ADMIN_EMAIL,
+  // so this flag is a UI convenience, not the actual access gate.
+  return c.json({ user: { ...user, isAdmin: user.email === c.env.ADMIN_EMAIL } });
 });
 
 // Waitlist application — submitted once to move from 'pending_profile' to
