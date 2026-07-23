@@ -334,6 +334,10 @@
   .moodboard-tile-caption { margin: 6px 0 0; font-size: 11.5px; color: var(--text-faint); }
   .public-showcase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
   .public-showcase-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
+  .showcase-cover { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--surface-2); display: block; margin-bottom: 18px; }
+  .showcase-cover-manage { position: relative; }
+  .showcase-cover-manage .showcase-cover { margin-bottom: 8px; }
+  .showcase-cover-remove { position: absolute; top: 8px; right: 8px; border: none; border-radius: 999px; width: 26px; height: 26px; background: rgba(10,11,14,0.7); color: #f0f6f4; cursor: pointer; font-size: 14px; line-height: 1; }
   .public-showcase-category { margin-bottom: 22px; }
   .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
   /* Casual-deterrent only (not real protection — anyone using dev tools or
@@ -881,7 +885,7 @@ Rules:
     async listShowcase() {
       const r = await fetch(`${API_BASE}/api/showcase`, { credentials: 'include' });
       const body = await r.json();
-      return { items: body.items || [], max: body.max || 25 };
+      return { items: body.items || [], max: body.max || 25, hasCover: !!body.hasCover };
     },
     async listShowcaseCandidates() {
       const r = await fetch(`${API_BASE}/api/showcase/candidates`, { credentials: 'include' });
@@ -912,6 +916,16 @@ Rules:
       if (!r.ok) throw new Error('not_found');
       return r.json();
     },
+    async uploadShowcaseCover(file) {
+      const r = await fetch(`${API_BASE}/api/showcase/cover`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file,
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async removeShowcaseCover() {
+      return fetch(`${API_BASE}/api/showcase/cover`, { method: 'DELETE', credentials: 'include' });
+    },
+    showcaseCoverUrl(userId) { return `${API_BASE}/api/showcase/${userId}/cover`; },
     async applyWaitlist(body) {
       const r = await fetch(`${API_BASE}/api/auth/me/apply`, {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -975,6 +989,7 @@ Rules:
     landingFaqTab: 0, // which of the 3 FAQ category tabs is active
     landingFaqOpen: 0, // which question within that tab is expanded (-1 = none)
     showcaseItems: [], // designer's own curated public-showcase items
+    showcaseHasCover: false, // whether a cover image has been uploaded
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
     showcaseMax: 25, // server-driven cap (see GET /api/showcase's max field) — default here is just a pre-fetch placeholder
@@ -5972,6 +5987,7 @@ ${e.rawResponse || '—'}`;
     const [showcase, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
     state.showcaseItems = showcase.items;
     state.showcaseMax = showcase.max;
+    state.showcaseHasCover = showcase.hasCover;
     state.showcaseCandidates = candidates;
     document.getElementById('app').innerHTML = `
       <div id="topbar" class="topbar"></div>
@@ -5986,6 +6002,7 @@ ${e.rawResponse || '—'}`;
     const [showcase, candidates] = await Promise.all([api.listShowcase(), api.listShowcaseCandidates()]);
     state.showcaseItems = showcase.items;
     state.showcaseMax = showcase.max;
+    state.showcaseHasCover = showcase.hasCover;
     state.showcaseCandidates = candidates;
     const root = document.getElementById('showcaseCardRoot');
     if (!root) return;
@@ -6219,6 +6236,19 @@ ${e.rawResponse || '—'}`;
       </div>
 
       <div class="showcase-field-section">
+        <div class="showcase-field-label">Cover image</div>
+        ${state.showcaseHasCover ? `
+          <div class="showcase-cover-manage">
+            <img class="showcase-cover" src="${esc(api.showcaseCoverUrl(state.user.id))}?t=${Date.now()}" alt="">
+            <button class="showcase-cover-remove" id="showcaseCoverRemoveBtn" title="Remove cover">×</button>
+          </div>
+        ` : ''}
+        <input type="file" id="showcaseCoverInput" accept="image/png,image/jpeg" style="display:none">
+        <button class="btn btn-sm" id="showcaseCoverBtn">${state.showcaseHasCover ? 'Replace cover image' : 'Upload cover image'}</button>
+        <p class="showcase-field-note">Recommended: 1280×720px (16:9 landscape), max 5MB. Shown at the top of your public page.</p>
+      </div>
+
+      <div class="showcase-field-section">
         <div class="showcase-field-label">Customize your link</div>
         <div class="showcase-field-row">
           <div class="input-with-prefix">
@@ -6311,6 +6341,33 @@ ${e.rawResponse || '—'}`;
     document.getElementById('showcaseCopyLinkBtn').addEventListener('click', () => {
       const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
       navigator.clipboard.writeText(publicUrl).then(() => toast('Link copied'), () => toast('Failed to copy link', true));
+    });
+    document.getElementById('showcaseCoverInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!['image/png', 'image/jpeg'].includes(file.type)) { toast('Cover must be a JPEG or PNG image', true); return; }
+      if (file.size > 5 * 1024 * 1024) { toast('Cover image must be under 5MB', true); return; }
+      const btn = document.getElementById('showcaseCoverBtn');
+      btn.disabled = true; btn.textContent = 'Uploading…';
+      const { ok, body } = await api.uploadShowcaseCover(file);
+      if (!ok) {
+        toast(body.message || 'Failed to upload cover image', true);
+        btn.disabled = false; btn.textContent = state.showcaseHasCover ? 'Replace cover image' : 'Upload cover image';
+        return;
+      }
+      toast('Cover image updated');
+      await refreshShowcaseScreen();
+    });
+    document.getElementById('showcaseCoverBtn').addEventListener('click', () => {
+      document.getElementById('showcaseCoverInput').click();
+    });
+    const coverRemoveBtn = document.getElementById('showcaseCoverRemoveBtn');
+    if (coverRemoveBtn) coverRemoveBtn.addEventListener('click', async () => {
+      coverRemoveBtn.disabled = true;
+      await api.removeShowcaseCover();
+      toast('Cover image removed');
+      await refreshShowcaseScreen();
     });
     // Flashes the button green with a checkmark before the card re-renders,
     // so a save gives visible confirmation beyond the toast alone.
@@ -6862,6 +6919,7 @@ ${e.rawResponse || '—'}`;
       <div class="showcase-page">
         <div class="showcase-page-inner">
           <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></a>
+          ${profile.hasCover ? `<img class="showcase-cover" src="${esc(api.showcaseCoverUrl(profile.id))}" alt="">` : ''}
           <div class="public-showcase-header">
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <div>

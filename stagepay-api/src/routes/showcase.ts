@@ -64,7 +64,8 @@ showcase.get('/showcase', async (c) => {
   )
     .bind(userId)
     .all();
-  return c.json({ items: results, max: SHOWCASE_MAX_ITEMS });
+  const user = await c.env.DB.prepare('SELECT showcase_cover_r2_key FROM users WHERE id = ?').bind(userId).first<{ showcase_cover_r2_key: string | null }>();
+  return c.json({ items: results, max: SHOWCASE_MAX_ITEMS, hasCover: !!user?.showcase_cover_r2_key });
 });
 
 showcase.post('/showcase', async (c) => {
@@ -141,6 +142,42 @@ showcase.put('/showcase/upload/:filename', async (c) => {
   return c.json({ id }, 201);
 });
 
+const COVER_MAX_BYTES = 5 * 1024 * 1024;
+const COVER_ACCEPT = ['image/png', 'image/jpeg'];
+
+// A single account-level banner, not a showcase_items row — one per
+// designer, replacing whichever one existed before (not appended like the
+// item gallery). Recommended 16:9 so it reads as roughly a quarter of a
+// phone screen on load and a normal hero-banner height on desktop.
+showcase.put('/showcase/cover', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const contentType = c.req.header('Content-Type') ?? '';
+  if (!COVER_ACCEPT.includes(contentType)) return c.json({ error: 'unsupported_type', allowed: COVER_ACCEPT }, 415);
+  const contentLength = Number(c.req.header('Content-Length') ?? 0);
+  if (!contentLength || contentLength > COVER_MAX_BYTES) return c.json({ error: 'file_too_large', maxBytes: COVER_MAX_BYTES }, 413);
+
+  const existing = await c.env.DB.prepare('SELECT showcase_cover_r2_key FROM users WHERE id = ?').bind(userId).first<{ showcase_cover_r2_key: string | null }>();
+  const key = `showcase/${userId}/cover-${crypto.randomUUID()}`;
+  await c.env.MEDIA.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+  await c.env.DB.prepare('UPDATE users SET showcase_cover_r2_key = ? WHERE id = ?').bind(key, userId).run();
+  if (existing?.showcase_cover_r2_key) await c.env.MEDIA.delete(existing.showcase_cover_r2_key);
+
+  return c.json({ ok: true });
+});
+
+showcase.delete('/showcase/cover', async (c) => {
+  const userId = currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+  const existing = await c.env.DB.prepare('SELECT showcase_cover_r2_key FROM users WHERE id = ?').bind(userId).first<{ showcase_cover_r2_key: string | null }>();
+  if (existing?.showcase_cover_r2_key) await c.env.MEDIA.delete(existing.showcase_cover_r2_key);
+  await c.env.DB.prepare('UPDATE users SET showcase_cover_r2_key = NULL WHERE id = ?').bind(userId).run();
+
+  return c.json({ ok: true });
+});
+
 showcase.put('/showcase/:itemId/thumbnail', async (c) => {
   // A client-captured JPEG frame — mobile browsers often won't render a
   // <video preload="metadata"> frame reliably, so a stored image is the only
@@ -197,9 +234,9 @@ showcase.delete('/showcase/:itemId', async (c) => {
 // real id regardless of which URL form a visitor used.
 showcase.get('/showcase/:userId/public', async (c) => {
   const param = c.req.param('userId');
-  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url, contact_link, free_credits_remaining FROM users WHERE id = ? OR showcase_slug = ?')
+  const profile = await c.env.DB.prepare('SELECT id, name, avatar_url, contact_link, free_credits_remaining, showcase_cover_r2_key FROM users WHERE id = ? OR showcase_slug = ?')
     .bind(param, param)
-    .first<{ id: string; name: string; avatar_url: string | null; contact_link: string | null; free_credits_remaining: number }>();
+    .first<{ id: string; name: string; avatar_url: string | null; contact_link: string | null; free_credits_remaining: number; showcase_cover_r2_key: string | null }>();
   if (!profile) return c.json({ error: 'not_found' }, 404);
 
   // Paused rather than 404'd deliberately — this is the designer's own
@@ -220,7 +257,25 @@ showcase.get('/showcase/:userId/public', async (c) => {
     .bind(profile.id)
     .all();
 
-  return c.json({ profile, items });
+  // Never leak the raw R2 key — just whether one exists, so the frontend
+  // knows whether to request /showcase/:userId/cover at all.
+  const { showcase_cover_r2_key, ...publicProfile } = profile;
+  return c.json({ profile: { ...publicProfile, hasCover: !!showcase_cover_r2_key }, items });
+});
+
+showcase.get('/showcase/:userId/cover', async (c) => {
+  const param = c.req.param('userId');
+  const profile = await c.env.DB.prepare('SELECT showcase_cover_r2_key FROM users WHERE id = ? OR showcase_slug = ?')
+    .bind(param, param)
+    .first<{ showcase_cover_r2_key: string | null }>();
+  if (!profile?.showcase_cover_r2_key) return c.json({ error: 'not_found' }, 404);
+
+  const object = await c.env.MEDIA.get(profile.showcase_cover_r2_key);
+  if (!object) return c.json({ error: 'not_found' }, 404);
+
+  return new Response(object.body, {
+    headers: { 'Content-Type': object.httpMetadata?.contentType || 'image/jpeg', 'Cache-Control': 'public, max-age=86400' },
+  });
 });
 
 // Parses a standard "bytes=start-end" Range header ourselves (rather than

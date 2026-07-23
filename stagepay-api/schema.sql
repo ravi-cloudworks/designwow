@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   stage_target_counts TEXT NOT NULL DEFAULT '{}', -- Goal Tracker manual allocation: target count per stage for the CURRENT goal — reset whenever a new goal is set
   showcase_slug TEXT, -- optional custom handle for a nicer /showcase/{slug} URL — nullable, falls back to the raw id
   contact_link TEXT, -- optional public contact link (Instagram/LinkedIn/site) shown on the showcase page — an alternative to publishing a personal phone number
+  showcase_cover_r2_key TEXT, -- optional 16:9 banner shown above the avatar/name on the public showcase page
   status TEXT NOT NULL DEFAULT 'pending_profile', -- 'pending_profile' | 'waitlisted' | 'approved' — gates access until manually approved
   role TEXT, -- from the waitlist form: 'ai_creator' | 'non_ai_creator' | 'agency' | 'other'
   instagram_url TEXT,
