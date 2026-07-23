@@ -519,6 +519,22 @@
   .landing-final .landing-punch { font-size: 17px; font-weight: 700; margin-bottom: 6px; opacity: 0.85; }
   .landing-final .landing-cta { background: var(--paper); color: var(--ink); margin-top: 22px; }
   .landing-footer { text-align: center; padding: 20px; font-size: 12px; color: var(--text-faint); }
+  .landing-footer a { color: var(--text-faint); margin: 0 6px; }
+  .legal-page-wrap { min-height: 100vh; background: var(--paper); padding: 24px 16px 64px; }
+  .legal-page { max-width: 760px; margin: 0 auto; }
+  .legal-page-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; text-decoration: none; color: inherit; }
+  .legal-page-brand .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .legal-page h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
+  .legal-page .legal-updated { font-size: 12.5px; color: var(--text-faint); margin-bottom: 8px; }
+  .legal-page .legal-intro { font-size: 13.5px; line-height: 1.7; color: var(--text-soft); margin: 12px 0 20px; }
+  .legal-page h2 { font-size: 16px; font-weight: 800; margin: 26px 0 10px; }
+  .legal-page p { font-size: 13.5px; line-height: 1.7; color: var(--text-soft); margin: 0 0 12px; }
+  .legal-page ul { margin: 0 0 12px; padding-left: 20px; }
+  .legal-page li { font-size: 13.5px; line-height: 1.7; color: var(--text-soft); margin-bottom: 6px; }
+  .legal-page strong { color: var(--text); }
+  .legal-page a { color: var(--teal); }
+  .legal-page hr { border: none; border-top: 1px solid var(--line); margin: 20px 0; }
+  .legal-page-nav { margin-top: 32px; font-size: 13px; }
 
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
@@ -4281,7 +4297,7 @@ ${e.rawResponse || '—'}`;
           <a class="landing-cta" href="/api/auth/google" data-login-link>${t('heroCta')}</a>
         </div>
 
-        <div class="landing-footer">${t('footer')}</div>
+        <div class="landing-footer">${t('footer')}<br><a href="/terms">Terms &amp; Conditions</a> · <a href="/privacy">Privacy Policy</a></div>
       </div>
       <div id="modalRoot"></div>`;
     renderFaqSectionInto();
@@ -4362,6 +4378,231 @@ ${e.rawResponse || '—'}`;
     document.getElementById('desktopOnlyOverlay').addEventListener('click', (e) => { if (e.target.id === 'desktopOnlyOverlay') close(); });
   }
 
+  // ---------- Legal pages (/terms, /privacy — public, no login) ----------
+  function legalPageBrandHtml() {
+    return `<a class="legal-page-brand" href="/"><span class="mark">💸</span><strong>StagePay</strong><span class="beta-badge">Beta</span></a>`;
+  }
+  function renderTermsPage() {
+    document.getElementById('app').innerHTML = `
+      <div class="legal-page-wrap"><div class="legal-page">
+        ${legalPageBrandHtml()}
+        <h1>Terms &amp; Conditions</h1>
+        <p class="legal-updated">Beta Version — Last updated: 23 July 2026</p>
+        <p class="legal-intro">Please read these Terms &amp; Conditions ("Terms") carefully before using StagePay. By creating an account, applying for waitlist access, or otherwise using StagePay (the "Service"), you agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+        <p class="legal-intro">StagePay is currently offered as a <strong>beta service</strong> to a limited, waitlist-approved set of users in India. Section 3 below explains what that means for you.</p>
+        <hr>
+
+        <h2>1. Who We Are</h2>
+        <p>StagePay is an independent developer project, operated by an individual developer in India (not a registered company) ("StagePay", "we", "us", "our"). You can reach us at <strong>stagepay.support@gmail.com</strong>.</p>
+
+        <h2>2. Eligibility</h2>
+        <ul>
+          <li>You must be <strong>18 years or older</strong> to create a StagePay account.</li>
+          <li>The Service is intended for use <strong>within India only</strong>. We make no representation that the Service is appropriate, legal, or available for use in any other jurisdiction.</li>
+          <li>You must sign in with a valid Google account. StagePay does not currently verify age at sign-up beyond this requirement — by using the Service, you represent and warrant that you meet the age requirement above.</li>
+        </ul>
+
+        <h2>3. Beta Service Notice</h2>
+        <p>StagePay is in <strong>active beta</strong>. By using the Service during this period, you acknowledge and agree that:</p>
+        <ul>
+          <li><strong>Bugs, errors, incomplete features, and unexpected downtime are expected.</strong> We make no warranty that the Service will be error-free or uninterrupted during beta.</li>
+          <li><strong>Pricing, free credit allowances, project limits, and features may change</strong> at any time during beta, with or without prior notice, at our sole discretion. We will try to communicate material changes where feasible, but this is not guaranteed during the beta period.</li>
+          <li><strong>Support is provided by email only</strong>, with no guaranteed response time or service-level commitment, during beta.</li>
+          <li>Access is currently <strong>gated by a waitlist</strong>. Submitting a waitlist application does not guarantee approval. Approval, rejection, or continued pending status is entirely at <strong>StagePay's sole discretion</strong>, and we are under no obligation to approve any application within any particular timeframe or at all.</li>
+        </ul>
+
+        <h2>4. Your Account</h2>
+        <ul>
+          <li>To use StagePay, you sign in with Google. We receive your name, email address, and profile photo from Google — we never receive or store your Google password.</li>
+          <li>You are responsible for maintaining the security of the device and Google account you use to access StagePay, and for all activity that occurs under your account.</li>
+          <li>Information you submit in your waitlist application (your name, role, Instagram/YouTube links, and description of your work) is reviewed by us to decide whether to approve your access, and may be visible to us indefinitely as part of that review record.</li>
+        </ul>
+
+        <h2>5. Nature of the Service — StagePay Is Not a Payment Gateway</h2>
+        <p>This is fundamental to how StagePay works, and you must understand it before using the Service:</p>
+        <ul>
+          <li><strong>StagePay never collects, holds, transmits, or has custody of any money exchanged between you and your customers.</strong> All payments between you and your customers happen directly, peer-to-peer, via UPI, entirely outside StagePay's systems.</li>
+          <li>StagePay only helps you generate a UPI payment QR code/link using the UPI ID <strong>you</strong> provide, and displays a record of amounts you've marked as priced or paid. It does not process, verify, or guarantee any transaction.</li>
+          <li><strong>"Paid" status shown in StagePay is self-attested</strong> — set by either you or your customer clicking a button confirming payment was made. StagePay does <strong>not</strong> verify this against any bank record, and has no way to confirm that a payment shown as "paid" actually occurred.</li>
+          <li>Any dispute about whether your customer actually paid you, how much, or when, is <strong>strictly between you and your customer</strong>. StagePay is not a party to that transaction and bears no responsibility or liability for it.</li>
+        </ul>
+
+        <h2>6. Your UPI ID Is Your Sole Responsibility</h2>
+        <ul>
+          <li>StagePay only checks that the UPI ID you enter <strong>looks like a valid UPI ID</strong> (in the general <code>handle@bank</code> format). We do <strong>not</strong> verify that it is a real, active account, or that it actually belongs to you.</li>
+          <li><strong>You are solely responsible</strong> for ensuring your UPI ID is correct, active, and yours before sharing any payment link with a customer.</li>
+          <li>StagePay is not liable in any way for payments sent to an incorrect, inactive, mistyped, or otherwise invalid UPI ID, including any resulting loss of funds, delay, or dispute with your customer.</li>
+        </ul>
+
+        <h2>7. Income Credits, Pricing &amp; Refunds</h2>
+        <ul>
+          <li>New approved accounts receive <strong>10 free income credits</strong>. Existing accounts at the time this pricing model was introduced may have been granted a different starting balance at our discretion.</li>
+          <li>One income credit is consumed each time you price a new, previously-unpriced stage of work (opening a "receivable") — regardless of the amount you charge your customer for that stage. Renegotiating the price of a stage that is already open and unpaid does not consume an additional credit.</li>
+          <li>Once your free credits are used, additional credits may be purchased in packs (currently 5 credits for ₹245, or 10 credits for ₹490 — subject to change per Section 3).</li>
+          <li><strong>Credit purchases are made by paying StagePay's own UPI ID directly</strong> — the same no-gateway model described in Section 5 applies to your payments to us. You must supply the correct <strong>UPI transaction ID (UTR)</strong> for your payment when submitting a credit purchase request.</li>
+          <li>Credits are added to your account <strong>only after we manually verify your UTR against the payment received.</strong> An incorrect, invalid, already-used, or unverifiable UTR will delay processing, and <strong>we may reject the request outright</strong> at our discretion if it cannot be verified.</li>
+          <li><strong>All income credit purchases are final. There are no refunds</strong>, for any reason, including unused credits, dissatisfaction with the Service, or account suspension or termination.</li>
+          <li>We reserve the right to suspend or terminate your account, and to withhold or decline to grant credits, if we suspect fraudulent, duplicate, or otherwise invalid credit purchase submissions.</li>
+        </ul>
+
+        <h2>8. Project Limits &amp; Deletion</h2>
+        <ul>
+          <li>Your account may have a <strong>maximum of 50 active projects</strong> at any time. Once you reach this limit, you must delete an existing project before creating a new one.</li>
+          <li><strong>Deleting a project is immediate and permanent.</strong> It removes: all files and uploaded content associated with that project; any of that project's work currently shown on your public Showcase page; and that project's income/payment records shown in your Income Tracker.</li>
+          <li><strong>This cannot be undone.</strong> StagePay cannot recover a deleted project or its associated data once removed. You are solely responsible for keeping your own copies of anything you wish to retain before deleting a project.</li>
+          <li>Similarly, <strong>unlocking a stage</strong> to make changes permanently deletes all content built on stages after it. This is intentional platform behavior, not a defect, and StagePay bears no liability for data loss resulting from your own decision to unlock a stage or delete a project.</li>
+        </ul>
+
+        <h2>9. Content You Upload</h2>
+        <ul>
+          <li>You retain ownership of any content you upload to StagePay (client briefs, reference material, deliverables, showcase items, and anything else you provide).</li>
+          <li><strong>You are solely responsible for the content you upload</strong>, and you represent and warrant that you own it, or have all necessary rights, licenses, and permissions to upload, use, and (where applicable) publicly display it.</li>
+          <li><strong>StagePay does not verify the authenticity, originality, or ownership of any content you upload.</strong> No plagiarism, copyright, or licensing check is performed on anything you provide.</li>
+          <li>We discourage uploading copied, plagiarized, or infringing content, but we rely on a reactive approach: if we receive a credible complaint that content you've uploaded infringes someone else's rights, we may remove that content and/or suspend or terminate your account, without prior notice.</li>
+          <li>You agree to indemnify and hold StagePay harmless from any claim, loss, or damage arising from content you upload that infringes or violates any third party's rights.</li>
+        </ul>
+
+        <h2>10. Public Pages — Showcase and Pay Links</h2>
+        <ul>
+          <li>Your <strong>Showcase page</strong> is public: anyone with the link can view it, with no login required. Whatever you choose to add to it — including your name, profile photo, and any showcased work — becomes publicly visible.</li>
+          <li>Your Showcase page will become <strong>temporarily unavailable</strong> if your income credit balance reaches zero, until you add more credits.</li>
+          <li>Each project's <strong>payment/delivery link</strong> is also public and requires no login for your customer to view it, download their paid deliverables, or pay you. This link displays your name, product/project details, and your UPI ID (rendered as a payment QR code).</li>
+          <li>You are responsible for only sharing these links, and only showcasing content, that you are comfortable making public.</li>
+        </ul>
+
+        <h2>11. Acceptable Use</h2>
+        <p>You agree not to use StagePay to:</p>
+        <ul>
+          <li>upload or share any content that is illegal, infringing, defamatory, obscene, or that exploits or endangers minors;</li>
+          <li>misrepresent your identity, impersonate any person or entity, or provide false information in your waitlist application or account;</li>
+          <li>submit fraudulent, duplicate, or falsified transaction IDs when requesting income credits;</li>
+          <li>attempt to interfere with, disrupt, reverse-engineer, or gain unauthorized access to the Service or other users' accounts or data;</li>
+          <li>use the Service for any purpose that violates applicable Indian law.</li>
+        </ul>
+        <p>We may suspend or terminate your access, without notice, if we believe you have violated this section.</p>
+
+        <h2>12. Third-Party Tools</h2>
+        <p>StagePay is designed to work alongside external creative and AI tools (such as Google Flow, ChatGPT, or others) that you may use as part of your own workflow. <strong>StagePay does not control, endorse, or take responsibility for</strong> the availability, output, pricing, or policies of any such third-party tool.</p>
+
+        <h2>13. Intellectual Property (StagePay's Own)</h2>
+        <p>Excluding content you upload, the Service itself — including its design, software, branding, and all related materials — is owned by StagePay and protected by applicable intellectual property laws. Nothing in these Terms grants you any rights to StagePay's own intellectual property beyond your right to use the Service as intended.</p>
+
+        <h2>14. Disclaimers</h2>
+        <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, ERROR-FREE, OR THAT ANY DATA LOSS WILL NOT OCCUR. THIS IS ESPECIALLY TRUE DURING THE BETA PERIOD DESCRIBED IN SECTION 3.</p>
+
+        <h2>15. Limitation of Liability</h2>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, STAGEPAY, ITS OWNERS, AND ANY EMPLOYEES OR CONTRACTORS SHALL NOT BE LIABLE FOR:</p>
+        <ul>
+          <li>any payment dispute, non-payment, delayed payment, or misdirected payment between you and your customer, or arising from an incorrect or invalid UPI ID (Sections 5–6);</li>
+          <li>any outage, delay, or failure of cloud infrastructure (including but not limited to Cloudflare, Google, or any other infrastructure or third-party service provider we rely on);</li>
+          <li>any UPI-related error, delay, reversal, or failure, whether in payments between you and your customer, or between you and StagePay for income credit purchases;</li>
+          <li>any indirect, incidental, special, consequential, or punitive damages, including loss of income, data, or goodwill, arising from your use of the Service.</li>
+        </ul>
+        <p>Our aggregate liability to you for any claim arising from these Terms or your use of the Service is limited to the total amount you have paid to StagePay for income credits in the 12 months preceding the claim, or ₹1,000, whichever is greater.</p>
+
+        <h2>16. Force Majeure</h2>
+        <p>StagePay shall not be liable for any failure or delay in performance resulting from causes beyond our reasonable control, including but not limited to: acts of God, natural disasters, war, civil unrest, government action, internet or telecommunications failures, power outages, or outages or failures of third-party infrastructure or service providers (including Cloudflare, Google, NPCI/UPI systems, or banks).</p>
+
+        <h2>17. Suspension &amp; Termination</h2>
+        <p>We may suspend or terminate your account, at our sole discretion, with or without notice, for reasons including but not limited to: violation of these Terms, suspected fraud or abuse (including fraudulent credit purchase requests), or discontinuation of the Service. Unused income credits are <strong>not refunded</strong> upon suspension or termination (see Section 7).</p>
+        <p>You may stop using the Service at any time. To request deletion of your account and associated data, contact us at <strong>stagepay.support@gmail.com</strong> — there is currently no self-service account deletion option.</p>
+
+        <h2>18. Changes to These Terms</h2>
+        <p>We may update these Terms at any time, particularly during the beta period. Continued use of the Service after a change constitutes your acceptance of the updated Terms. We encourage you to review this page periodically.</p>
+
+        <h2>19. Governing Law &amp; Dispute Resolution</h2>
+        <p>These Terms are governed by the laws of India, and any dispute arising from these Terms or your use of the Service shall be subject to the jurisdiction of the courts of India.</p>
+
+        <h2>20. Contact &amp; Grievance Officer</h2>
+        <p>For questions, support, or grievances regarding these Terms or the Service, contact:</p>
+        <p><strong>StagePay Support</strong><br>📧 stagepay.support@gmail.com</p>
+
+        <div class="legal-page-nav"><a href="/privacy">Privacy Policy</a> · <a href="/">Back to StagePay</a></div>
+      </div></div>`;
+  }
+  function renderPrivacyPage() {
+    document.getElementById('app').innerHTML = `
+      <div class="legal-page-wrap"><div class="legal-page">
+        ${legalPageBrandHtml()}
+        <h1>Privacy Policy</h1>
+        <p class="legal-updated">Beta Version — Last updated: 23 July 2026</p>
+        <p class="legal-intro">This Privacy Policy explains what information StagePay ("we", "us", "our") collects from you when you use StagePay (the "Service"), how we use it, and your rights regarding it. This Policy applies to users in India and is intended to be read together with our <a href="/terms">Terms &amp; Conditions</a>.</p>
+        <hr>
+
+        <h2>1. Information We Collect</h2>
+        <p><strong>From Google Sign-In:</strong> When you sign in with Google, we receive your name, email address, and profile photo. We never receive or store your Google password.</p>
+        <p><strong>From your waitlist application:</strong> the role you select, your Instagram profile URL, your YouTube channel URL (if provided), and a short description of the work you do.</p>
+        <p><strong>Information you provide while using the Service:</strong></p>
+        <ul>
+          <li>Your UPI ID — stored only as plain text, used solely to generate a payment QR code on your behalf. <strong>We do not access, process, or have any visibility into your actual bank account, balance, or transaction history.</strong></li>
+          <li>Project and business information: client brief details (brand, product, audience, campaign goals), pricing you set per stage, and your income/payment history.</li>
+          <li>Files you upload: reference images, video clips, and other project deliverables.</li>
+          <li>UPI transaction reference numbers (UTRs) you submit when requesting to purchase income credits.</li>
+        </ul>
+        <p><strong>Automatically collected:</strong> we use a session cookie to keep you signed in. We do not use any advertising or analytics tracking cookies or scripts — StagePay currently has no third-party analytics, advertising, or tracking integrated into the Service.</p>
+
+        <h2>2. How We Use Your Information</h2>
+        <p>We use the information above to:</p>
+        <ul>
+          <li>operate your account and the Service, including generating your payment QR codes and public Showcase/pay pages;</li>
+          <li>review and decide on your waitlist application;</li>
+          <li>manually verify your UPI transaction ID when you request to purchase income credits;</li>
+          <li>respond to support requests you send us;</li>
+          <li>comply with applicable law, and protect the security and integrity of the Service.</li>
+        </ul>
+        <p>We do not sell your personal information, and we do not use it for third-party advertising.</p>
+
+        <h2>3. What Becomes Public</h2>
+        <p>Some information you provide is <strong>intentionally made public</strong>, with no login required to view it:</p>
+        <ul>
+          <li><strong>Your Showcase page</strong>: your name, profile photo, any work you choose to add, and your optional public contact link (Instagram, LinkedIn, or WhatsApp), are all visible to anyone with your Showcase link.</li>
+          <li><strong>Your project pay/delivery links</strong>: each shows your name, the relevant project/product details, and <strong>your UPI ID rendered as a payment QR code</strong>, visible to anyone with that specific link — this is necessary so your customer can pay you.</li>
+        </ul>
+        <p>You are responsible for only sharing these links, and only adding Showcase content, that you're comfortable making public.</p>
+
+        <h2>4. Third Parties We Work With</h2>
+        <ul>
+          <li><strong>Cloudflare</strong> — hosts our application, database, and file storage.</li>
+          <li><strong>Google</strong> — provides sign-in (OAuth) only; we do not use any other Google services to collect data about you.</li>
+        </ul>
+        <p>We do not share your personal information with advertisers, data brokers, or any other third party for marketing purposes.</p>
+
+        <h2>5. Data Retention &amp; Deletion</h2>
+        <ul>
+          <li>We retain your data for as long as your account remains active.</li>
+          <li><strong>Deleting a project is immediate and permanent</strong> — it removes that project's files, its content on your Showcase (if any), and its income records. This cannot be reversed (see our Terms, Section 8).</li>
+          <li><strong>Account deletion</strong>: there is currently no self-service option to delete your entire account. To request deletion of your account and associated data, email us at <strong>stagepay.support@gmail.com</strong>, and we will process your request except where we're required to retain certain records by law.</li>
+        </ul>
+
+        <h2>6. Security</h2>
+        <ul>
+          <li>We never collect or store a password for your StagePay account — sign-in is entirely through Google.</li>
+          <li>We take reasonable technical measures to protect your data, but <strong>no method of storage or transmission is 100% secure</strong>, and we cannot guarantee absolute security, particularly during the beta period referenced in our Terms.</li>
+        </ul>
+
+        <h2>7. Children's Privacy</h2>
+        <p>The Service is not intended for use by anyone under 18 years of age. We do not knowingly collect information from anyone under 18. If you believe a minor has provided us with personal information, please contact us at <strong>stagepay.support@gmail.com</strong> and we will take steps to remove it.</p>
+
+        <h2>8. Your Rights</h2>
+        <p>Subject to applicable Indian law (including the Digital Personal Data Protection Act, 2023), you may request to:</p>
+        <ul>
+          <li>access the personal information we hold about you;</li>
+          <li>correct inaccurate information;</li>
+          <li>request deletion of your account and associated data (see Section 5).</li>
+        </ul>
+        <p>To exercise any of these rights, contact us at <strong>stagepay.support@gmail.com</strong>.</p>
+
+        <h2>9. Grievance Officer</h2>
+        <p>In accordance with applicable Indian law, grievances can be directed to:</p>
+        <p><strong>StagePay Support</strong><br>📧 stagepay.support@gmail.com</p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time, particularly during the beta period. We encourage you to review this page periodically. Continued use of the Service after a change constitutes acceptance of the updated Policy.</p>
+
+        <div class="legal-page-nav"><a href="/terms">Terms &amp; Conditions</a> · <a href="/">Back to StagePay</a></div>
+      </div></div>`;
+  }
+
   // ---------- Waitlist gate ----------
   const WAITLIST_ROLES = [
     ['ai_creator', 'AI UGC Creator'],
@@ -4424,6 +4665,7 @@ ${e.rawResponse || '—'}`;
             <input id="waitlistDescription" type="text" placeholder="e.g. skincare demos, tech unboxings, comedy skits" value="${esc(d.ugcDescription)}" maxlength="200">
           </div>
           <button class="btn btn-primary" id="waitlistSubmitBtn" style="width:100%;margin-top:8px">Submit Application</button>
+          <p style="font-size:11px;color:var(--text-faint);text-align:center;margin-top:10px">By continuing, you agree to StagePay's <a href="/terms" target="_blank" style="color:var(--teal)">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" style="color:var(--teal)">Privacy Policy</a>.</p>
         </div>
       </div>`;
     document.querySelectorAll('[data-waitlist-role]').forEach((btn) => btn.addEventListener('click', () => {
@@ -6651,6 +6893,8 @@ ${e.rawResponse || '—'}`;
     if (payMatch) { await renderPublicPayPage(payMatch[1]); return; }
     const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
     if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
+    if (location.pathname === '/terms') { renderTermsPage(); return; }
+    if (location.pathname === '/privacy') { renderPrivacyPage(); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
     if (new URLSearchParams(location.search).get('screen') === 'admin') {
