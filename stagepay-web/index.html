@@ -7143,11 +7143,24 @@ ${e.rawResponse || '—'}`;
         el.load();
         // waiting/playing are the honest signal for "still buffering" vs
         // "actually showing frames" — wired once, right when this video's
-        // real src is first assigned.
+        // real src is first assigned. Native loop restarts by seeking back
+        // to 0, which fires "waiting" every cycle even though nothing is
+        // actually loading — only show the indicator before this video has
+        // ever successfully played once; after that, a "waiting" is just
+        // the harmless loop-seek hiccup, not real buffering.
         const indicator = slideEl.querySelector('[data-video-loading]');
+        let hasPlayedOnce = false;
         if (indicator) {
-          el.addEventListener('waiting', () => { console.log(`[SWIPE] video waiting: slide ${idx}`); indicator.style.display = 'flex'; });
-          el.addEventListener('playing', () => { console.log(`[SWIPE] video playing: slide ${idx}`); indicator.style.display = 'none'; });
+          el.addEventListener('waiting', () => {
+            if (hasPlayedOnce) return;
+            console.log(`[SWIPE] video waiting: slide ${idx}`);
+            indicator.style.display = 'flex';
+          });
+          el.addEventListener('playing', () => {
+            console.log(`[SWIPE] video playing: slide ${idx}`);
+            indicator.style.display = 'none';
+            hasPlayedOnce = true;
+          });
         }
         // loop should mean this never fires at all — if it does, that's the bug.
         el.addEventListener('ended', () => { console.log(`[SWIPE] ⚠️ video ENDED fired: slide ${idx} — loop should have prevented this`); });
