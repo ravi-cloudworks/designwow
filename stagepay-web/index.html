@@ -338,6 +338,26 @@
   .showcase-cover-manage { position: relative; }
   .showcase-cover-manage .showcase-cover { margin-bottom: 8px; }
   .showcase-cover-remove { position: absolute; top: 8px; right: 8px; border: none; border-radius: 999px; width: 26px; height: 26px; background: rgba(10,11,14,0.7); color: #f0f6f4; cursor: pointer; font-size: 14px; line-height: 1; }
+
+  /* ---------- Experimental swipeable showcase (/showcase-swipe/:userId) ---------- */
+  .swipe-page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; position: relative; transition: background-color 0.5s ease; }
+  .swipe-topbar { flex-shrink: 0; padding: 16px 16px 10px; text-align: center; position: relative; z-index: 2; }
+  .swipe-brand { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: rgba(20,22,27,0.6); text-decoration: none; }
+  .swipe-title-wrap { height: 36px; overflow: hidden; margin-top: 8px; position: relative; }
+  .swipe-title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; color: var(--ink); transition: transform 0.35s ease, opacity 0.35s ease; }
+  .swipe-title.leaving { transform: translateX(-40px); opacity: 0; }
+  .swipe-title.entering { transform: translateX(40px); opacity: 0; }
+  .swipe-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px 16px; }
+  .swipe-swiper { width: 100%; max-width: 420px; height: 100%; max-height: 680px; }
+  .swipe-card { position: relative; background: var(--surface); border-radius: 20px; box-shadow: 0 14px 34px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; height: 100%; }
+  .swipe-card img, .swipe-card video { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; background: var(--ink); }
+  .swipe-card-overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; background: linear-gradient(transparent, rgba(0,0,0,0.6)); color: #f0f6f4; }
+  .swipe-mute-btn { position: absolute; top: 12px; right: 12px; border: none; border-radius: 999px; padding: 6px 12px; background: rgba(0,0,0,0.65); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; z-index: 1; }
+  .swipe-card-caption { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .swipe-card-hint { font-size: 12.5px; opacity: 0.85; }
+  .swipe-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); position: relative; z-index: 2; }
+  :root[data-theme="dark"] .swipe-footer, .theme-dark .swipe-footer { background: rgba(20,22,27,0.85); }
+  .swipe-footer-name { font-weight: 800; font-size: 16px; }
   .public-showcase-category { margin-bottom: 22px; }
   .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
   /* Casual-deterrent only (not real protection — anyone using dev tools or
@@ -6233,6 +6253,7 @@ ${e.rawResponse || '—'}`;
           <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
           <a class="btn btn-sm" href="/showcase/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
         </div>
+        <p class="showcase-field-note" style="margin-top:8px">🧪 Trying something new: <a href="/showcase-swipe/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener">preview a swipeable version</a> of this page — experimental, not linked anywhere publicly.</p>
       </div>
 
       <div class="showcase-field-section">
@@ -6920,23 +6941,36 @@ ${e.rawResponse || '—'}`;
         <div class="showcase-page-inner">
           <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></a>
           ${profile.hasCover ? `<img class="showcase-cover" src="${esc(api.showcaseCoverUrl(profile.id))}" alt="">` : ''}
-          <div class="public-showcase-header">
-            ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
-            <div>
-              <h1 style="margin:0">${esc(profile.name)}</h1>
-              ${(() => {
-                if (!profile.contact_link) return '';
-                const waNumber = whatsappNumberFromLink(profile.contact_link);
-                if (!waNumber) return `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">🔗 Get in touch</a>`;
+          ${(() => {
+            let contactBtn = '';
+            if (profile.contact_link) {
+              const waNumber = whatsappNumberFromLink(profile.contact_link);
+              if (!waNumber) {
+                contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex">🔗 Get in touch</a>`;
+              } else {
                 // Pre-filled, not auto-sent — WhatsApp always shows this in the
                 // compose box first, so the visitor can edit or clear it before sending.
                 const firstName = (profile.name || '').trim().split(/\s+/)[0] || '';
                 const waMessage = `Hi ${firstName}! I saw your profile on StagePay and I'm interested in working together. I'd like to talk about our next project — are you available?`;
                 const waHref = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`;
-                return `<a class="btn btn-sm btn-primary" href="${esc(waHref)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">💬 WhatsApp</a>`;
-              })()}
+                contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(waHref)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex">💬 WhatsApp</a>`;
+              }
+            }
+            // A cover image already carries the creator's visual identity —
+            // repeating the Google avatar/name underneath it is redundant, so
+            // only the contact button survives in that case, on its own.
+            if (profile.hasCover) {
+              return contactBtn ? `<div class="public-showcase-header" style="margin-bottom:20px">${contactBtn}</div>` : '';
+            }
+            return `
+          <div class="public-showcase-header">
+            ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
+            <div>
+              <h1 style="margin:0">${esc(profile.name)}</h1>
+              ${contactBtn ? `<div style="margin-top:8px">${contactBtn}</div>` : ''}
             </div>
-          </div>
+          </div>`;
+          })()}
           ${items.length
             ? [...grouped.entries()].map(([label, groupItems]) => `
                 <div class="public-showcase-category">
@@ -6953,11 +6987,228 @@ ${e.rawResponse || '—'}`;
     wireShowcaseThumbFallbacks();
   }
 
+  // ---------- Experimental: swipeable showcase (/showcase-swipe/:userId) ----------
+  // A throwaway alternate presentation, built alongside the real showcase
+  // page rather than replacing it — same public data (getPublicShowcase),
+  // just a different shell, so it can be judged on its own and discarded
+  // with zero risk to the page that's actually in use.
+  const SWIPE_CATEGORY_PALETTE = ['#f4e8d8', '#e0ecf1', '#f1e0e6', '#e3f1e6', '#ece3f4', '#f4ecdd', '#e6ecdd', '#f1e6d8'];
+  // Deeper companion tone per category, same family as the background pastel
+  // above but dark enough to read as a frame around contained media instead
+  // of blending into it — this is what shows in the letterbox gaps.
+  const SWIPE_CARD_PALETTE = ['#8a6a3f', '#3f6a8a', '#8a3f5c', '#3f8a5c', '#5c3f8a', '#8a5c3f', '#5c8a3f', '#8a703f'];
+  let swipeLib = null; // cached across calls so a second visit doesn't re-fetch the CDN bundle
+  function loadSwiperLib() {
+    if (swipeLib) return swipeLib;
+    swipeLib = new Promise((resolve, reject) => {
+      if (!document.getElementById('swiperCssLink')) {
+        const link = document.createElement('link');
+        link.id = 'swiperCssLink'; link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css';
+        document.head.appendChild(link);
+      }
+      if (window.Swiper) { resolve(window.Swiper); return; }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js';
+      script.onload = () => resolve(window.Swiper);
+      script.onerror = () => reject(new Error('Failed to load Swiper'));
+      document.head.appendChild(script);
+    });
+    return swipeLib;
+  }
+  async function renderPublicShowcaseSwipePage(userId) {
+    const app = document.getElementById('app');
+    app.innerHTML = `<div class="swipe-page"><p style="margin:auto;color:var(--text-faint)">Loading…</p></div>`;
+    let data;
+    try {
+      data = await api.getPublicShowcase(userId);
+    } catch {
+      app.innerHTML = `<div class="swipe-page"><p style="margin:auto;color:var(--text-faint)">This showcase isn't available.</p></div>`;
+      return;
+    }
+    if (data.unavailable) {
+      app.innerHTML = `<div class="swipe-page"><p style="margin:auto;color:var(--text-faint)">Portfolio temporarily unavailable — check back soon.</p></div>`;
+      return;
+    }
+    const { profile, items } = data;
+    const grouped = groupPublicShowcaseItems(items);
+
+    // Flatten into an ordered slide list — cover first (if any), then every
+    // item grouped by category in the same order the real page uses.
+    const slides = [];
+    if (profile.hasCover) slides.push({ kind: 'cover', category: null });
+    for (const [label, groupItems] of grouped) {
+      for (const it of groupItems) slides.push({ kind: 'item', category: label, item: it });
+    }
+    const categories = [...grouped.keys()];
+
+    const waNumber = whatsappNumberFromLink(profile.contact_link);
+    let contactBtn = '';
+    if (profile.contact_link) {
+      if (!waNumber) {
+        contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Get in touch</a>`;
+      } else {
+        const firstName = (profile.name || '').trim().split(/\s+/)[0] || '';
+        const waMessage = `Hi ${firstName}! I saw your profile on StagePay and I'm interested in working together. I'd like to talk about our next project — are you available?`;
+        contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(`https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`)}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>`;
+      }
+    }
+
+    // Every card carries the same bottom overlay — caption (if any) plus the
+    // swipe hint — so the hint is always anchored to the card itself, not a
+    // separate page-level line. The cover uses the same object-fit: contain
+    // as every other slide (no special crop-to-fill treatment) so it's
+    // never cropped, just letterboxed like anything else that isn't a
+    // perfect match for the card's own shape.
+    const overlayHtml = (caption) => `<div class="swipe-card-overlay">${caption ? `<div class="swipe-card-caption">${esc(caption)}</div>` : ''}<div class="swipe-card-hint">↕ Swipe for more</div></div>`;
+    // Cover has no category of its own — gets a fixed neutral slate rather
+    // than colliding with whichever category happens to sit at index 0.
+    const cardColorForCategory = (category) => category ? SWIPE_CARD_PALETTE[categories.indexOf(category) % SWIPE_CARD_PALETTE.length] : '#2a2e38';
+    // data-src, not src — nothing actually fetches until loadSlideMedia()
+    // assigns it, which only happens for the active slide (plus one ahead/
+    // behind, pre-warmed for a smooth swipe). Fetching all 14+ files eagerly
+    // on open would fight the one video that actually matters right now —
+    // whatever's first — for the same limited mobile bandwidth.
+    const slideHtml = (s) => {
+      if (s.kind === 'cover') {
+        return `<div class="swiper-slide"><div class="swipe-card"><img data-src="${esc(api.showcaseCoverUrl(profile.id))}" alt="" style="background:${cardColorForCategory(null)}">${overlayHtml('')}</div></div>`;
+      }
+      const it = s.item;
+      const isVideo = (it.mime_type || '').startsWith('video/');
+      const bg = cardColorForCategory(s.category);
+      // Starts muted — autoplay is blocked outright otherwise — but a visible
+      // toggle lets a visitor turn sound on, which browsers do allow once
+      // playback already started from a muted state.
+      const media = isVideo
+        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
+        : `<img data-src="${esc(api.showcaseFileUrl(it.id))}" alt="${esc(it.file_name || '')}" style="background:${bg}">`;
+      return `<div class="swiper-slide"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
+    };
+    // Assigns data-src -> src exactly once per element — safe to call
+    // repeatedly on the same slide as the user swipes back and forth.
+    function loadSlideMedia(slideEl) {
+      if (!slideEl) return;
+      const el = slideEl.querySelector('img[data-src], video[data-src]');
+      if (!el) return;
+      el.src = el.dataset.src;
+      delete el.dataset.src;
+      if (el.tagName === 'VIDEO') el.load();
+    }
+
+    app.innerHTML = `
+      <div class="swipe-page" id="swipePageRoot">
+        <div class="swipe-topbar">
+          <a class="swipe-brand" href="https://stagepay.pages.dev/">💸 StagePay <span class="beta-badge">Beta</span></a>
+          <div class="swipe-title-wrap"><div class="swipe-title" id="swipeTitle">${esc(slides[0] ? (slides[0].category || 'Cover') : '')}</div></div>
+        </div>
+        <div class="swipe-stage">
+          ${slides.length ? `
+            <div class="swiper swipe-swiper" id="swipeSwiper">
+              <div class="swiper-wrapper">${slides.map(slideHtml).join('')}</div>
+            </div>
+          ` : '<p style="color:var(--text-faint)">No showcased work yet.</p>'}
+        </div>
+        <div class="swipe-footer">
+          <span class="swipe-footer-name">${esc(profile.name)}</span>
+          ${contactBtn}
+        </div>
+      </div>`;
+
+    if (!slides.length) return;
+    const root = document.getElementById('swipePageRoot');
+    let currentCategory = slides[0].category;
+    // A visitor turning sound on once means they want sound — carries
+    // forward to whichever video becomes active next, not just this one.
+    let soundOn = false;
+
+    function pauseAllVideosExcept(activeEl) {
+      document.querySelectorAll('.swipe-card video').forEach((v) => { if (v !== activeEl) v.pause(); });
+    }
+    // One delegated listener for every mute button, current and future —
+    // slides are rendered once up front, never re-rendered per swipe.
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-mute-toggle]');
+      if (!btn) return;
+      const video = btn.previousElementSibling;
+      if (!video || video.tagName !== 'VIDEO') return;
+      video.muted = !video.muted;
+      soundOn = !video.muted;
+      btn.textContent = video.muted ? 'Unmute' : 'Mute';
+    });
+    // Backgrounding the tab shouldn't leave a video quietly playing (or
+    // audibly playing, if they'd unmuted it) — stop and force it back to
+    // muted so returning to the tab is never a surprise.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden') return;
+      soundOn = false;
+      document.querySelectorAll('.swipe-card video').forEach((v) => {
+        v.pause();
+        v.muted = true;
+      });
+      document.querySelectorAll('.swipe-mute-btn').forEach((btn) => { btn.textContent = 'Unmute'; });
+    });
+    function updateForSlide(index) {
+      const s = slides[index];
+      const cat = s.category || 'Cover';
+      root.style.backgroundColor = SWIPE_CATEGORY_PALETTE[categories.indexOf(s.category) % SWIPE_CATEGORY_PALETTE.length] || '';
+      const titleEl = document.getElementById('swipeTitle');
+      if (cat !== currentCategory && titleEl) {
+        titleEl.classList.add('leaving');
+        setTimeout(() => {
+          titleEl.textContent = cat;
+          titleEl.classList.remove('leaving');
+          titleEl.classList.add('entering');
+          requestAnimationFrame(() => titleEl.classList.remove('entering'));
+        }, 200);
+        currentCategory = cat;
+      } else if (titleEl && index === 0) {
+        titleEl.textContent = cat;
+      }
+      // swiper.slides is the real DOM element list in order, independent of
+      // loop mode — the data-swiper-slide-index attribute this used to rely
+      // on is only ever set by Swiper when loop:true, which isn't enabled here.
+      const activeSlideEl = swiper && swiper.slides[index];
+      if (activeSlideEl) loadSlideMedia(activeSlideEl);
+      // Pre-warm one slide in each direction so the very next swipe (either
+      // way) doesn't have to wait on a fresh network request.
+      if (swiper) {
+        loadSlideMedia(swiper.slides[index + 1]);
+        loadSlideMedia(swiper.slides[index - 1]);
+      }
+      const activeVideo = activeSlideEl ? activeSlideEl.querySelector('video') : null;
+      pauseAllVideosExcept(activeVideo || null);
+      if (activeVideo) {
+        activeVideo.muted = !soundOn;
+        const muteBtn = activeSlideEl.querySelector('[data-mute-toggle]');
+        if (muteBtn) muteBtn.textContent = activeVideo.muted ? 'Unmute' : 'Mute';
+        activeVideo.play().catch(() => {});
+      }
+    }
+
+    let swiper;
+    try {
+      const Swiper = await loadSwiperLib();
+      swiper = new Swiper('#swipeSwiper', {
+        effect: 'cards',
+        direction: 'vertical',
+        grabCursor: true,
+        mousewheel: { forceToAxis: true },
+        cardsEffect: { perSlideOffset: 8, perSlideRotate: 3, slideShadows: false },
+        on: { slideChange(sw) { updateForSlide(sw.activeIndex); } },
+      });
+      updateForSlide(0);
+    } catch {
+      toast('Could not load the swipe experience — showing plain view', true);
+    }
+  }
+
   async function boot() {
     const payMatch = location.pathname.match(/^\/pay\/([^/]+)/);
     if (payMatch) { await renderPublicPayPage(payMatch[1]); return; }
     const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
     if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
+    const showcaseSwipeMatch = location.pathname.match(/^\/showcase-swipe\/([^/]+)/);
+    if (showcaseSwipeMatch) { await renderPublicShowcaseSwipePage(showcaseSwipeMatch[1]); return; }
     if (location.pathname === '/legal/terms') { renderTermsPage(); return; }
     if (location.pathname === '/legal/privacy') { renderPrivacyPage(); return; }
     state.user = await api.me();
