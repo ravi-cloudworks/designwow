@@ -341,24 +341,32 @@
 
   /* ---------- Experimental swipeable showcase (/showcase-swipe/:userId) ---------- */
   .swipe-page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; position: relative; transition: background-color 0.5s ease; }
-  .swipe-topbar { flex-shrink: 0; padding: 16px 16px 10px; text-align: center; position: relative; z-index: 2; }
-  .swipe-brand { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: rgba(20,22,27,0.6); text-decoration: none; }
-  .swipe-title-wrap { height: 36px; overflow: hidden; margin-top: 8px; position: relative; }
-  .swipe-title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; color: var(--ink); transition: transform 0.35s ease, opacity 0.35s ease; }
+  .swipe-topbar { flex-shrink: 0; padding: 12px 12px 6px; text-align: center; position: relative; z-index: 2; }
+  .swipe-brand { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: rgba(20,22,27,0.6); text-decoration: none; }
+  .swipe-title-wrap { height: 40px; overflow: hidden; margin-top: 6px; position: relative; }
+  .swipe-title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 23px; font-weight: 800; color: var(--ink); transition: transform 0.35s ease, opacity 0.35s ease; }
   .swipe-title.leaving { transform: translateX(-40px); opacity: 0; }
   .swipe-title.entering { transform: translateX(40px); opacity: 0; }
-  .swipe-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px 16px; }
-  .swipe-swiper { width: 100%; max-width: 420px; height: 100%; max-height: 680px; }
+  .swipe-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4px 8px; }
+  .swipe-swiper { width: 100%; max-width: 520px; height: 100%; max-height: 800px; }
   .swipe-card { position: relative; background: var(--surface); border-radius: 20px; box-shadow: 0 14px 34px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; height: 100%; }
   .swipe-card img, .swipe-card video { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; background: var(--ink); }
   .swipe-card-overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; background: linear-gradient(transparent, rgba(0,0,0,0.6)); color: #f0f6f4; }
-  .swipe-mute-btn { position: absolute; top: 12px; right: 12px; border: none; border-radius: 999px; padding: 6px 12px; background: rgba(0,0,0,0.65); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; z-index: 1; }
-  .swipe-video-loading { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); color: #fff; font-size: 13px; font-weight: 700; }
-  .swipe-card-caption { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-  .swipe-card-hint { font-size: 12.5px; opacity: 0.85; }
-  .swipe-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); position: relative; z-index: 2; }
+  .swipe-mute-btn { position: absolute; top: 12px; right: 12px; border: none; border-radius: 999px; padding: 7px 14px; background: rgba(0,0,0,0.65); color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; z-index: 1; }
+  .swipe-video-loading { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); color: #fff; font-size: 15px; font-weight: 700; }
+  .swipe-card-caption { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .swipe-card-hint { font-size: 13.5px; opacity: 0.85; }
+  .swipe-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); position: relative; z-index: 2; }
   :root[data-theme="dark"] .swipe-footer, .theme-dark .swipe-footer { background: rgba(20,22,27,0.85); }
-  .swipe-footer-name { font-weight: 800; font-size: 16px; }
+  .swipe-footer-name { font-weight: 800; font-size: 18px; }
+  /* Desktop only — mobile keeps everything centered above the card as-is.
+     On a wide viewport the centered brand/title sit directly above the
+     (also centered) card and read as overlapping it; left-aligning them
+     moves them clear of the card instead. */
+  @media (min-width: 700px) {
+    .swipe-topbar { text-align: left; padding-left: 28px; }
+    .swipe-title { justify-content: flex-start; }
+  }
   .public-showcase-category { margin-bottom: 22px; }
   .public-showcase-category-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); margin: 0 0 10px; }
   /* Casual-deterrent only (not real protection — anyone using dev tools or
@@ -7102,9 +7110,9 @@ ${e.rawResponse || '—'}`;
     // behind, pre-warmed for a smooth swipe). Fetching all 14+ files eagerly
     // on open would fight the one video that actually matters right now —
     // whatever's first — for the same limited mobile bandwidth.
-    const slideHtml = (s) => {
+    const slideHtml = (s, i) => {
       if (s.kind === 'cover') {
-        return `<div class="swiper-slide"><div class="swipe-card"><img data-src="${esc(api.showcaseCoverUrl(profile.id))}" alt="" style="background:${cardColorForCategory(null)}">${overlayHtml('')}</div></div>`;
+        return `<div class="swiper-slide" data-slide-idx="${i}"><div class="swipe-card"><img data-src="${esc(api.showcaseCoverUrl(profile.id))}" alt="" style="background:${cardColorForCategory(null)}">${overlayHtml('')}</div></div>`;
       }
       const it = s.item;
       const isVideo = (it.mime_type || '').startsWith('video/');
@@ -7117,9 +7125,9 @@ ${e.rawResponse || '—'}`;
       // a wait on the actual video file — so there's always something on
       // screen the moment this slide becomes active, not a blank card.
       const media = isVideo
-        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" poster="${esc(api.showcaseThumbnailUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><div class="swipe-video-loading" data-video-loading>Loading…</div><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
+        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" data-slide-idx="${i}" poster="${esc(api.showcaseThumbnailUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><div class="swipe-video-loading" data-video-loading>Loading…</div><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
         : `<img data-src="${esc(api.showcaseFileUrl(it.id))}" alt="${esc(it.file_name || '')}" style="background:${bg}">`;
-      return `<div class="swiper-slide"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
+      return `<div class="swiper-slide" data-slide-idx="${i}"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
     };
     // Assigns data-src -> src exactly once per element — safe to call
     // repeatedly on the same slide as the user swipes back and forth.
@@ -7127,6 +7135,8 @@ ${e.rawResponse || '—'}`;
       if (!slideEl) return;
       const el = slideEl.querySelector('img[data-src], video[data-src]');
       if (!el) return;
+      const idx = slideEl.getAttribute('data-slide-idx');
+      console.log(`[SWIPE] loadSlideMedia: assigning src for slide ${idx} (${el.tagName})`, el.dataset.src);
       el.src = el.dataset.src;
       delete el.dataset.src;
       if (el.tagName === 'VIDEO') {
@@ -7136,9 +7146,15 @@ ${e.rawResponse || '—'}`;
         // real src is first assigned.
         const indicator = slideEl.querySelector('[data-video-loading]');
         if (indicator) {
-          el.addEventListener('waiting', () => { indicator.style.display = 'flex'; });
-          el.addEventListener('playing', () => { indicator.style.display = 'none'; });
+          el.addEventListener('waiting', () => { console.log(`[SWIPE] video waiting: slide ${idx}`); indicator.style.display = 'flex'; });
+          el.addEventListener('playing', () => { console.log(`[SWIPE] video playing: slide ${idx}`); indicator.style.display = 'none'; });
         }
+        // loop should mean this never fires at all — if it does, that's the bug.
+        el.addEventListener('ended', () => { console.log(`[SWIPE] ⚠️ video ENDED fired: slide ${idx} — loop should have prevented this`); });
+        el.addEventListener('emptied', () => { console.log(`[SWIPE] ⚠️ video EMPTIED (src reset): slide ${idx}`); });
+        el.addEventListener('play', () => { console.log(`[SWIPE] video play(): slide ${idx}, currentSrc=${el.currentSrc}`); });
+        el.addEventListener('pause', () => { console.log(`[SWIPE] video pause(): slide ${idx}`); });
+        el.addEventListener('seeked', () => { console.log(`[SWIPE] video seeked (loop restart likely): slide ${idx}, currentTime=${el.currentTime.toFixed(2)}`); });
       }
     }
 
@@ -7151,7 +7167,7 @@ ${e.rawResponse || '—'}`;
         <div class="swipe-stage">
           ${slides.length ? `
             <div class="swiper swipe-swiper" id="swipeSwiper">
-              <div class="swiper-wrapper">${slides.map(slideHtml).join('')}</div>
+              <div class="swiper-wrapper">${slides.map((s, i) => slideHtml(s, i)).join('')}</div>
             </div>
           ` : '<p style="color:var(--text-faint)">No showcased work yet.</p>'}
         </div>
@@ -7209,6 +7225,7 @@ ${e.rawResponse || '—'}`;
     // so loading/playing media through the DOM element Swiper hands us
     // works the same either way — only the data lookup needs the real index.
     function updateForSlide(realIdx, domIdx) {
+      console.log(`[SWIPE] updateForSlide called: realIdx=${realIdx}, domIdx=${domIdx}, activeSlide data-slide-idx=${swiper && swiper.slides[domIdx] ? swiper.slides[domIdx].getAttribute('data-slide-idx') : 'n/a'}`);
       const s = slides[realIdx];
       const cat = s.category || 'Cover';
       root.style.backgroundColor = SWIPE_CATEGORY_PALETTE[categories.indexOf(s.category) % SWIPE_CATEGORY_PALETTE.length] || '';
@@ -7235,12 +7252,13 @@ ${e.rawResponse || '—'}`;
         loadSlideMedia(swiper.slides[domIdx - 1]);
       }
       const activeVideo = activeSlideEl ? activeSlideEl.querySelector('video') : null;
+      if (activeVideo) console.log(`[SWIPE] active video for domIdx=${domIdx}: currentSrc=${activeVideo.currentSrc || '(not yet loaded)'}`);
       pauseAllVideosExcept(activeVideo || null);
       if (activeVideo) {
         activeVideo.muted = !soundOn;
         const muteBtn = activeSlideEl.querySelector('[data-mute-toggle]');
         if (muteBtn) muteBtn.textContent = activeVideo.muted ? 'Unmute' : 'Mute';
-        activeVideo.play().catch(() => {});
+        activeVideo.play().catch((err) => console.log('[SWIPE] play() rejected', err));
       }
     }
 
@@ -7254,7 +7272,12 @@ ${e.rawResponse || '—'}`;
         loop: slides.length > 1,
         mousewheel: { forceToAxis: true },
         cardsEffect: { perSlideOffset: 8, perSlideRotate: 3, slideShadows: false },
-        on: { slideChange(sw) { updateForSlide(sw.realIndex, sw.activeIndex); } },
+        on: {
+          slideChange(sw) {
+            console.log(`[SWIPE] Swiper slideChange event: realIndex=${sw.realIndex}, activeIndex=${sw.activeIndex}, previousIndex=${sw.previousIndex}`);
+            updateForSlide(sw.realIndex, sw.activeIndex);
+          },
+        },
       });
       updateForSlide(swiper.realIndex, swiper.activeIndex);
     } catch {
