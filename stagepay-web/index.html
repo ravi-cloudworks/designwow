@@ -6866,7 +6866,17 @@ ${e.rawResponse || '—'}`;
             ${profile.avatar_url ? `<img class="public-showcase-avatar" src="${esc(profile.avatar_url)}" alt="">` : ''}
             <div>
               <h1 style="margin:0">${esc(profile.name)}</h1>
-              ${profile.contact_link ? `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">${whatsappNumberFromLink(profile.contact_link) ? '💬 WhatsApp' : '🔗 Get in touch'}</a>` : ''}
+              ${(() => {
+                if (!profile.contact_link) return '';
+                const waNumber = whatsappNumberFromLink(profile.contact_link);
+                if (!waNumber) return `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">🔗 Get in touch</a>`;
+                // Pre-filled, not auto-sent — WhatsApp always shows this in the
+                // compose box first, so the visitor can edit or clear it before sending.
+                const firstName = (profile.name || '').trim().split(/\s+/)[0] || '';
+                const waMessage = `Hi ${firstName}! I saw your profile on StagePay and I'm interested in working together. I'd like to talk about our next project — are you available?`;
+                const waHref = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`;
+                return `<a class="btn btn-sm btn-primary" href="${esc(waHref)}" target="_blank" rel="noopener" style="text-decoration:none;margin-top:8px;display:inline-flex">💬 WhatsApp</a>`;
+              })()}
             </div>
           </div>
           ${items.length
