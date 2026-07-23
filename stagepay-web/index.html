@@ -353,6 +353,7 @@
   .swipe-card img, .swipe-card video { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; background: var(--ink); }
   .swipe-card-overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; background: linear-gradient(transparent, rgba(0,0,0,0.6)); color: #f0f6f4; }
   .swipe-mute-btn { position: absolute; top: 12px; right: 12px; border: none; border-radius: 999px; padding: 6px 12px; background: rgba(0,0,0,0.65); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; z-index: 1; }
+  .swipe-video-loading { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); color: #fff; font-size: 13px; font-weight: 700; }
   .swipe-card-caption { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
   .swipe-card-hint { font-size: 12.5px; opacity: 0.85; }
   .swipe-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); position: relative; z-index: 2; }
@@ -6253,7 +6254,6 @@ ${e.rawResponse || '—'}`;
           <button class="btn btn-sm" id="showcaseCopyLinkBtn">Copy link</button>
           <a class="btn btn-sm" href="/showcase/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener" style="text-decoration:none">View</a>
         </div>
-        <p class="showcase-field-note" style="margin-top:8px">🧪 Trying something new: <a href="/showcase-swipe/${esc(state.user.showcase_slug || state.user.id)}" target="_blank" rel="noopener">preview a swipeable version</a> of this page — experimental, not linked anywhere publicly.</p>
       </div>
 
       <div class="showcase-field-section">
@@ -7112,8 +7112,12 @@ ${e.rawResponse || '—'}`;
       // Starts muted — autoplay is blocked outright otherwise — but a visible
       // toggle lets a visitor turn sound on, which browsers do allow once
       // playback already started from a muted state.
+      // poster shows the same thumbnail the regular showcase grid already
+      // generates and stores — instant, since it's a small stored image, not
+      // a wait on the actual video file — so there's always something on
+      // screen the moment this slide becomes active, not a blank card.
       const media = isVideo
-        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
+        ? `<video data-src="${esc(api.showcaseFileUrl(it.id))}" poster="${esc(api.showcaseThumbnailUrl(it.id))}" preload="none" muted loop playsinline style="background:${bg}"></video><div class="swipe-video-loading" data-video-loading>Loading…</div><button type="button" class="swipe-mute-btn" data-mute-toggle>Unmute</button>`
         : `<img data-src="${esc(api.showcaseFileUrl(it.id))}" alt="${esc(it.file_name || '')}" style="background:${bg}">`;
       return `<div class="swiper-slide"><div class="swipe-card">${media}${overlayHtml(it.caption)}</div></div>`;
     };
@@ -7125,7 +7129,17 @@ ${e.rawResponse || '—'}`;
       if (!el) return;
       el.src = el.dataset.src;
       delete el.dataset.src;
-      if (el.tagName === 'VIDEO') el.load();
+      if (el.tagName === 'VIDEO') {
+        el.load();
+        // waiting/playing are the honest signal for "still buffering" vs
+        // "actually showing frames" — wired once, right when this video's
+        // real src is first assigned.
+        const indicator = slideEl.querySelector('[data-video-loading]');
+        if (indicator) {
+          el.addEventListener('waiting', () => { indicator.style.display = 'flex'; });
+          el.addEventListener('playing', () => { indicator.style.display = 'none'; });
+        }
+      }
     }
 
     app.innerHTML = `
@@ -7167,8 +7181,10 @@ ${e.rawResponse || '—'}`;
     root.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-mute-toggle]');
       if (!btn) return;
-      const video = btn.previousElementSibling;
-      if (!video || video.tagName !== 'VIDEO') return;
+      // Not previousElementSibling — the loading-indicator div now sits
+      // between the video and this button, so sibling order no longer holds.
+      const video = btn.closest('.swipe-card')?.querySelector('video');
+      if (!video) return;
       video.muted = !video.muted;
       soundOn = !video.muted;
       btn.textContent = video.muted ? 'Unmute' : 'Mute';
@@ -7185,8 +7201,15 @@ ${e.rawResponse || '—'}`;
       });
       document.querySelectorAll('.swipe-mute-btn').forEach((btn) => { btn.textContent = 'Unmute'; });
     });
-    function updateForSlide(index) {
-      const s = slides[index];
+    // realIdx indexes into our own `slides` data array (0..N-1, category/
+    // caption lookups) — with loop:true enabled below, that's different from
+    // domIdx, the actual DOM position Swiper is showing, which can be one of
+    // the extra clones it duplicates at each end to make the wrap seamless.
+    // Clones are plain copies of the real slide's markup (data-src intact),
+    // so loading/playing media through the DOM element Swiper hands us
+    // works the same either way — only the data lookup needs the real index.
+    function updateForSlide(realIdx, domIdx) {
+      const s = slides[realIdx];
       const cat = s.category || 'Cover';
       root.style.backgroundColor = SWIPE_CATEGORY_PALETTE[categories.indexOf(s.category) % SWIPE_CATEGORY_PALETTE.length] || '';
       const titleEl = document.getElementById('swipeTitle');
@@ -7199,19 +7222,17 @@ ${e.rawResponse || '—'}`;
           requestAnimationFrame(() => titleEl.classList.remove('entering'));
         }, 200);
         currentCategory = cat;
-      } else if (titleEl && index === 0) {
+      } else if (titleEl && realIdx === 0) {
         titleEl.textContent = cat;
       }
-      // swiper.slides is the real DOM element list in order, independent of
-      // loop mode — the data-swiper-slide-index attribute this used to rely
-      // on is only ever set by Swiper when loop:true, which isn't enabled here.
-      const activeSlideEl = swiper && swiper.slides[index];
+      const activeSlideEl = swiper && swiper.slides[domIdx];
       if (activeSlideEl) loadSlideMedia(activeSlideEl);
-      // Pre-warm one slide in each direction so the very next swipe (either
-      // way) doesn't have to wait on a fresh network request.
+      // Pre-warm one slide in each direction (by DOM position, so this still
+      // makes sense right at the wrap-around boundary) so the very next
+      // swipe, either way, doesn't have to wait on a fresh network request.
       if (swiper) {
-        loadSlideMedia(swiper.slides[index + 1]);
-        loadSlideMedia(swiper.slides[index - 1]);
+        loadSlideMedia(swiper.slides[domIdx + 1]);
+        loadSlideMedia(swiper.slides[domIdx - 1]);
       }
       const activeVideo = activeSlideEl ? activeSlideEl.querySelector('video') : null;
       pauseAllVideosExcept(activeVideo || null);
@@ -7230,11 +7251,12 @@ ${e.rawResponse || '—'}`;
         effect: 'cards',
         direction: 'vertical',
         grabCursor: true,
+        loop: slides.length > 1,
         mousewheel: { forceToAxis: true },
         cardsEffect: { perSlideOffset: 8, perSlideRotate: 3, slideShadows: false },
-        on: { slideChange(sw) { updateForSlide(sw.activeIndex); } },
+        on: { slideChange(sw) { updateForSlide(sw.realIndex, sw.activeIndex); } },
       });
-      updateForSlide(0);
+      updateForSlide(swiper.realIndex, swiper.activeIndex);
     } catch {
       toast('Could not load the swipe experience — showing plain view', true);
     }
@@ -7243,8 +7265,12 @@ ${e.rawResponse || '—'}`;
   async function boot() {
     const payMatch = location.pathname.match(/^\/pay\/([^/]+)/);
     if (payMatch) { await renderPublicPayPage(payMatch[1]); return; }
+    // Swipe became the default presentation — the old grid page's code is
+    // kept intact below (renderPublicShowcasePage), just deliberately
+    // unrouted, so it can be brought back by pointing this match at it
+    // again rather than having to rebuild it.
     const showcaseMatch = location.pathname.match(/^\/showcase\/([^/]+)/);
-    if (showcaseMatch) { await renderPublicShowcasePage(showcaseMatch[1]); return; }
+    if (showcaseMatch) { await renderPublicShowcaseSwipePage(showcaseMatch[1]); return; }
     const showcaseSwipeMatch = location.pathname.match(/^\/showcase-swipe\/([^/]+)/);
     if (showcaseSwipeMatch) { await renderPublicShowcaseSwipePage(showcaseSwipeMatch[1]); return; }
     if (location.pathname === '/legal/terms') { renderTermsPage(); return; }
