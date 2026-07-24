@@ -286,3 +286,13 @@ see will visibly change.
   view of past prompts, reachable from either surface, for a stage that's
   already locked. Explicitly deferred — revisit when Phase 2 actually
   starts, not decided now.
+
+## Future — not yet built
+
+- **Purchase/licensing gate for the extension.** Business model: the
+  extension is an AI-creator-only tool (filmed creators never install it at
+  all — they upload real photos/video directly in the swimlane, nothing in
+  the extension is relevant to them). Eventually check whether the current
+  user has bought it and whether that purchase is still valid before
+  loading the real panel — if not, show a "Buy now" screen with a purchase
+  link instead. Not built yet; noted here so it isn't lost.

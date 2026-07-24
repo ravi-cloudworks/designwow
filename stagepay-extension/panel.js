@@ -86,7 +86,25 @@ function renderLastCopied() {
   }
 }
 
+// A shimmering placeholder shown the instant the panel opens (or starts a
+// real reload) instead of an empty list that then snaps to fully-populated
+// once the fetches resolve — that abrupt empty-then-everything jump is the
+// "flicker." Shown immediately, synchronously, before any awaiting starts.
+function renderSkeleton() {
+  itemListEl.innerHTML = `
+    <div class="skeleton-card">
+      <div class="skeleton-line" style="width:40%"></div>
+      <div class="skeleton-line" style="width:75%"></div>
+      <div class="skeleton-line" style="width:55%"></div>
+    </div>
+    <div class="skeleton-card">
+      <div class="skeleton-line" style="width:35%"></div>
+      <div class="skeleton-line" style="width:60%"></div>
+    </div>`;
+}
+
 async function init() {
+  renderSkeleton();
   await refreshFromActiveTab();
   // The panel only detects the project once when it opens — it never
   // notices the SAME tab navigating to a different project afterward
@@ -131,6 +149,7 @@ async function refreshFromActiveTab(force) {
   }
   if (projectId === currentProjectId && !force) return; // already showing this one
   currentProjectId = projectId;
+  renderSkeleton(); // a real reload is about to happen (new project, or a forced refetch) — shimmer instead of a jump
   await loadProject();
   render();
 }
@@ -432,6 +451,7 @@ function updateStageBanner() {
 
 function render() {
   updateStageBanner();
+  renderFolderConnectModal();
   if (!currentProjectId) return;
   if (currentCompleted) {
     itemListEl.innerHTML = `<p class="stage-empty-note">🎉 This project is completed — every stage is locked and paid. Nothing left to produce.</p>`;
@@ -516,6 +536,11 @@ async function tryRestoreDownloadsFolder() {
     } else {
       folderPermissionState = 'needs-reconnect';
     }
+    // init() calls this AFTER refreshFromActiveTab() has already rendered
+    // once with the default 'none' state — without this, a previously
+    // connected (or lapsed) folder wouldn't show correctly until some other
+    // event happened to trigger a re-render.
+    render();
   } catch (e) { /* nothing saved yet, or it's no longer valid — connect fresh */ }
 }
 
@@ -573,11 +598,61 @@ async function scanDownloadsFolder() {
       if (!FOLDER_GALLERY_MIME_PREFIXES.some((p) => file.type.startsWith(p))) continue;
       found.push({ name, file, lastModified: file.lastModified });
     }
-  } catch (e) { /* folder became inaccessible mid-scan — show whatever was found */ }
+  } catch (e) {
+    // Previously silent — an empty gallery from a genuinely deleted/moved
+    // folder looked identical to "nothing downloaded recently," which is
+    // exactly the confusing case this state exists to catch.
+    folderPermissionState = 'missing';
+  }
   found.sort((a, b) => b.lastModified - a.lastModified);
   folderThumbnails = found.slice(0, FOLDER_GALLERY_LIMIT).map((f) => ({
     name: f.name, file: f.file, url: URL.createObjectURL(f.file),
   }));
+}
+
+// Forces the folder connection: the whole point of this extension is
+// auto-showing Flow's downloads, so an unconnected/lapsed/missing folder
+// silently defeats it — shown every time that's true, no dismiss, since
+// this extension is an AI-creator-only tool with no audience to annoy
+// (filmed creators never install it at all).
+function renderFolderConnectModal() {
+  const root = document.getElementById('folderConnectModalRoot');
+  if (!root) return;
+  const shouldShow = currentProjectId && !currentCompleted && currentStage !== 1
+    && folderPermissionState !== 'granted';
+  if (!shouldShow) { root.innerHTML = ''; return; }
+
+  const isMissing = folderPermissionState === 'missing';
+  const isReconnect = folderPermissionState === 'needs-reconnect';
+  const title = isMissing
+    ? "⚠️ Downloads folder can't be found"
+    : isReconnect
+    ? '🔓 Reconnect your downloads folder'
+    : '🔗 Connect your downloads folder';
+  const message = isMissing
+    ? `The "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" folder you connected seems to have been moved or deleted. Flow's downloads won't show up here automatically until you reconnect it.`
+    : isReconnect
+    ? `Your previously connected folder needs permission confirmed again this browser session before Flow's downloads will show up here automatically.`
+    : `Without this, Flow's downloads won't show up here automatically — you'll need to pick files manually every time. Connect the "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" folder inside Downloads to fix that.`;
+  // The subfolder only exists once something has actually been downloaded
+  // from Flow (Chrome creates it then) or the user makes it by hand — the
+  // picker won't show it otherwise, which looks like a dead end.
+  const creationHint = !isReconnect
+    ? `Don't see "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" in the picker yet? Click "New Folder" and name it exactly that — or download anything from Flow first and it'll be created automatically.`
+    : '';
+
+  root.innerHTML = `<div class="folder-connect-modal-overlay">
+    <div class="folder-connect-modal-card">
+      <h2>${title}</h2>
+      <p>${escapeHtml(message)}</p>
+      ${creationHint ? `<p class="folder-connect-modal-hint">${escapeHtml(creationHint)}</p>` : ''}
+      <button type="button" id="folderConnectModalBtn">${isReconnect ? '🔓 Reconnect folder' : '🔗 Connect folder'}</button>
+    </div>
+  </div>`;
+  const btn = document.getElementById('folderConnectModalBtn');
+  if (btn) btn.addEventListener('click', () => {
+    if (isReconnect) reconnectDownloadsFolder(); else connectDownloadsFolder();
+  });
 }
 
 function renderFieldControl(def, value) {

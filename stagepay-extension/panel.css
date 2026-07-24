@@ -22,6 +22,14 @@ header strong { font-size: 14px; }
 .stage-banner-stage { font-size: 15px; font-weight: 800; margin-top: 2px; }
 
 .item-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.skeleton-card { background: #fff; border: 1px solid #dbdfe2; border-radius: 8px; padding: 14px; }
+.skeleton-line {
+  height: 12px; border-radius: 6px; margin-bottom: 10px;
+  background: linear-gradient(90deg, #eef1f2 25%, #e2e5e7 37%, #eef1f2 63%);
+  background-size: 400% 100%; animation: skeleton-shimmer 1.4s ease infinite;
+}
+.skeleton-line:last-child { margin-bottom: 0; }
+@keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 .item-card { background: #fff; border: 1px solid #dbdfe2; border-radius: 8px; padding: 10px; }
 .item-card h3 { margin: 0 0 6px; font-size: 12.5px; }
 .item-row-head { display: flex; align-items: center; gap: 8px; cursor: pointer; margin: -10px -10px 0; padding: 10px; border-radius: 8px; }
@@ -128,6 +136,16 @@ header strong { font-size: 14px; }
   display: flex; align-items: center; justify-content: center;
 }
 .staging-note { font-size: 11px; color: #b23a37; margin: 4px 0 0; }
+
+.folder-connect-modal-overlay {
+  position: fixed; inset: 0; background: rgba(20,22,27,.55); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.folder-connect-modal-card { background: #fff; border-radius: 10px; padding: 16px; max-width: 100%; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.folder-connect-modal-card h2 { margin: 0 0 6px; font-size: 14px; }
+.folder-connect-modal-card p { margin: 0 0 12px; font-size: 12px; color: #4b5563; line-height: 1.5; }
+.folder-connect-modal-card .folder-connect-modal-hint { font-size: 11px; color: #8b92a1; margin-top: -6px; }
+.folder-connect-modal-card button { width: 100%; border: none; background: #176b5e; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 
 .last-copied { padding: 10px; background: #fbeedb; border-top: 1px solid #eccd9a; border-bottom: 1px solid #eccd9a; }
 .last-copied h2 { font-size: 12px; margin: 0 0 2px; color: #a05f10; }
