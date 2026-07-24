@@ -45,14 +45,20 @@ let lastCopied = null; // { kind: 'prompt' | 'image', label, preview, copiedAt }
 // which StagePay item a downloaded file is "for," so there's exactly one
 // gallery, and the user clicks whichever thumbnail belongs where.
 let downloadsDirHandle = null;
-let folderPermissionState = 'none'; // 'none' | 'granted' | 'needs-reconnect'
+let folderPermissionState = 'none'; // 'none' | 'granted' | 'needs-reconnect' | 'missing'
 let folderThumbnails = []; // [{ name, file, url }] — most recent first
+// Set when the user picks a folder in showDirectoryPicker() that isn't
+// named FLOW_DOWNLOADS_SUBFOLDER_HINT — the name is mandatory (see
+// connectDownloadsFolder), since background.js's redirect target is
+// hardcoded and a differently-named folder would silently stop receiving
+// Flow's downloads.
+let folderNameMismatch = null;
 const FOLDER_GALLERY_LIMIT = 16;
 const FOLDER_GALLERY_MIME_PREFIXES = ['image/', 'video/'];
 // Must match FLOW_DOWNLOADS_SUBFOLDER in background.js — not shared code
-// (separate execution contexts), just kept in sync by hand. Only used here
-// to tell the user what to look for in the picker; background.js is the
-// one actually creating/naming the folder.
+// (separate execution contexts), just kept in sync by hand. Mandatory, not
+// just a hint: background.js only ever redirects Flow's downloads into
+// this exact name, so any other folder name silently breaks auto-detection.
 const FLOW_DOWNLOADS_SUBFOLDER_HINT = 'StagePayBridge';
 
 const statusEl = document.getElementById('projectStatus');
@@ -520,6 +526,15 @@ async function idbLoadDirHandle() {
     req.onerror = () => reject(req.error);
   });
 }
+async function idbClearDirHandle() {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 // Runs once at panel startup — silent (queryPermission never prompts), so
 // no user gesture is needed just to check whether a previously granted
@@ -528,6 +543,18 @@ async function tryRestoreDownloadsFolder() {
   try {
     const handle = await idbLoadDirHandle();
     if (!handle) return;
+    // The name check inside connectDownloadsFolder() only runs for a fresh
+    // pick — a handle saved before that validation existed (or otherwise
+    // pointing at the wrong folder) would restore silently as 'granted'
+    // forever, with no "Change folder" button left to fix it. Catch that
+    // here too, on every restore, not just at the moment of a new connect.
+    if (handle.name !== FLOW_DOWNLOADS_SUBFOLDER_HINT) {
+      folderNameMismatch = handle.name;
+      await idbClearDirHandle();
+      folderPermissionState = 'none';
+      render();
+      return;
+    }
     downloadsDirHandle = handle;
     const perm = await handle.queryPermission({ mode: 'read' });
     if (perm === 'granted') {
@@ -552,9 +579,20 @@ async function tryRestoreDownloadsFolder() {
 // immediately sees the FLOW_DOWNLOADS_SUBFOLDER name from background.js
 // (kept in sync manually — not shared code, just two small files) and picks
 // it in one click instead of navigating from wherever the dialog last was.
+//
+// The name is mandatory, not just a suggestion: background.js only ever
+// redirects Flow's downloads into FLOW_DOWNLOADS_SUBFOLDER_HINT, so a
+// differently-named (or renamed) folder would silently stop receiving
+// anything new — the exact bug that prompted this check.
 async function connectDownloadsFolder() {
   try {
     const handle = await window.showDirectoryPicker({ startIn: 'downloads' });
+    if (handle.name !== FLOW_DOWNLOADS_SUBFOLDER_HINT) {
+      folderNameMismatch = handle.name;
+      render();
+      return;
+    }
+    folderNameMismatch = null;
     downloadsDirHandle = handle;
     folderPermissionState = 'granted';
     await idbSaveDirHandle(handle);
@@ -630,22 +668,27 @@ function renderFolderConnectModal() {
     ? '🔓 Reconnect your downloads folder'
     : '🔗 Connect your downloads folder';
   const message = isMissing
-    ? `The "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" folder you connected seems to have been moved or deleted. Flow's downloads won't show up here automatically until you reconnect it.`
+    ? `The "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" folder you connected seems to have been moved, renamed, or deleted. Flow's downloads won't show up here automatically until you reconnect it.`
     : isReconnect
     ? `Your previously connected folder needs permission confirmed again this browser session before Flow's downloads will show up here automatically.`
-    : `Without this, Flow's downloads won't show up here automatically — you'll need to pick files manually every time. Connect the "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" folder inside Downloads to fix that.`;
-  // The subfolder only exists once something has actually been downloaded
-  // from Flow (Chrome creates it then) or the user makes it by hand — the
-  // picker won't show it otherwise, which looks like a dead end.
-  const creationHint = !isReconnect
-    ? `Don't see "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" in the picker yet? Click "New Folder" and name it exactly that — or download anything from Flow first and it'll be created automatically.`
+    : `Without this, Flow's downloads won't show up here automatically — you'll need to pick files manually every time.`;
+  // The name is mandatory (background.js's redirect target is hardcoded),
+  // and the folder itself only exists once something's been downloaded from
+  // Flow or the user makes it by hand — spelled out here since the picker
+  // won't show it until one of those happens.
+  const nameNote = !isReconnect
+    ? `Create a folder named exactly "${FLOW_DOWNLOADS_SUBFOLDER_HINT}" inside Downloads (click "New Folder" in the picker, or make it beforehand in Finder/Explorer), then select it below — that's the one folder Flow's downloads get redirected into.`
+    : '';
+  const mismatchNote = folderNameMismatch
+    ? `You picked "${folderNameMismatch}" — that won't work. It has to be named exactly "${FLOW_DOWNLOADS_SUBFOLDER_HINT}", or Flow's downloads will keep landing somewhere this extension isn't watching.`
     : '';
 
   root.innerHTML = `<div class="folder-connect-modal-overlay">
     <div class="folder-connect-modal-card">
       <h2>${title}</h2>
       <p>${escapeHtml(message)}</p>
-      ${creationHint ? `<p class="folder-connect-modal-hint">${escapeHtml(creationHint)}</p>` : ''}
+      ${nameNote ? `<p class="folder-connect-modal-hint">${escapeHtml(nameNote)}</p>` : ''}
+      ${mismatchNote ? `<p class="folder-connect-modal-hint folder-connect-modal-error">${escapeHtml(mismatchNote)}</p>` : ''}
       <button type="button" id="folderConnectModalBtn">${isReconnect ? '🔓 Reconnect folder' : '🔗 Connect folder'}</button>
     </div>
   </div>`;
@@ -746,7 +789,7 @@ function renderItemCard(item) {
             return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${i}" title="${escapeHtml(t.name)}">${media}${videoBadge}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
           }).join('')}</div>`
         : `<p class="folder-gallery-empty">No recent images/videos found in that folder yet — click 🔄 after downloading something.</p>`;
-      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button><button type="button" data-reconnect-folder-btn>Change folder</button></div>${galleryItems}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
+      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button></div>${galleryItems}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
     }
     if (folderPermissionState === 'needs-reconnect') {
       return `<div class="folder-gallery-head"><button type="button" data-reconnect-folder-btn>🔓 Reconnect "${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : 'downloads')}" folder</button></div>`;
