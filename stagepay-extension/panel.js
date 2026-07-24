@@ -542,8 +542,12 @@ function renderFieldControl(def, value) {
     </div></div>`;
   }
   if (def.type === 'textarea') {
+    // Full text, not truncated — .pill-row button now has white-space:
+    // nowrap, so the pill just sizes to fit its own text on one line
+    // (wrapping onto a new row via the row's own flex-wrap if it doesn't
+    // fit) instead of needing to cut the label short to look right.
     const presetsHtml = def.presets && def.presets.length
-      ? `<div class="pill-row presets" style="margin-bottom:4px">${def.presets.map((p) => `<button type="button" data-field-preset="${path}" data-value="${escapeHtml(p)}">${escapeHtml(p.length > 24 ? p.slice(0, 24) + '…' : p)}</button>`).join('')}</div>`
+      ? `<div class="pill-row presets" style="margin-bottom:4px">${def.presets.map((p) => `<button type="button" data-field-preset="${path}" data-value="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}</div>`
       : '';
     return `<div class="setup-field"><label>${escapeHtml(def.label)}</label>${presetsHtml}<textarea data-field-text="${path}">${escapeHtml(value || '')}</textarea></div>`;
   }
@@ -919,10 +923,14 @@ function wireItemCard(item) {
       if (row) row.querySelectorAll('[data-field-pick]').forEach((b) => b.classList.toggle('selected', b === btn));
       recompileIfTemplate();
     }));
+    // Replaces, not appends — these presets are each a complete, mutually
+    // exclusive direction (e.g. Movie's "Quick zoom in, then hold steady"
+    // vs. "Slow pull back to reveal the scene"), not composable fragments.
+    // Appending two together produces a contradiction, not a richer one.
     document.querySelectorAll(`[data-item-id="${item.id}"] [data-field-preset]`).forEach((btn) => btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-field-preset');
       const preset = btn.getAttribute('data-value');
-      draft.fields[key] = draft.fields[key] ? `${draft.fields[key]} ${preset}` : preset;
+      draft.fields[key] = preset;
       const textarea = document.querySelector(`[data-item-id="${item.id}"] [data-field-text="${key}"]`);
       if (textarea) textarea.value = draft.fields[key];
       recompileIfTemplate();

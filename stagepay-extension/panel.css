@@ -57,7 +57,7 @@ header strong { font-size: 14px; }
 }
 .setup-field textarea { min-height: 44px; resize: vertical; }
 .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.pill-row button { border: 1px solid #dbdfe2; background: #fff; border-radius: 999px; padding: 3px 9px; font-size: 10.5px; cursor: pointer; }
+.pill-row button { border: 1px solid #dbdfe2; background: #fff; border-radius: 999px; padding: 3px 9px; font-size: 10.5px; cursor: pointer; white-space: nowrap; }
 .pill-row button.selected { background: #14161b; color: #eef1f2; border-color: #14161b; }
 .pill-row.presets button { border-style: dashed; color: #6b7280; }
 
