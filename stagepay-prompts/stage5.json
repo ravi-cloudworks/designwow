@@ -21,7 +21,14 @@
             "Slow pull back to reveal the full scene.",
             "Quick zoom in for emphasis, then hold steady."
           ] },
-          { "key": "duration", "label": "Duration (sec)", "type": "pill", "options": ["4", "6", "8", "10", "15", "30"] },
+          { "key": "duration", "label": "Duration (sec)", "type": "pill", "options": ["4", "6", "8", "10", "15", "30"], "optionHelp": {
+            "4": "What: a very short beat. When to use: for a quick cutaway or punchy insert. Example: a fast reaction shot between longer scenes.",
+            "6": "What: a brief, single-idea shot. When to use: for a simple action with no dialogue. Example: a quick unboxing moment.",
+            "8": "What: a short scene with time for one clear action or line. When to use: the standard length for a simple dialogue or action beat. Example: someone delivering one short line to camera.",
+            "10": "What: enough time for a small action plus a beat of reaction. When to use: the default for most standard scenes. Example: opening a product and reacting to it.",
+            "15": "What: enough time for a short sequence of actions or a fuller line of dialogue. When to use: for scenes with more than one beat. Example: picking up a product, examining it, then smiling.",
+            "30": "What: a longer, fuller scene. When to use: for a hero/opening scene or one with multiple beats and dialogue. Example: a full testimonial statement with setup and payoff."
+          } },
           { "key": "broll", "label": "B-roll", "type": "pill", "options": ["None", "Product Macro Shot", "Product Spin", "Slow-Motion Detail", "Texture Close-up", "Lifestyle Cutaway"], "optionHelp": {
             "None": "What: no supplementary footage. When to use: the main shot alone tells the story. Example: a simple testimonial clip, no product insert needed.",
             "Product Macro Shot": "What: an extreme close-up insert of the product. When to use: to highlight fine detail like label or texture. Example: a close-up of a jar's lid twisting open.",

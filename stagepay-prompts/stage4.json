@@ -17,11 +17,42 @@
           { "key": "location", "label": "Location", "type": "text" },
           { "key": "action", "label": "Action", "type": "text" },
           { "key": "dialogue", "label": "Dialogue", "type": "textarea" },
-          { "key": "emotion", "label": "Emotion", "type": "pill", "options": ["Frustrated", "Curious", "Relieved", "Happy", "Excited", "Confident", "Calm"] },
-          { "key": "type", "label": "Shot type", "type": "pill", "options": ["Close-up", "Wide", "Macro", "Medium", "POV", "Over-the-shoulder"] },
-          { "key": "camera_angle", "label": "Camera Angle", "type": "pill", "options": ["Eye Level", "Low Angle", "High Angle", "Top View", "Dutch Angle"] },
-          { "key": "camera", "label": "Camera", "type": "pill", "options": ["Handheld", "Tripod", "Gimbal", "Drone"] },
-          { "key": "lens", "label": "Lens", "type": "pill", "options": ["24mm", "35mm", "50mm", "85mm"] }
+          { "key": "emotion", "label": "Emotion", "type": "pill", "options": ["Frustrated", "Curious", "Relieved", "Happy", "Excited", "Confident", "Calm"], "optionHelp": {
+            "Frustrated": "What: a mix of annoyance and being stuck. When to use: for a \"before\" moment showing a problem or pain point. Example: struggling to open a stubborn jar lid.",
+            "Curious": "What: an inquisitive, exploring expression. When to use: when introducing a new product or discovery. Example: examining a new gadget for the first time.",
+            "Relieved": "What: tension easing into comfort. When to use: right after a problem gets solved. Example: exhaling after finally getting a stain out.",
+            "Happy": "What: a warm, pleased, genuine smile. When to use: for a satisfied \"after\" moment. Example: smiling after the first sip of coffee.",
+            "Excited": "What: energetic, enthusiastic delight. When to use: for a big reveal or standout result. Example: reacting to a surprise unboxing.",
+            "Confident": "What: assured, composed, in-control. When to use: for an expert or authority moment. Example: a chef presenting a finished dish with certainty.",
+            "Calm": "What: relaxed, at ease, unhurried. When to use: for a soothing or wind-down moment. Example: sinking into a chair with a cup of tea."
+          } },
+          { "key": "type", "label": "Shot type", "type": "pill", "options": ["Close-up", "Wide", "Macro", "Medium", "POV", "Over-the-shoulder"], "optionHelp": {
+            "Close-up": "What: tight framing on a face or small detail. When to use: to show emotion or fine detail. Example: a close-up on someone's face reacting to a taste.",
+            "Wide": "What: a broad shot showing the full scene or environment. When to use: to establish location and context. Example: showing a whole kitchen before zooming into the action.",
+            "Macro": "What: an extreme close-up on tiny detail or texture. When to use: to highlight fine product detail. Example: droplets forming on a chilled can.",
+            "Medium": "What: frames a subject from roughly waist-up. When to use: the standard \"talking\" shot, balances subject and surroundings. Example: someone speaking directly to camera at a counter.",
+            "POV": "What: point-of-view — the camera sees through the subject's own eyes. When to use: to put the viewer directly in the moment. Example: looking down at your own hands opening a package.",
+            "Over-the-shoulder": "What: framed from behind one subject, looking past them at another person or object. When to use: for conversations or handing something over. Example: looking over a customer's shoulder as they unbox a product."
+          } },
+          { "key": "camera_angle", "label": "Camera Angle", "type": "pill", "options": ["Eye Level", "Low Angle", "High Angle", "Top View", "Dutch Angle"], "optionHelp": {
+            "Eye Level": "What: camera at the subject's natural eye height. When to use: the neutral, most natural-feeling default. Example: a straightforward product shot on a table.",
+            "Low Angle": "What: camera positioned below, looking up. When to use: to make a subject feel powerful or larger-than-life. Example: looking up at a bottle to make it feel premium.",
+            "High Angle": "What: camera positioned above, looking down. When to use: to make a subject feel small or vulnerable, or to show an overview. Example: looking down at ingredients laid out on a counter.",
+            "Top View": "What: directly overhead, looking straight down. When to use: for flat-lay or overview shots. Example: an overhead shot of a full table spread.",
+            "Dutch Angle": "What: camera tilted off the horizontal axis. When to use: for tension, unease, or stylized energy. Example: a tilted shot during a dramatic or chaotic moment."
+          } },
+          { "key": "camera", "label": "Camera", "type": "pill", "options": ["Handheld", "Tripod", "Gimbal", "Drone"], "optionHelp": {
+            "Handheld": "What: naturally shaky, human-held camera movement. When to use: for a raw, authentic, documentary feel. Example: a casual lifestyle moment filmed like a friend recording it.",
+            "Tripod": "What: fully static, no camera movement. When to use: for a clean, stable, formal shot. Example: a straightforward product-on-table shot.",
+            "Gimbal": "What: smooth, stabilized motion while moving. When to use: for polished walking or following shots with no shake. Example: smoothly following someone walking into a room.",
+            "Drone": "What: aerial camera movement from above. When to use: for sweeping establishing shots or a sense of scale. Example: an aerial view descending onto a rooftop cafe."
+          } },
+          { "key": "lens", "label": "Lens", "type": "pill", "options": ["24mm", "35mm", "50mm", "85mm"], "optionHelp": {
+            "24mm": "What: a wide-angle lens, captures a broad field of view. When to use: for establishing shots or tight spaces. Example: showing a whole room in one shot.",
+            "35mm": "What: slightly wide, natural-feeling everyday lens. When to use: general-purpose scenes with some surrounding context. Example: a person in their kitchen with surroundings visible.",
+            "50mm": "What: standard lens, closest to natural human-eye perspective. When to use: for balanced, natural-looking portraits or product shots. Example: a straightforward, natural-looking product close-up.",
+            "85mm": "What: telephoto, compresses the background and isolates the subject. When to use: for flattering close-up portraits with a blurred background. Example: a face close-up with a soft, blurred background."
+          } }
         ]
       },
       "outputInstructions": [

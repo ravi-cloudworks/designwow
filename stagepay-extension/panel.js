@@ -701,8 +701,11 @@ function renderFolderConnectModal() {
 function renderFieldControl(def, value) {
   const path = def.key;
   if (def.type === 'pill') {
+    // Mirrors index.html's same optionHelp -> title pattern — a hover
+    // tooltip explaining what/when/example for each option, for options
+    // that aren't self-explanatory (e.g. "POV", "Dutch Angle").
     return `<div class="setup-field"><label>${escapeHtml(def.label)}</label><div class="pill-row">
-      ${def.options.map((o) => `<button type="button" class="${o === value ? 'selected' : ''}" data-field-pick="${path}" data-value="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+      ${def.options.map((o) => `<button type="button" class="${o === value ? 'selected' : ''}" data-field-pick="${path}" data-value="${escapeHtml(o)}"${def.optionHelp && def.optionHelp[o] ? ` title="${escapeHtml(def.optionHelp[o])}"` : ''}>${escapeHtml(o)}</button>`).join('')}
     </div></div>`;
   }
   if (def.type === 'textarea') {
