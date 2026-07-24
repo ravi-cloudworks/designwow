@@ -3930,6 +3930,7 @@ ${e.rawResponse || '—'}`;
         <span>Created: <strong>${formatISTWithRelative(p.created_at)}</strong></span>
         <span>Updated: <strong>${formatISTWithRelative(p.updated_at)}</strong></span>
         ${total > 0 ? `<span class="project-earned-pill lg">💰 ${formatRupees(total)} earned</span>` : ''}
+        <button type="button" class="btn btn-sm" id="projectInfoRefreshBtn" title="Pull the latest — e.g. a file just added via the StagePay Bridge extension">🔄 Refresh</button>
         <button type="button" class="btn btn-sm" id="projectInfoMoodboardBtn">🖼 Moodboard</button>
         <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Open customer payment link</button>
       </div>`;
@@ -3957,6 +3958,12 @@ ${e.rawResponse || '—'}`;
     }
     const payLinkBtn = document.getElementById('projectInfoPayLinkBtn');
     if (payLinkBtn) payLinkBtn.addEventListener('click', openCustomerPaymentLink);
+    const refreshBtn = document.getElementById('projectInfoRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+      refreshBtn.disabled = true; refreshBtn.textContent = 'Refreshing…';
+      await refreshProjectData();
+      refreshBtn.disabled = false; refreshBtn.textContent = '🔄 Refresh';
+    });
     const moodboardBtn = document.getElementById('projectInfoMoodboardBtn');
     if (moodboardBtn) moodboardBtn.addEventListener('click', () => {
       state.screen = 'moodboard';
@@ -6706,6 +6713,28 @@ ${e.rawResponse || '—'}`;
     renderApp();
   }
 
+  // Same data openProject() fetches, minus the parts that would be jarring
+  // to reset on every refresh (state.expandedItems collapsing every open
+  // card, state.screen/history churn) — used when something outside this
+  // tab's own actions may have changed the project, e.g. a file added via
+  // the StagePay Bridge extension, which writes to the same backend but
+  // has no way to tell this tab's in-memory state to update itself.
+  async function refreshProjectData() {
+    if (!state.project) return;
+    const id = state.project.id;
+    const full = await api.getProject(id);
+    state.project = full.project; state.brief = full.brief; state.items = full.items;
+    const paymentLinkRes = await api.getProjectPaymentLink(id);
+    state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
+    state.paymentLinks = paymentLinkRes.stages || [];
+    if (state.user && paymentLinkRes.freeCreditsRemaining !== undefined) state.user.free_credits_remaining = paymentLinkRes.freeCreditsRemaining;
+    const stageLocksRes = await api.getStageLocks(id);
+    state.stageLocks = stageLocksRes.locks || [];
+    state.earningsSummary = await api.getEarningsSummary();
+    await renderTool();
+    renderProjectInfoBar();
+  }
+
   async function renderApp() {
     const app = document.getElementById('app');
     if (state.screen === 'login') { app.style.cssText = ''; renderLoginScreen(); return; }
@@ -7427,6 +7456,19 @@ ${e.rawResponse || '—'}`;
       }
     }
     openMediaViewerModal(link.getAttribute('href'), link.getAttribute('data-media-name'), link.getAttribute('data-media-kind') || 'image', gallery);
+  });
+
+  // A file added via the StagePay Bridge extension writes straight to the
+  // same backend this tab already trusts in memory — this tab has no way to
+  // know that happened until something re-fetches. Catches the realistic
+  // common case (worked in the Flow tab + the side panel, switch back here
+  // to check progress) for free; doesn't catch the side panel sitting open
+  // right next to an already-visible tool screen, since nothing "changes"
+  // from this tab's perspective in that layout — the manual Refresh button
+  // above covers that case instead.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (state.screen === 'tool' && state.project) refreshProjectData();
   });
 
   boot();

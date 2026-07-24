@@ -93,10 +93,18 @@ async function init() {
   // (StagePay is a single-page app, so this is a URL change with no full
   // reload). Re-check whenever the tab's URL changes or focus switches tabs,
   // plus a manual button for whenever that misses something.
+  //
+  // onActivated forces a real refetch even for the SAME project — switching
+  // tabs away and back is exactly the moment something may have changed
+  // (e.g. a file added manually in the swimlane itself, on this same tab,
+  // while the panel wasn't watching). Mirrors the same fix on the web app
+  // side (refetch on tab visibility/focus) — same known gap too: doesn't
+  // catch the panel sitting open right next to an already-active StagePay
+  // tab with no tab-switching involved; the manual 🔄 button covers that.
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) refreshFromActiveTab();
   });
-  chrome.tabs.onActivated.addListener(() => refreshFromActiveTab());
+  chrome.tabs.onActivated.addListener(() => refreshFromActiveTab(true));
   document.getElementById('refreshBtn').addEventListener('click', () => refreshFromActiveTab(true));
   await tryRestoreDownloadsFolder();
 }
