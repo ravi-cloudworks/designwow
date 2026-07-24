@@ -615,7 +615,10 @@ function renderItemCard(item) {
       const galleryItems = folderThumbnails.length
         ? `<div class="folder-gallery-row">${folderThumbnails.map((t, i) => {
             const isSelected = staged.includes(t.file);
-            return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${i}" title="${escapeHtml(t.name)}">${t.file.type.startsWith('video') ? `<video src="${t.url}" muted></video>` : `<img src="${t.url}">`}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
+            const isVideo = t.file.type.startsWith('video');
+            const media = isVideo ? `<video src="${t.url}" muted></video>` : `<img src="${t.url}">`;
+            const videoBadge = isVideo ? `<span class="video-badge">▶</span>` : '';
+            return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${i}" title="${escapeHtml(t.name)}">${media}${videoBadge}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
           }).join('')}</div>`
         : `<p class="folder-gallery-empty">No recent images/videos found in that folder yet — click 🔄 after downloading something.</p>`;
       return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button><button type="button" data-reconnect-folder-btn>Change folder</button></div>${galleryItems}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
@@ -731,8 +734,9 @@ async function loadMustAttach(item) {
 // Every uploaded file gets a wrap + remove button regardless of type — a
 // video/audio deliverable previously had no representation at all here (the
 // old code just skipped anything non-image), which meant no way to delete
-// one via the extension. Only images get a fetched, real preview + copy
-// button; video/audio show a generic icon but are just as removable.
+// one via the extension. Images and videos both get a fetched, real
+// preview (only images also get a copy button); audio/other files fall
+// back to a generic icon but are just as removable either way.
 function loadThumbs(item) {
   const row = document.querySelector(`[data-thumbs="${item.id}"]`);
   if (!row) return;
@@ -751,14 +755,48 @@ function loadThumbs(item) {
 
     if (f.kind === 'image') {
       loadImageThumb(f, wrap);
+    } else if (f.kind === 'video') {
+      // Icon first (synchronous, always visible), then try to upgrade to a
+      // real video frame once fetched — never leaves the slot blank if the
+      // fetch fails, just stays on the icon.
+      const icon = document.createElement('span');
+      icon.className = 'thumb-generic-icon';
+      icon.textContent = '🎬';
+      wrap.appendChild(icon);
+      loadVideoThumb(f, wrap, icon);
     } else {
       const icon = document.createElement('span');
       icon.className = 'thumb-generic-icon';
-      icon.textContent = f.kind === 'video' ? '🎬' : f.kind === 'audio' ? '🔊' : '📄';
+      icon.textContent = f.kind === 'audio' ? '🔊' : '📄';
       wrap.appendChild(icon);
     }
     row.appendChild(wrap);
   });
+}
+
+// Same fetch-then-render shape as loadImageThumb, but for video — this is
+// the one that was missing entirely; videos previously never got past the
+// generic 🎬 icon. Adds a small badge too, so a video thumbnail (whose
+// first frame alone can look identical to a photo) is unambiguous at a
+// glance, not just a different tag under the hood.
+async function loadVideoThumb(f, wrap, iconEl) {
+  try {
+    const mediaUrl = `${API_BASE}/api/media/${f.key}`;
+    const r = await fetch(mediaUrl, { credentials: 'include' });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    if (!blob.type.startsWith('video/')) return;
+    const objectUrl = URL.createObjectURL(blob);
+    const video = document.createElement('video');
+    video.src = objectUrl;
+    video.muted = true;
+    video.title = f.fileName;
+    const badge = document.createElement('span');
+    badge.className = 'video-badge';
+    badge.textContent = '▶';
+    iconEl.replaceWith(video);
+    wrap.appendChild(badge);
+  } catch (e) { /* leave the generic 🎬 icon in place */ }
 }
 
 async function loadImageThumb(f, wrap) {
@@ -1039,8 +1077,10 @@ function renderStaging(item) {
   const files = stagingFiles[item.id] || [];
   row.innerHTML = files.map((file, i) => {
     const url = URL.createObjectURL(file);
-    const media = file.type.startsWith('video') ? `<video src="${url}" muted></video>` : `<img src="${url}">`;
-    return `<div class="staging-wrap" title="${escapeHtml(file.name)}">${media}<button type="button" class="staging-remove-btn" data-staging-remove="${item.id}" data-index="${i}">×</button></div>`;
+    const isVideo = file.type.startsWith('video');
+    const media = isVideo ? `<video src="${url}" muted></video>` : `<img src="${url}">`;
+    const videoBadge = isVideo ? `<span class="video-badge">▶</span>` : '';
+    return `<div class="staging-wrap" title="${escapeHtml(file.name)}">${media}${videoBadge}<button type="button" class="staging-remove-btn" data-staging-remove="${item.id}" data-index="${i}">×</button></div>`;
   }).join('');
   document.querySelectorAll(`[data-staging="${item.id}"] [data-staging-remove]`).forEach((btn) => btn.addEventListener('click', () => {
     const idx = Number(btn.getAttribute('data-index'));
