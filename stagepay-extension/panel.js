@@ -247,6 +247,31 @@ function draftFor(item) {
   return itemDrafts[item.id];
 }
 
+// The backend's one `prompt` column always reflects whichever mode is
+// currently active — Custom's own text stays preserved in
+// fields._customPrompt regardless, so switching back to Template later
+// still shows the compiled view, not a stale Custom save.
+function currentPromptFor(item) {
+  const draft = draftFor(item);
+  const mode = draft.fields._uiMode === 'custom' ? 'custom' : 'template';
+  return (mode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '';
+}
+
+// Shared by Save, Copy prompt, "Enhance with ChatGPT", and Send — every
+// moment that actually uses the current Setup/prompt now persists it too,
+// not just the one explicit Save button.
+async function saveItemDraft(item) {
+  const draft = draftFor(item);
+  const promptVal = currentPromptFor(item);
+  await fetch(`${API_BASE}/api/items/${item.id}/version`, {
+    method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: draft.fields, prompt: promptVal }),
+  });
+  const v = theVersion(item);
+  v.fields = draft.fields;
+  v.prompt = promptVal;
+}
+
 // Same idea as the web app's mustAttachFiles — "every file this item needs
 // ALREADY attached as visual input before generating," not this item's own
 // (not-yet-produced) output. Kept in exact parity with index.html's version
@@ -607,7 +632,7 @@ function renderItemCard(item) {
         <textarea data-prompt-area="${item.id}" ${promptMode === 'template' ? 'readonly' : ''} placeholder="${promptMode === 'custom' ? 'Paste your custom prompt here...' : 'Edit Setup above to fill this in...'}">${escapeHtml((promptMode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '')}</textarea>
         <div class="row">
           <button type="button" data-copy-prompt-btn="${item.id}">📋 Copy prompt</button>
-          <button type="button" data-chatgpt-btn="${item.id}">🤖 Open in ChatGPT</button>
+          <button type="button" data-chatgpt-btn="${item.id}">🤖 Enhance this prompt with ChatGPT</button>
           <button type="button" class="primary" data-save-draft-btn="${item.id}">💾 Save</button>
         </div>`,
     });
@@ -950,16 +975,22 @@ function wireItemCard(item) {
       if (promptMode === 'custom') draft.fields._customPrompt = promptArea.value;
       else draft.prompt = promptArea.value; // readonly in this mode, but harmless if ever reached
     });
-    const currentPromptText = () => (promptMode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '';
-
+    // Copy, ChatGPT, and Send are each a moment where you're about to step
+    // away from the panel to go use this somewhere else — the exact moments
+    // unsaved Setup/prompt work was previously at risk of being silently
+    // lost if the panel closed before you got back to click Save. All three
+    // now persist too, alongside Save staying available as its own,
+    // earlier, optional checkpoint (e.g. right after typing something into
+    // Custom, before you've even copied it anywhere).
     const copyPromptBtn = document.querySelector(`[data-copy-prompt-btn="${item.id}"]`);
     if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => {
-      const text = currentPromptText();
+      const text = currentPromptFor(item);
       navigator.clipboard.writeText(text).then(() => {
         setLastCopied({ kind: 'prompt', label: item.name || item.item_key, preview: text });
         copyPromptBtn.textContent = '✓ Copied';
         setTimeout(() => { copyPromptBtn.textContent = '📋 Copy prompt'; }, 1200);
       });
+      saveItemDraft(item);
     });
 
     const chatgptBtn = document.querySelector(`[data-chatgpt-btn="${item.id}"]`);
@@ -967,23 +998,13 @@ function wireItemCard(item) {
       const metaPrompt = buildChatGptMetaPrompt(item, draft.fields);
       navigator.clipboard.writeText(metaPrompt).catch(() => {});
       chrome.tabs.create({ url: `https://chatgpt.com/?q=${encodeURIComponent(metaPrompt)}` });
+      saveItemDraft(item);
     });
 
     const saveBtn = document.querySelector(`[data-save-draft-btn="${item.id}"]`);
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
-      // The backend's one `prompt` column always reflects whichever mode is
-      // currently active — Custom's own text stays preserved in
-      // fields._customPrompt regardless, so switching back to Template
-      // later still shows the compiled view, not a stale Custom save.
-      const promptVal = currentPromptText();
-      await fetch(`${API_BASE}/api/items/${item.id}/version`, {
-        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: draft.fields, prompt: promptVal }),
-      });
-      const v = theVersion(item);
-      v.fields = draft.fields;
-      v.prompt = promptVal;
+      await saveItemDraft(item);
       saveBtn.disabled = false; saveBtn.textContent = '✓ Saved';
       setTimeout(() => { saveBtn.textContent = '💾 Save'; }, 1200);
     });
@@ -1132,11 +1153,21 @@ async function sendStagedFiles(itemId) {
     }
   }
   const mediaFiles = [...(theVersion(item).media_files || []), ...uploaded];
+  // Previously this PATCH only ever included mediaFiles — Setup/prompt work
+  // was never persisted just by sending a file, only by separately
+  // remembering to click Save. One combined PATCH now, not two round trips.
+  const patchBody = { mediaFiles };
+  if (hasFlowPrompt(item)) {
+    const draft = draftFor(item);
+    patchBody.fields = draft.fields;
+    patchBody.prompt = currentPromptFor(item);
+  }
   await fetch(`${API_BASE}/api/items/${itemId}/version`, {
     method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mediaFiles }),
+    body: JSON.stringify(patchBody),
   });
   theVersion(item).media_files = mediaFiles;
+  if (patchBody.fields) { theVersion(item).fields = patchBody.fields; theVersion(item).prompt = patchBody.prompt; }
   stagingFiles[itemId] = [];
   render();
 }

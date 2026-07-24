@@ -272,3 +272,17 @@ see will visibly change.
   creator, or should be reframed/skippable — raised earlier, not resolved,
   not blocking this plan (Scene stays a normal upload-only swimlane item
   either way).
+- **Where a saved prompt/Setup becomes visible once Phase 2 removes
+  Generate/Setup/prompt UI from the swimlane.** Today (pre-Phase 2), a
+  prompt saved via the extension is still visible in the swimlane's own
+  Generate modal, since both read/write the same `item_versions.prompt`/
+  `fields` columns. The extension itself only ever shows the *current*
+  stage's items — once a stage locks, its items drop out of the
+  extension's view entirely. So today there's still a fallback place to
+  check an old prompt (the swimlane's modal); after Phase 2 removes that
+  modal, a saved prompt for anything outside the current stage becomes
+  invisible in *both* places at once, even though it's still sitting in the
+  database. Needs a real answer before Phase 2 ships — e.g. some read-only
+  view of past prompts, reachable from either surface, for a stage that's
+  already locked. Explicitly deferred — revisit when Phase 2 actually
+  starts, not decided now.
