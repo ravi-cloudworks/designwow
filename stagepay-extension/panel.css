@@ -17,6 +17,10 @@ header strong { font-size: 14px; }
 .status.error { color: #b23a37; }
 .status.ok { color: #2f7a4f; }
 
+.landing-intro { padding: 14px; background: #fff; border-bottom: 1px solid #dbdfe2; }
+.landing-tagline { margin: 0 0 4px; font-size: 12.5px; font-weight: 800; color: #176b5e; }
+.landing-pitch { margin: 0; font-size: 12px; color: #4b5563; line-height: 1.5; }
+
 .stage-banner { padding: 10px 14px; background: #14161b; color: #fff; }
 .stage-banner-project { font-size: 11px; color: #b7bcc4; text-transform: uppercase; letter-spacing: .03em; }
 .stage-banner-stage { font-size: 15px; font-weight: 800; margin-top: 2px; }

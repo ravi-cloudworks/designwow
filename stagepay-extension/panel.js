@@ -1,4 +1,4 @@
-// StagePay Bridge — side panel logic.
+// StagePay Director — side panel logic.
 // This talks ONLY to stagepay-api (via the stagepay.pages.dev proxy, same
 // endpoints the web app itself uses) and to a user-granted local folder (via
 // the File System Access API — see connectDownloadsFolder/scanDownloadsFolder)
@@ -59,11 +59,12 @@ const FOLDER_GALLERY_MIME_PREFIXES = ['image/', 'video/'];
 // (separate execution contexts), just kept in sync by hand. Mandatory, not
 // just a hint: background.js only ever redirects Flow's downloads into
 // this exact name, so any other folder name silently breaks auto-detection.
-const FLOW_DOWNLOADS_SUBFOLDER_HINT = 'StagePayBridge';
+const FLOW_DOWNLOADS_SUBFOLDER_HINT = 'StagePayDirector';
 
 const statusEl = document.getElementById('projectStatus');
 const itemListEl = document.getElementById('itemList');
 const lastCopiedSectionEl = document.getElementById('lastCopiedSection');
+const landingIntroEl = document.getElementById('landingIntro');
 const lastCopiedContentEl = document.getElementById('lastCopiedContent');
 
 // ---------- last-copied strip (unchanged) ----------
@@ -148,6 +149,7 @@ async function refreshFromActiveTab(force) {
   if (!projectId) {
     statusEl.textContent = 'No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.';
     statusEl.className = 'status error';
+    landingIntroEl.hidden = false;
     currentProjectId = null;
     itemListEl.innerHTML = '';
     updateStageBanner();
@@ -194,12 +196,14 @@ async function loadProject() {
   if (listRes.status === 401 || detailRes.status === 401) {
     statusEl.textContent = 'Not logged in — log into StagePay in a normal tab first, then reopen this panel.';
     statusEl.className = 'status error';
+    landingIntroEl.hidden = false;
     currentItems = [];
     return;
   }
   if (!listRes.ok || !detailRes.ok) {
     statusEl.textContent = `Could not load project (${listRes.status}/${detailRes.status}).`;
     statusEl.className = 'status error';
+    landingIntroEl.hidden = false;
     currentItems = [];
     return;
   }
@@ -222,6 +226,7 @@ async function loadProject() {
 
   statusEl.textContent = 'Connected'; // project + stage now live once, in the stage banner below — no need to repeat it here
   statusEl.className = 'status ok';
+  landingIntroEl.hidden = true;
 }
 
 function itemById(id) { return currentItems.find((i) => i.id === id) || null; }
@@ -464,7 +469,7 @@ function render() {
     return;
   }
   if (currentStage === 1) {
-    itemListEl.innerHTML = `<p class="stage-empty-note">Stage 1 (Brief) is filled in directly in StagePay itself — nothing to bridge to Flow yet. Once the brief is locked, reopen this panel.</p>`;
+    itemListEl.innerHTML = `<p class="stage-empty-note">Stage 1 (Brief) is filled in directly in StagePay itself — nothing to send to Flow yet. Once the brief is locked, reopen this panel.</p>`;
     return;
   }
   const items = currentItems.filter((i) => i.stage === currentStage);
@@ -496,7 +501,7 @@ function render() {
 // bug report. The handle itself is stored in IndexedDB (structured-cloneable,
 // unlike chrome.storage) so it survives the panel closing/reopening; only
 // the underlying OS permission needs re-confirming per browser session.
-const IDB_NAME = 'stagepay-bridge';
+const IDB_NAME = 'stagepay-director';
 const IDB_STORE = 'handles';
 const IDB_KEY = 'downloadsDir';
 
@@ -1007,7 +1012,7 @@ async function loadImageThumb(f, wrap) {
         setLastCopied({ kind: 'image', label: f.fileName, preview: mediaUrl });
         copyBtn.textContent = '✓';
       } catch (e) {
-        console.error('[StagePay Bridge] clipboard copy failed', e);
+        console.error('[StagePay Director] clipboard copy failed', e);
         copyBtn.textContent = '✗';
       }
       setTimeout(() => { copyBtn.textContent = '📋'; }, 1200);
@@ -1332,7 +1337,7 @@ function escapeHtml(s) {
 // redirected Flow download finishes (via chrome.downloads.onChanged), so
 // the gallery updates itself with no manual "Rescan" click needed.
 chrome.runtime.onMessage.addListener((message) => {
-  if (message && message.type === 'stagepay-bridge-download-ready' && folderPermissionState === 'granted') {
+  if (message && message.type === 'stagepay-director-download-ready' && folderPermissionState === 'granted') {
     scanDownloadsFolder().then(render);
   }
 });

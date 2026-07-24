@@ -3950,7 +3950,7 @@ ${e.rawResponse || '—'}`;
         <span>Created: <strong>${formatISTWithRelative(p.created_at)}</strong></span>
         <span>Updated: <strong>${formatISTWithRelative(p.updated_at)}</strong></span>
         ${total > 0 ? `<span class="project-earned-pill lg">💰 ${formatRupees(total)} earned</span>` : ''}
-        <button type="button" class="btn btn-sm" id="projectInfoRefreshBtn" title="Pull the latest — e.g. a file just added via the StagePay Bridge extension">🔄 Refresh</button>
+        <button type="button" class="btn btn-sm" id="projectInfoRefreshBtn" title="Pull the latest — e.g. a file just added via the StagePay Director extension">🔄 Refresh</button>
         <button type="button" class="btn btn-sm" id="projectInfoMoodboardBtn">🖼 Moodboard</button>
         <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Open customer payment link</button>
       </div>`;
@@ -4709,10 +4709,10 @@ ${e.rawResponse || '—'}`;
         <p>In accordance with applicable Indian law, grievances can be directed to:</p>
         <p><strong>StagePay Support</strong><br>📧 stagepay.support@gmail.com</p>
 
-        <h2>10. StagePay Bridge (Chrome Extension)</h2>
-        <p>StagePay Bridge is an optional Chrome extension for AI-creator designers, used to produce deliverables for stages where content is generated via Google Flow or ChatGPT rather than uploaded directly. It uses the same account and session as the Service, and additionally:</p>
+        <h2>10. StagePay Director (Chrome Extension)</h2>
+        <p>StagePay Director is an optional Chrome extension for AI-creator designers, used to produce deliverables for stages where content is generated via Google Flow or ChatGPT rather than uploaded directly. It uses the same account and session as the Service, and additionally:</p>
         <ul>
-          <li><strong>Local downloads folder access:</strong> if you connect a folder (e.g. one named "StagePayBridge" inside your Downloads), the extension reads that folder's recent images/videos so you can attach them without a manual file dialog. This access is granted by you via Chrome's own permission dialog and can be revoked at any time in Chrome's settings. We do not read any other folder, and folder contents are never uploaded anywhere except the specific file(s) you choose to attach.</li>
+          <li><strong>Local downloads folder access:</strong> if you connect a folder (e.g. one named "StagePayDirector" inside your Downloads), the extension reads that folder's recent images/videos so you can attach them without a manual file dialog. This access is granted by you via Chrome's own permission dialog and can be revoked at any time in Chrome's settings. We do not read any other folder, and folder contents are never uploaded anywhere except the specific file(s) you choose to attach.</li>
           <li><strong>Redirecting Flow downloads:</strong> the extension automatically moves files you download from Google Flow (labs.google) into that same subfolder, so they're easy to find. It does not inspect or alter downloads from any other website.</li>
           <li><strong>ChatGPT hand-off:</strong> clicking "Enhance with ChatGPT" opens a new chatgpt.com tab with that item's compiled prompt text pre-filled into the address bar. Only the prompt text for that one item is sent, and only when you click that button.</li>
         </ul>
@@ -6745,7 +6745,7 @@ ${e.rawResponse || '—'}`;
   // to reset on every refresh (state.expandedItems collapsing every open
   // card, state.screen/history churn) — used when something outside this
   // tab's own actions may have changed the project, e.g. a file added via
-  // the StagePay Bridge extension, which writes to the same backend but
+  // the StagePay Director extension, which writes to the same backend but
   // has no way to tell this tab's in-memory state to update itself.
   async function refreshProjectData() {
     if (!state.project) return;
@@ -7496,7 +7496,7 @@ ${e.rawResponse || '—'}`;
     openMediaViewerModal(link.getAttribute('href'), link.getAttribute('data-media-name'), link.getAttribute('data-media-kind') || 'image', gallery);
   });
 
-  // A file added via the StagePay Bridge extension writes straight to the
+  // A file added via the StagePay Director extension writes straight to the
   // same backend this tab already trusts in memory — this tab has no way to
   // know that happened until something re-fetches. Two separate triggers,
   // covering two separate real setups:

@@ -223,7 +223,7 @@ location to match the connected folder — zero code, but affects every site's
 downloads, not just Flow's; (2) built instead — `chrome.downloads
 .onDeterminingFilename` in `background.js` auto-redirects only downloads
 whose referrer matches Flow's own domain (`labs.google`, confirmed from the
-user's own Chrome download history, not guessed) into a `StagePayBridge/`
+user's own Chrome download history, not guessed) into a `StagePayDirector/`
 subfolder inside Downloads. A subfolder isn't a blocked top-level directory,
 so the panel can be connected to exactly that one — everything else
 downloaded in the browser is untouched. `downloads` permission re-added to

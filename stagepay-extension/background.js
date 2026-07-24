@@ -1,4 +1,4 @@
-// StagePay Bridge — background service worker (Manifest V3).
+// StagePay Director — background service worker (Manifest V3).
 //
 // A full download-capture feature (auto-detect a Flow download and attach it
 // with zero picker interaction) was prototyped and deliberately dropped:
@@ -33,9 +33,9 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 const FLOW_REFERRER_MATCH = /labs\.google/i;
-const FLOW_DOWNLOADS_SUBFOLDER = 'StagePayBridge';
+const FLOW_DOWNLOADS_SUBFOLDER = 'StagePayDirector';
 
-// Downloads redirected into the bridge subfolder, awaiting completion — lets
+// Downloads redirected into the subfolder, awaiting completion — lets
 // onChanged below tell the panel to rescan only for these, not every
 // download in the browser.
 const redirectedDownloadIds = new Set();
@@ -57,6 +57,6 @@ chrome.downloads.onChanged.addListener((delta) => {
   if (!redirectedDownloadIds.has(delta.id)) return;
   if (delta.state && delta.state.current === 'complete') {
     redirectedDownloadIds.delete(delta.id);
-    chrome.runtime.sendMessage({ type: 'stagepay-bridge-download-ready' }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'stagepay-director-download-ready' }).catch(() => {});
   }
 });
