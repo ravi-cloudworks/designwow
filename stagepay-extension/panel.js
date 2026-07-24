@@ -214,6 +214,31 @@ function hasFlowPrompt(item) {
 // web app enforces this by hiding its upload button once at capacity; the
 // extension has no such button to hide, so it has to check explicitly.
 function maxFilesFor(item) { return item.item_key === 'story' ? 2 : 1; }
+
+// Mirrors index.html's DEFAULT_MEDIA_MAX_MB/MEDIA_MAX_MB/maxUploadMb/
+// checkFileSize exactly — the backend's own 100MB cap (media.ts) is a
+// type-blind absolute backstop, not a substitute for these tighter,
+// per-item-type limits (a 50MB Character image should never reach the
+// server at all, the same way the swimlane itself would block it).
+const DEFAULT_MEDIA_MAX_MB = 20;
+const MEDIA_MAX_MB = { movie: 100 };
+function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
+function checkFileSize(file, maxMb) { return file.size <= maxMb * 1024 * 1024; }
+
+// Mirrors index.html's cleanUploadFileName exactly — Flow's own downloaded
+// filenames are long and ugly (e.g. "image.png_2K_202607241152.jpeg"); this
+// renames to something clean based on the item's own name, same as every
+// upload already gets in the swimlane.
+function cleanUploadFileName(item, originalFileName, existingCount) {
+  const extMatch = originalFileName.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'dat';
+  const ic = itemConfigFor(item);
+  const base = (item.name || (ic && ic.label) || item.item_key)
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'file';
+  const suffix = existingCount > 0 ? `-${existingCount + 1}` : '';
+  return `${base}${suffix}.${ext}`;
+}
 function draftFor(item) {
   if (!itemDrafts[item.id]) {
     const v = theVersion(item);
@@ -375,8 +400,18 @@ function render() {
     itemListEl.innerHTML = `<p class="stage-empty-note">No items yet in Stage ${currentStage} — ${escapeHtml(STAGE_NAMES[currentStage] || '')}.</p>`;
     return;
   }
-  itemListEl.innerHTML = items.map(renderItemCard).join('');
+  const isSingleItem = items.length === 1;
+  itemListEl.innerHTML = items.map((item) => renderItemRow(item, isSingleItem)).join('');
+  document.querySelectorAll('[data-toggle-item]').forEach((el) => el.addEventListener('click', () => {
+    const id = el.getAttribute('data-toggle-item');
+    expandedItems[id] = !expandedItems[id];
+    render();
+  }));
+  // Only expanded items have any of this DOM to wire or thumbnails to fetch
+  // in the first place — skipping collapsed ones avoids fetching every
+  // other item's files just because the stage happened to render.
   items.forEach((item) => {
+    if (!isSingleItem && !expandedItems[item.id]) return;
     loadThumbs(item);
     if (hasFlowPrompt(item)) loadMustAttach(item);
     wireItemCard(item);
@@ -526,30 +561,47 @@ function renderItemCard(item) {
   const showPrompt = hasFlowPrompt(item);
   const draft = showPrompt ? draftFor(item) : null;
   const label = item.name || (ic && ic.label) || item.item_key;
-  // What's actually being produced/sent, e.g. "Character", "Scene", "Final
-  // Movie Clip" — same value already used for the card's own title, reused
-  // here so each step reads as "Generate Character" / "Choose & send
-  // Character" instead of a generic verb with no object. Matches the web
-  // app's own established phrasing (e.g. its Scene Generate button already
-  // reads "Generate Scene Image Prompt", not just "Generate").
-  const noun = (ic && ic.label) || item.item_key;
+  // Same precedence as `label` above (this WAS the bug — it used to skip
+  // item.name and always fall back to the generic type label, so every
+  // Scene's Movie clip showed "Setup Final Movie Clip" instead of "Setup
+  // Scene 1 Movie Clip"). Reused so each step reads as "Generate Scene 1
+  // Movie Clip" / "Choose & send Scene 1 Movie Clip" — this specific item,
+  // not just its type. Matches the web app's own established phrasing (e.g.
+  // its Scene Generate button already reads "Generate Scene Image Prompt",
+  // not just "Generate").
+  const noun = label;
   const steps = [];
 
-  if (showPrompt && schema.length) {
-    steps.push({
-      title: `Setup ${noun}`,
-      body: schema.map((def) => renderFieldControl(def, draft.fields[def.key])).join(''),
-    });
-  }
-
+  // Template mode: Setup drives the prompt, live — no separate Compile
+  // click, the textarea just updates as fields change. Custom mode: Setup
+  // is hidden (it has no effect here), the textarea is yours alone — paste
+  // a ChatGPT-written template or write from scratch, nothing ever
+  // auto-overwrites it. Persisted the same way Story/Scene/Movie already
+  // remember Generate-vs-Upload, in fields._uiMode.
+  const promptMode = showPrompt && draft.fields._uiMode === 'custom' ? 'custom' : 'template';
   if (showPrompt) {
+    const modeToggleHtml = `<div class="item-mode-toggle">
+      <button type="button" class="${promptMode === 'template' ? 'active' : ''}" data-prompt-mode-btn="template" data-item-id="${item.id}">🧩 Template</button>
+      <button type="button" class="${promptMode === 'custom' ? 'active' : ''}" data-prompt-mode-btn="custom" data-item-id="${item.id}">✏️ Custom</button>
+    </div>`;
+
+    if (promptMode === 'template' && schema.length) {
+      steps.push({
+        title: `Setup ${noun}`,
+        body: modeToggleHtml + schema.map((def) => renderFieldControl(def, draft.fields[def.key])).join(''),
+      });
+    }
+
     steps.push({
       title: `Generate ${noun}`,
       body: `
+        ${(promptMode === 'custom' || !schema.length) ? modeToggleHtml : ''}
         <div class="must-attach-row" data-must-attach="${item.id}"></div>
-        <textarea data-prompt-area="${item.id}" placeholder="Click Compile, or write your own...">${escapeHtml(draft.prompt || '')}</textarea>
+        ${promptMode === 'custom'
+          ? `<p class="prompt-mode-note">Your own prompt/template — nothing here ever auto-changes it.</p>`
+          : (schema.length ? `<p class="prompt-mode-note">Read-only — mirrors Setup above exactly. Switch to Custom to write or paste your own.</p>` : '')}
+        <textarea data-prompt-area="${item.id}" ${promptMode === 'template' ? 'readonly' : ''} placeholder="${promptMode === 'custom' ? 'Paste your custom prompt here...' : 'Edit Setup above to fill this in...'}">${escapeHtml((promptMode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '')}</textarea>
         <div class="row">
-          <button type="button" data-compile-btn="${item.id}">🪄 Compile</button>
           <button type="button" data-copy-prompt-btn="${item.id}">📋 Copy prompt</button>
           <button type="button" data-chatgpt-btn="${item.id}">🤖 Open in ChatGPT</button>
           <button type="button" class="primary" data-save-draft-btn="${item.id}">💾 Save</button>
@@ -596,11 +648,41 @@ function renderItemCard(item) {
       ${currentFiles.length ? '' : `<p class="deliverable-empty">Nothing sent yet — pick and send a file above.</p>`}`,
   });
 
-  return `
-    <div class="item-card" data-item-id="${item.id}">
-      <h3>${escapeHtml(label)}</h3>
-      ${steps.map((s, i) => `<div class="section-label">${i + 1}. ${s.title}</div>${s.body}`).join('')}
-    </div>`;
+  return steps.map((s, i) => `<div class="section-label">${i + 1}. ${s.title}</div>${s.body}`).join('');
+}
+
+// A quick, no-fetch-required summary for a collapsed row — enough to see
+// what's left to do across a whole stage without opening every item.
+function itemStatusSummary(item) {
+  const sent = (theVersion(item).media_files || []).length;
+  const staged = (stagingFiles[item.id] || []).length;
+  if (sent > 0) return `✅ ${sent} file(s)`;
+  if (staged > 0) return `🟡 ${staged} staged, not sent`;
+  return '— nothing yet';
+}
+
+// One item at a time, matching the main web app's own collapsed-by-default
+// item cards (state.expandedItems) — a stage with several Characters/Props/
+// Scenes was rendering every single one fully expanded at once, which is
+// exactly the "visually overloading" problem the swimlane already solved
+// this same way. A lone item in a stage (Story is always exactly one) skips
+// the collapse chrome entirely — nothing to collapse when there's only one.
+const expandedItems = {};
+function renderItemRow(item, isSingleItem) {
+  const ic = itemConfigFor(item);
+  const label = item.name || (ic && ic.label) || item.item_key;
+  if (isSingleItem) {
+    return `<div class="item-card" data-item-id="${item.id}"><h3>${escapeHtml(label)}</h3>${renderItemCard(item)}</div>`;
+  }
+  const isExpanded = !!expandedItems[item.id];
+  return `<div class="item-card" data-item-id="${item.id}">
+    <div class="item-row-head" data-toggle-item="${item.id}">
+      <strong>${escapeHtml(label)}</strong>
+      <span class="item-row-status">${itemStatusSummary(item)}</span>
+      <span class="item-row-chevron">${isExpanded ? '▾' : '▸'}</span>
+    </div>
+    ${isExpanded ? renderItemCard(item) : ''}
+  </div>`;
 }
 
 // Loads the must-attach reference images (the INPUTS this item needs
@@ -764,14 +846,40 @@ function wireItemCard(item) {
 
   if (showPrompt) {
     const draft = draftFor(item);
-    // Neither of these touches anything outside its own field — no reason to
-    // rebuild the whole panel (Step 2's prompt, the gallery, etc.) just
-    // because one Setup pill/preset was clicked.
+    const promptMode = draft.fields._uiMode === 'custom' ? 'custom' : 'template';
+    const promptArea = document.querySelector(`[data-prompt-area="${item.id}"]`);
+    // Template mode only — recompute and push straight into the textarea, no
+    // full render() (matches the same light-touch pattern pills/presets
+    // already use elsewhere). Custom mode never runs this: Setup isn't even
+    // shown there, and nothing should touch a hand-pasted prompt.
+    const recompileIfTemplate = () => {
+      if (promptMode !== 'template') return;
+      const composed = composeFinalPrompt(item, compilePrompt(item, draft.fields));
+      draft.prompt = composed;
+      if (promptArea) promptArea.value = composed;
+    };
+    // Covers the case recompileIfTemplate's other call sites can't: an item
+    // with NO Setup fields at all (Story, always) never fires a single
+    // field-change event, so nothing would ever trigger that first compile —
+    // the box would just stay blank forever. Runs once per card render, but
+    // only actually does anything while the prompt is still empty, so it
+    // never overwrites a real compile or a hand-typed edit on a later render.
+    if (promptMode === 'template' && !draft.prompt) recompileIfTemplate();
+
+    document.querySelectorAll(`[data-item-id="${item.id}"] [data-prompt-mode-btn]`).forEach((btn) => btn.addEventListener('click', () => {
+      draft.fields._uiMode = btn.getAttribute('data-prompt-mode-btn');
+      render(); // Setup showing/hiding and the textarea's placeholder both change — a real structural change, not just a value update
+    }));
+
+    // Neither of these touches anything outside its own field/the prompt —
+    // no reason to rebuild the whole panel (the gallery, other items, etc.)
+    // just because one Setup pill/preset was clicked.
     document.querySelectorAll(`[data-item-id="${item.id}"] [data-field-pick]`).forEach((btn) => btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-field-pick');
       draft.fields[key] = btn.getAttribute('data-value');
       const row = btn.closest('.pill-row');
       if (row) row.querySelectorAll('[data-field-pick]').forEach((b) => b.classList.toggle('selected', b === btn));
+      recompileIfTemplate();
     }));
     document.querySelectorAll(`[data-item-id="${item.id}"] [data-field-preset]`).forEach((btn) => btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-field-preset');
@@ -779,27 +887,29 @@ function wireItemCard(item) {
       draft.fields[key] = draft.fields[key] ? `${draft.fields[key]} ${preset}` : preset;
       const textarea = document.querySelector(`[data-item-id="${item.id}"] [data-field-text="${key}"]`);
       if (textarea) textarea.value = draft.fields[key];
+      recompileIfTemplate();
     }));
     // 'input' (not 'change') so some OTHER action that still does a full
     // render() (e.g. clicking a gallery thumbnail in Step 3) never discards
     // an in-progress, not-yet-blurred edit in a text field.
     document.querySelectorAll(`[data-item-id="${item.id}"] [data-field-text]`).forEach((el) => el.addEventListener('input', () => {
       draft.fields[el.getAttribute('data-field-text')] = el.value;
+      recompileIfTemplate();
     }));
-    const promptArea = document.querySelector(`[data-prompt-area="${item.id}"]`);
-    if (promptArea) promptArea.addEventListener('input', () => { draft.prompt = promptArea.value; });
-
-    const compileBtn = document.querySelector(`[data-compile-btn="${item.id}"]`);
-    if (compileBtn) compileBtn.addEventListener('click', () => {
-      const composed = composeFinalPrompt(item, compilePrompt(item, draft.fields));
-      draft.prompt = composed;
-      if (promptArea) promptArea.value = composed;
+    // Template and Custom keep entirely separate text — draft.prompt for the
+    // compiled/readonly Template view, fields._customPrompt for Custom —
+    // so switching tabs never mixes one mode's text into the other's box,
+    // and each survives independently across a tab switch or a reload.
+    if (promptArea) promptArea.addEventListener('input', () => {
+      if (promptMode === 'custom') draft.fields._customPrompt = promptArea.value;
+      else draft.prompt = promptArea.value; // readonly in this mode, but harmless if ever reached
     });
+    const currentPromptText = () => (promptMode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '';
 
     const copyPromptBtn = document.querySelector(`[data-copy-prompt-btn="${item.id}"]`);
     if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => {
-      const text = promptArea ? promptArea.value : draft.prompt;
-      navigator.clipboard.writeText(text || '').then(() => {
+      const text = currentPromptText();
+      navigator.clipboard.writeText(text).then(() => {
         setLastCopied({ kind: 'prompt', label: item.name || item.item_key, preview: text });
         copyPromptBtn.textContent = '✓ Copied';
         setTimeout(() => { copyPromptBtn.textContent = '📋 Copy prompt'; }, 1200);
@@ -816,7 +926,11 @@ function wireItemCard(item) {
     const saveBtn = document.querySelector(`[data-save-draft-btn="${item.id}"]`);
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
-      const promptVal = promptArea ? promptArea.value : draft.prompt;
+      // The backend's one `prompt` column always reflects whichever mode is
+      // currently active — Custom's own text stays preserved in
+      // fields._customPrompt regardless, so switching back to Template
+      // later still shows the compiled view, not a stale Custom save.
+      const promptVal = currentPromptText();
       await fetch(`${API_BASE}/api/items/${item.id}/version`, {
         method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: draft.fields, prompt: promptVal }),
@@ -880,21 +994,30 @@ function wireItemCard(item) {
 function addToStaging(itemId, files) {
   if (!files.length) return;
   const item = currentItems.find((i) => i.id === itemId);
+  if (!stagingFiles[itemId]) stagingFiles[itemId] = [];
+
+  const maxMb = maxUploadMb(item.item_key);
+  const oversized = files.filter((f) => !checkFileSize(f, maxMb));
+  const okFiles = files.filter((f) => checkFileSize(f, maxMb));
+  const notes = [];
+  if (oversized.length) {
+    notes.push(oversized.map((f) => `"${f.name}" is ${(f.size / (1024 * 1024)).toFixed(1)}MB`).join(', ') + ` — max allowed is ${maxMb}MB.`);
+  }
+
   const max = maxFilesFor(item);
   const existingCount = (theVersion(item).media_files || []).length;
-  const alreadyStaged = (stagingFiles[itemId] || []).length;
+  const alreadyStaged = stagingFiles[itemId].length;
   const room = Math.max(0, max - existingCount - alreadyStaged);
 
-  if (!stagingFiles[itemId]) stagingFiles[itemId] = [];
   if (room <= 0) {
-    stagingNotes[itemId] = `This item already has its max of ${max} file(s) — remove one first (from here or StagePay) before adding another.`;
-  } else if (files.length > room) {
-    stagingFiles[itemId].push(...files.slice(0, room));
-    stagingNotes[itemId] = `Only added ${room} of ${files.length} — max ${max} file(s) allowed for this item.`;
+    if (okFiles.length) notes.push(`This item already has its max of ${max} file(s) — remove one first (from here or StagePay) before adding another.`);
+  } else if (okFiles.length > room) {
+    stagingFiles[itemId].push(...okFiles.slice(0, room));
+    notes.push(`Only added ${room} of ${okFiles.length} — max ${max} file(s) allowed for this item.`);
   } else {
-    stagingFiles[itemId].push(...files);
-    stagingNotes[itemId] = null;
+    stagingFiles[itemId].push(...okFiles);
   }
+  stagingNotes[itemId] = notes.length ? notes.join(' ') : null;
   render(); // full re-render — not just the staging row — so a gallery thumbnail's tick mark (and this note) stay in sync with actual state, not a one-off DOM mutation render() would immediately overwrite
 }
 
@@ -937,19 +1060,21 @@ async function sendStagedFiles(itemId) {
   if (!files.length) return;
   const sendBtn = document.querySelector(`[data-send-staged-btn="${itemId}"]`);
   const item = currentItems.find((i) => i.id === itemId);
+  const existingCount = (theVersion(item).media_files || []).length;
   const uploaded = [];
   for (let i = 0; i < files.length; i++) {
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = `Uploading ${i + 1}/${files.length}…`; }
     const file = files[i];
     try {
+      const cleanName = cleanUploadFileName(item, file.name, existingCount + uploaded.length);
       const uploadRes = await fetch(
-        `${API_BASE}/api/media?projectId=${encodeURIComponent(currentProjectId)}&fileName=${encodeURIComponent(file.name)}`,
+        `${API_BASE}/api/media?projectId=${encodeURIComponent(currentProjectId)}&fileName=${encodeURIComponent(cleanName)}`,
         { method: 'POST', credentials: 'include', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }
       );
       const result = await uploadRes.json();
       if (!result.key) throw new Error('upload_failed');
       const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
-      uploaded.push({ key: result.key, fileName: file.name, kind });
+      uploaded.push({ key: result.key, fileName: result.fileName || cleanName, kind });
     } catch (e) {
       if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = `Upload failed on file ${i + 1} — try again`; }
       stagingFiles[itemId] = files.slice(i); // keep whatever didn't make it, so nothing's silently lost

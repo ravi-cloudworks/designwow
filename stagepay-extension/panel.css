@@ -24,10 +24,16 @@ header strong { font-size: 14px; }
 .item-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .item-card { background: #fff; border: 1px solid #dbdfe2; border-radius: 8px; padding: 10px; }
 .item-card h3 { margin: 0 0 6px; font-size: 12.5px; }
+.item-row-head { display: flex; align-items: center; gap: 8px; cursor: pointer; margin: -10px -10px 0; padding: 10px; border-radius: 8px; }
+.item-row-head:hover { background: #f5f6f7; }
+.item-row-head strong { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-row-status { font-size: 11px; color: #8b92a1; white-space: nowrap; }
+.item-row-chevron { color: #8b92a1; font-size: 12px; width: 12px; text-align: center; }
 .item-card textarea {
   width: 100%; min-height: 60px; font-size: 11.5px; border: 1px solid #dbdfe2;
   border-radius: 6px; padding: 6px; resize: vertical; font-family: inherit;
 }
+.item-card textarea[readonly] { background: #f5f6f7; color: #4b5563; cursor: default; }
 .item-card .row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
 .item-card button { border: 1px solid #dbdfe2; background: #fff; border-radius: 6px; padding: 5px 9px; font-size: 11px; cursor: pointer; }
 .item-card button.primary { background: #176b5e; color: #fff; border-color: #176b5e; }
@@ -39,6 +45,10 @@ header strong { font-size: 14px; }
   margin: 12px -10px 6px; padding: 5px 10px 5px 8px;
 }
 .item-card > .section-label:first-of-type { margin-top: 8px; }
+.item-mode-toggle { display: flex; gap: 2px; margin-bottom: 8px; background: #eef1f2; border-radius: 999px; padding: 3px; width: fit-content; max-width: 100%; }
+.item-mode-toggle button { padding: 5px 12px; font-size: 11px; font-weight: 700; border: none; background: transparent; border-radius: 999px; cursor: pointer; color: #6b7280; }
+.item-mode-toggle button.active { background: #fff; color: #14161b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.prompt-mode-note { font-size: 11px; color: #8b92a1; margin: 0 0 6px; }
 .setup-field { margin-bottom: 8px; }
 .setup-field label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 3px; }
 .setup-field input[type=text], .setup-field textarea {

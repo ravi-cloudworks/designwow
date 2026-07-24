@@ -3315,7 +3315,7 @@ ${e.rawResponse || '—'}`;
           const scenes = state.items.filter(i => i.stage === 4 && i.item_key === 'scene');
           for (const scene of scenes) {
             if (!movieFor(scene.id)) {
-              await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Final Clip`, parentItemId: scene.id });
+              await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Video Clip`, parentItemId: scene.id });
             }
           }
           // One per project, not per scene — the designer stitches every
