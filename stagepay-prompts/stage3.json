@@ -1,11 +1,56 @@
 {
   "stage": 3,
   "laneTitle": "Visual & Music",
-  "note": "Character/Property/Sound/Background no longer generate anything via Flow — testing showed Gemini can't reliably infer visual specifics for ambiguous characters (a story just saying 'grandma' or 'a kid'), and designers prefer uploading their own known-good reference images anyway. These four item types are now upload-only: a name (typed manually or created by Story's sync) plus a direct file upload, nothing else. content/outputInstructions intentionally removed.",
+  "note": "Character/Property/Background regained a Flow prompt (031_stage3_flow_prompts) — not Gemini-drafted, just a fixed reference-sheet template (from the user's own tested RTF prompts) wrapped around one designer-typed one-line description, same masterSheetPrompt+yourDescription pattern as Story/Scene/Movie. This lives in the StagePay Bridge extension only, never in the swimlane itself — the swimlane stays upload-only for these types (see STAGEPAY_SWIMLANE_EXTENSION_PLAN.md). Sound has no Flow prompt — it's real audio, nothing to generate — and stays upload-only everywhere.",
   "items": {
-    "character": { "label": "Character" },
-    "property": { "label": "Property" },
-    "sound": { "label": "Sound" },
-    "background": { "label": "Background" }
+    "character": {
+      "label": "Character",
+      "content": {
+        "fieldsSchema": [
+          { "key": "description", "label": "One-line character description", "type": "textarea" }
+        ]
+      },
+      "outputInstructions": [
+        {
+          "key": "master_character_reference_sheet_prompt",
+          "label": "Master Character Reference Sheet Prompt",
+          "default": true,
+          "text": "Create a professional CHARACTER REFERENCE SHEET for AI video generation.\n\nCreate ONE clean studio reference sheet.\n\n==================================================\nHEADER\n==================================================\n\nTitle:\nCHARACTER TURNAROUND SHEET\n\nSubtitle:\nREFERENCE FOR AI VIDEO GENERATION\n\n==================================================\nCHARACTER VIEWS\n==================================================\n\nGenerate the EXACT SAME PERSON in FIVE UNIQUE full-body views.\n\nArrange left to right.\n\n1. FRONT VIEW\n• Facing camera directly\n\n2. LEFT SIDE PROFILE (90°)\n• Complete left profile\n• Only left side of face visible\n\n3. BACK VIEW (180°)\n• Complete back view\n\n4. RIGHT SIDE PROFILE (90°)\n• Complete right profile\n• Only right side of face visible\n\n5. RIGHT 3/4 VIEW (45°)\n• Rotate character exactly 45° toward the RIGHT\n• Show both eyes\n• RIGHT side of face is dominant\n• Must NOT duplicate any previous view\n\n==================================================\nIDENTITY LOCK\n==================================================\n\nEvery panel must show the EXACT SAME PERSON.\n\nIdentical\n\n• Face\n• Eyes\n• Nose\n• Lips\n• Jawline\n• Hair\n• Skin tone\n• Height\n• Weight\n• Body proportions\n• Clothing\n• Accessories\n• Shoes\n\nNo variation whatsoever.\n\n==================================================\nPOSE\n==================================================\n\nNeutral facial expression\n\nRelaxed standing pose\n\nArms naturally beside body\n\nFeet shoulder-width apart\n\nNo smile\n\nNo action pose\n\n==================================================\nCAMERA\n==================================================\n\nOrthographic character turnaround\n\nEye-level camera\n\nSame camera distance\n\nSame focal length\n\nSame lighting\n\nEqual spacing\n\n==================================================\nLIGHTING\n==================================================\n\nSoft white studio lighting\n\nEven illumination\n\nNo dramatic shadows\n\n==================================================\nBACKGROUND\n==================================================\n\nPlain light gray seamless background\n\n==================================================\nBOTTOM PANEL\n==================================================\n\nCreate a professional information panel.\n\nLEFT\n\nCHARACTER DETAILS\n\n• Name (leave blank if not provided)\n• Age\n• Occupation\n• Height\n• Build\n\nCENTER\n\nKEY FEATURES\n\n• Face Shape\n• Hair Style\n• Eye Color\n• Skin Tone\n\nRIGHT\n\nWARDROBE\n\n• Top\n• Bottom\n• Shoes\n• Accessories\n\nInclude wardrobe color swatches.\n\n==================================================\nSTYLE\n==================================================\n\nProfessional animation model sheet\n\nCharacter design turnaround\n\nPhotorealistic\n\nCommercial photography\n\nUltra detailed\n\nLuxury fashion catalog quality\n\nSharp focus\n\n8K\n\n==================================================\nNEGATIVE\n==================================================\n\nNo duplicate views\n\nNo mirrored views\n\nNo extra people\n\nNo props\n\nNo environment\n\nNo perspective distortion\n\nNo anatomy errors\n\nNo cropped body\n\nNo hairstyle changes\n\nNo clothing changes\n\nNo accessory changes\n\nNo facial changes\n\nDo not invent a character name.\n\nMaintain perfect identity consistency."
+        }
+      ]
+    },
+    "property": {
+      "label": "Property",
+      "content": {
+        "fieldsSchema": [
+          { "key": "description", "label": "One-line property description", "type": "textarea" }
+        ]
+      },
+      "outputInstructions": [
+        {
+          "key": "master_prop_reference_sheet_prompt",
+          "label": "Master Prop Reference Sheet Prompt",
+          "default": true,
+          "text": "Generate five unique views.\n\n1. Front\n2. Left Side\n3. Back\n4. Right Side\n5. Top View\n\nSame proportions.\nSame label.\nSame colors.\nSame reflections.\n\nPlain white background.\n\nProfessional product photography.\n\nUltra detailed.\n\nCommercial catalog quality.\n\n8K.\n\nNo hands.\n\nNo people.\n\nNo shadows covering the label."
+        }
+      ]
+    },
+    "background": {
+      "label": "Background",
+      "content": {
+        "fieldsSchema": [
+          { "key": "description", "label": "One-line background description", "type": "textarea" }
+        ]
+      },
+      "outputInstructions": [
+        {
+          "key": "master_background_reference_sheet_prompt",
+          "label": "Master Background Reference Sheet Prompt",
+          "default": true,
+          "text": "Generate five views:\n\n1. Wide Front\n2. Left Corner\n3. Right Corner\n4. Window Perspective\n5. Reverse View\n\nSame lighting\nSame furniture\nSame layout\nSame colors\n\nProfessional interior reference sheet\n8K"
+        }
+      ]
+    },
+    "sound": { "label": "Sound" }
   }
 }

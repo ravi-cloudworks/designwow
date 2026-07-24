@@ -2,19 +2,22 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>StagePay Companion</title>
+  <title>StagePay Bridge</title>
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
   <header>
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <strong>💸 StagePay Companion</strong>
+      <strong>💸 StagePay Bridge</strong>
       <button id="refreshBtn" title="Re-check which project is open">🔄</button>
     </div>
     <p id="projectStatus" class="status">Looking for an open StagePay tab…</p>
   </header>
 
-  <nav id="stageTabs" class="stage-tabs" hidden></nav>
+  <div id="stageBanner" class="stage-banner" hidden>
+    <div class="stage-banner-project" id="stageBannerProject"></div>
+    <div class="stage-banner-stage" id="stageBannerStage"></div>
+  </div>
 
   <main id="itemList" class="item-list"></main>
 

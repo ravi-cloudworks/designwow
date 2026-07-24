@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "StagePay Companion",
-  "version": "0.1.0",
-  "description": "Stage StagePay prompts and reference images for copying into Google Flow, and attach generated output straight to the right StagePay item.",
+  "name": "StagePay Bridge",
+  "version": "0.2.0",
+  "description": "Setup fields, compiled Flow/ChatGPT prompts, and reference images for whichever stage you're currently on in StagePay — attach generated output straight back as the deliverable.",
   "action": {
-    "default_title": "Open StagePay Companion"
+    "default_title": "Open StagePay Bridge"
   },
   "side_panel": {
     "default_path": "panel.html"
@@ -12,6 +12,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["sidePanel", "storage", "tabs", "clipboardWrite"],
+  "permissions": ["sidePanel", "storage", "tabs", "clipboardWrite", "downloads"],
   "host_permissions": ["https://stagepay.pages.dev/*"]
 }
