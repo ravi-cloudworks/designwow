@@ -225,6 +225,27 @@ const MEDIA_MAX_MB = { movie: 100 };
 function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
 function checkFileSize(file, maxMb) { return file.size <= maxMb * 1024 * 1024; }
 
+// Mirrors index.html's MEDIA_ACCEPT map exactly: Sound is audio-only,
+// Movie/Final Video are video-only, everything else (Story included) is
+// image-only. Used both for the file input's own `accept` attribute (a
+// soft hint — native pickers can still be told to show "all files", and
+// it does nothing at all for drag-and-drop) and, more importantly, for a
+// real check in addToStaging below, since that's the one gate every path
+// — picker, drop, and the downloads-folder gallery — actually goes through.
+const MEDIA_ACCEPT = { sound: 'audio/*', movie: 'video/*', final_video: 'video/*' };
+function mediaAcceptFor(itemKey) { return MEDIA_ACCEPT[itemKey] || 'image/*'; }
+function requiredKindFor(itemKey) {
+  if (itemKey === 'sound') return 'audio';
+  if (itemKey === 'movie' || itemKey === 'final_video') return 'video';
+  return 'image';
+}
+function fileKindOf(file) {
+  if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('audio/')) return 'audio';
+  if (file.type.startsWith('image/')) return 'image';
+  return 'other';
+}
+
 // Mirrors index.html's cleanUploadFileName exactly — Flow's own downloaded
 // filenames are long and ugly (e.g. "image.png_2K_202607241152.jpeg"); this
 // renames to something clean based on the item's own name, same as every
@@ -664,7 +685,7 @@ function renderItemCard(item) {
       ${!showPrompt ? `<p class="no-prompt-note">No Flow/ChatGPT prompt for this item type — just attach your file directly (this includes a Final Movie clip stitched/downloaded from Flow too).</p>` : ''}
       ${folderGalleryHtml}
       <div class="dropzone" data-dropzone="${item.id}">Or drag one or more files here, or click to choose manually</div>
-      <input type="file" accept="image/*,video/*,audio/*" multiple style="display:none" data-file-input="${item.id}">
+      <input type="file" accept="${mediaAcceptFor(item.item_key)}" multiple style="display:none" data-file-input="${item.id}">
       <div class="staging-row" data-staging="${item.id}"></div>
       <p class="staging-note" data-staging-note="${item.id}" ${stagingNotes[item.id] ? '' : 'hidden'}>${escapeHtml(stagingNotes[item.id] || '')}</p>
       <div class="row" data-staging-actions="${item.id}" ${staged.length ? '' : 'hidden'}>
@@ -1062,11 +1083,21 @@ function addToStaging(itemId, files) {
   if (!files.length) return;
   const item = currentItems.find((i) => i.id === itemId);
   if (!stagingFiles[itemId]) stagingFiles[itemId] = [];
+  const notes = [];
+
+  // The accept attribute only filters what the picker dialog shows by
+  // default — it does nothing at all for drag-and-drop or a folder-gallery
+  // click, so this is the one real gate every path actually goes through.
+  const requiredKind = requiredKindFor(item.item_key);
+  const wrongKind = files.filter((f) => fileKindOf(f) !== requiredKind);
+  const kindOk = files.filter((f) => fileKindOf(f) === requiredKind);
+  if (wrongKind.length) {
+    notes.push(`${wrongKind.map((f) => `"${f.name}"`).join(', ')} — this item only accepts ${requiredKind} files.`);
+  }
 
   const maxMb = maxUploadMb(item.item_key);
-  const oversized = files.filter((f) => !checkFileSize(f, maxMb));
-  const okFiles = files.filter((f) => checkFileSize(f, maxMb));
-  const notes = [];
+  const oversized = kindOk.filter((f) => !checkFileSize(f, maxMb));
+  const okFiles = kindOk.filter((f) => checkFileSize(f, maxMb));
   if (oversized.length) {
     notes.push(oversized.map((f) => `"${f.name}" is ${(f.size / (1024 * 1024)).toFixed(1)}MB`).join(', ') + ` — max allowed is ${maxMb}MB.`);
   }
