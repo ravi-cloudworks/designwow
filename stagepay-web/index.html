@@ -2350,26 +2350,31 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         const file = files[0];
         if (!checkFileSize(file, maxUploadMb(item.item_key))) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
-        const mediaFiles = [];
-        const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
-        const cleanName = cleanUploadFileName(item, file.name, 0);
-        const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
-        mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
-        version.media_files = mediaFiles;
-        const patch = { mediaFiles };
-        // Uploading your own file replaces what a Generate-flow prompt would
-        // have produced — that old prompt is now stale/unrelated, so clear
-        // it (Setup field values are left alone, in case of switching back).
-        const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
-        if (currentMode === 'upload' && version.prompt) {
-          version.prompt = '';
-          patch.prompt = '';
+        uploadsInFlight++;
+        try {
+          const mediaFiles = [];
+          const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
+          const cleanName = cleanUploadFileName(item, file.name, 0);
+          const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
+          mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
+          version.media_files = mediaFiles;
+          const patch = { mediaFiles };
+          // Uploading your own file replaces what a Generate-flow prompt would
+          // have produced — that old prompt is now stale/unrelated, so clear
+          // it (Setup field values are left alone, in case of switching back).
+          const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
+          if (currentMode === 'upload' && version.prompt) {
+            version.prompt = '';
+            patch.prompt = '';
+          }
+          await api.updateVersion(item.id, patch);
+          uploadInput.value = '';
+          uploadBtn.disabled = false; uploadBtn.textContent = '+ Choose file(s)';
+          renderTool();
+          toast(patch.prompt !== undefined ? 'Cleared the previous prompt — this item now uses your uploaded file directly.' : 'Saved');
+        } finally {
+          uploadsInFlight--;
         }
-        await api.updateVersion(item.id, patch);
-        uploadInput.value = '';
-        uploadBtn.disabled = false; uploadBtn.textContent = '+ Choose file(s)';
-        renderTool();
-        toast(patch.prompt !== undefined ? 'Cleared the previous prompt — this item now uses your uploaded file directly.' : 'Saved');
       });
     }
     document.querySelectorAll(`[data-remove-media="${item.id}"]`).forEach(el => el.addEventListener('click', async () => {
@@ -2684,12 +2689,17 @@ ${e.rawResponse || '—'}`;
       if (!file) return;
       if (!checkFileSize(file, DEFAULT_MEDIA_MAX_MB)) { logoInput.value = ''; return; }
       chooseLogoBtn.disabled = true; chooseLogoBtn.textContent = 'Uploading…';
-      const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
-      state.brief.logo_media = { key: uploaded.key, fileName: uploaded.fileName };
-      await api.updateBrief(state.project.id, { logoMedia: state.brief.logo_media });
-      chooseLogoBtn.disabled = false; chooseLogoBtn.textContent = '+ Choose file';
-      renderTool();
-      toast('Saved');
+      uploadsInFlight++;
+      try {
+        const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
+        state.brief.logo_media = { key: uploaded.key, fileName: uploaded.fileName };
+        await api.updateBrief(state.project.id, { logoMedia: state.brief.logo_media });
+        chooseLogoBtn.disabled = false; chooseLogoBtn.textContent = '+ Choose file';
+        renderTool();
+        toast('Saved');
+      } finally {
+        uploadsInFlight--;
+      }
     });
     const photosInput = document.getElementById('productPhotosInput');
     const choosePhotosBtn = document.getElementById('chooseProductPhotosBtn');
@@ -2700,17 +2710,22 @@ ${e.rawResponse || '—'}`;
       const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
       if (oversized) { photosInput.value = ''; return; }
       choosePhotosBtn.disabled = true; choosePhotosBtn.textContent = 'Uploading…';
-      const photos = [...(state.brief.product_photos || [])];
-      for (const file of files) {
-        const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('product', file.name, photos.length + 1));
-        photos.push({ key: uploaded.key, fileName: uploaded.fileName });
+      uploadsInFlight++;
+      try {
+        const photos = [...(state.brief.product_photos || [])];
+        for (const file of files) {
+          const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('product', file.name, photos.length + 1));
+          photos.push({ key: uploaded.key, fileName: uploaded.fileName });
+        }
+        state.brief.product_photos = photos;
+        await api.updateBrief(state.project.id, { productPhotos: photos });
+        photosInput.value = '';
+        choosePhotosBtn.disabled = false; choosePhotosBtn.textContent = '+ Choose files';
+        renderTool();
+        toast('Saved');
+      } finally {
+        uploadsInFlight--;
       }
-      state.brief.product_photos = photos;
-      await api.updateBrief(state.project.id, { productPhotos: photos });
-      photosInput.value = '';
-      choosePhotosBtn.disabled = false; choosePhotosBtn.textContent = '+ Choose files';
-      renderTool();
-      toast('Saved');
     });
     document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', async () => {
       const i = Number(el.getAttribute('data-remove-photo'));
@@ -2968,18 +2983,23 @@ ${e.rawResponse || '—'}`;
         const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
         if (oversized) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
-        for (const file of files) {
-          const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
-          const cleanName = cleanUploadFileName(story, file.name, mediaFiles.length);
-          const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
-          mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
+        uploadsInFlight++;
+        try {
+          for (const file of files) {
+            const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
+            const cleanName = cleanUploadFileName(story, file.name, mediaFiles.length);
+            const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
+            mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
+          }
+          version.media_files = mediaFiles;
+          await api.updateVersion(story.id, { mediaFiles });
+          uploadInput.value = '';
+          uploadBtn.disabled = false; uploadBtn.textContent = '+ Upload file';
+          renderTool();
+          toast('Saved');
+        } finally {
+          uploadsInFlight--;
         }
-        version.media_files = mediaFiles;
-        await api.updateVersion(story.id, { mediaFiles });
-        uploadInput.value = '';
-        uploadBtn.disabled = false; uploadBtn.textContent = '+ Upload file';
-        renderTool();
-        toast('Saved');
       });
     }
     document.querySelectorAll(`[data-remove-media="${story.id}"]`).forEach(el => el.addEventListener('click', async () => {
@@ -6723,6 +6743,16 @@ ${e.rawResponse || '—'}`;
     if (!state.project) return;
     const id = state.project.id;
     const full = await api.getProject(id);
+    // Checked again here, not just by the caller before starting this fetch —
+    // an upload can begin WHILE this await was in flight (confirmed live: a
+    // window-focus-triggered refresh started, then the file input's own
+    // change handler incremented uploadsInFlight before this fetch resolved).
+    // Continuing past this point would replace state.items with data fetched
+    // before the upload's own api.updateVersion() committed, detaching the
+    // object reference the upload is about to mutate — so its own renderTool()
+    // afterward would draw from stale state. Bailing out here is strictly
+    // safer than finishing with data that's already out of date.
+    if (uploadsInFlight > 0) return;
     state.project = full.project; state.brief = full.brief; state.items = full.items;
     const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
@@ -7460,16 +7490,39 @@ ${e.rawResponse || '—'}`;
 
   // A file added via the StagePay Bridge extension writes straight to the
   // same backend this tab already trusts in memory — this tab has no way to
-  // know that happened until something re-fetches. Catches the realistic
-  // common case (worked in the Flow tab + the side panel, switch back here
-  // to check progress) for free; doesn't catch the side panel sitting open
-  // right next to an already-visible tool screen, since nothing "changes"
-  // from this tab's perspective in that layout — the manual Refresh button
-  // above covers that case instead.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
+  // know that happened until something re-fetches. Two separate triggers,
+  // covering two separate real setups:
+  //   - visibilitychange: this tab was hidden behind another TAB in the SAME
+  //     window, then re-selected. Tab-switching within one window doesn't
+  //     change window-level OS focus, so 'focus' below wouldn't fire here.
+  //   - window 'focus': StagePay is open in its own separate Chrome WINDOW
+  //     (e.g. Flow + the side panel live in a different window entirely) —
+  //     switching windows never changes which tab is active in either one,
+  //     so visibilitychange wouldn't fire here; only window-level focus does.
+  // Neither catches the side panel sitting open right next to an
+  // already-visible, already-focused tool screen — nothing "changes" from
+  // this tab's perspective in that layout — the manual Refresh button above
+  // covers that case instead.
+  //
+  // uploadsInFlight guards a real race this exposed: opening a native file
+  // picker (any upload button, anywhere) blurs then re-focuses the window —
+  // completely normal OS dialog behavior — and that focus can fire BEFORE
+  // the upload's own change handler has even started, so checking the flag
+  // only here isn't enough (confirmed live via logging: a focus-triggered
+  // refreshProjectData() had already started its fetch, uploadsInFlight
+  // still 0 at that moment, before the upload incremented it moments later).
+  // The real guard is the second check inside refreshProjectData() itself,
+  // right before it touches state.items — this one just avoids starting a
+  // redundant new fetch while one's already known to be running.
+  let uploadsInFlight = 0;
+  function refreshIfOnToolScreen() {
+    if (uploadsInFlight > 0) return;
     if (state.screen === 'tool' && state.project) refreshProjectData();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshIfOnToolScreen();
   });
+  window.addEventListener('focus', refreshIfOnToolScreen);
 
   boot();
 })();

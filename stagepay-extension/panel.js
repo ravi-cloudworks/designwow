@@ -94,17 +94,27 @@ async function init() {
   // reload). Re-check whenever the tab's URL changes or focus switches tabs,
   // plus a manual button for whenever that misses something.
   //
-  // onActivated forces a real refetch even for the SAME project — switching
-  // tabs away and back is exactly the moment something may have changed
-  // (e.g. a file added manually in the swimlane itself, on this same tab,
-  // while the panel wasn't watching). Mirrors the same fix on the web app
-  // side (refetch on tab visibility/focus) — same known gap too: doesn't
-  // catch the panel sitting open right next to an already-active StagePay
-  // tab with no tab-switching involved; the manual 🔄 button covers that.
+  // Two separate triggers, covering two separate real setups — both force a
+  // real refetch even for the SAME project, since switching back is exactly
+  // the moment something (e.g. a manual swimlane upload) may have changed:
+  //   - onActivated: StagePay and Flow/ChatGPT are tabs in the SAME window —
+  //     switching tabs within one window doesn't change which window has OS
+  //     focus, so onFocusChanged wouldn't fire here.
+  //   - windows.onFocusChanged: the side panel's own window is a SEPARATE
+  //     top-level Chrome window from wherever StagePay's tab actually lives —
+  //     switching windows never changes which tab is active in either one,
+  //     so onActivated wouldn't fire here; only window-level focus does.
+  // Neither catches the panel sitting open right next to an already-active
+  // StagePay tab with no window/tab-switching involved — the manual 🔄
+  // button covers that.
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) refreshFromActiveTab();
   });
   chrome.tabs.onActivated.addListener(() => refreshFromActiveTab(true));
+  chrome.windows.onFocusChanged.addListener((windowId) => {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) return; // focus left Chrome entirely — nothing to refetch yet
+    refreshFromActiveTab(true);
+  });
   document.getElementById('refreshBtn').addEventListener('click', () => refreshFromActiveTab(true));
   await tryRestoreDownloadsFolder();
 }
