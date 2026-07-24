@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../lib/bindings';
+import { currentUserId, signSessionValue } from '../lib/bindings';
 
 const auth = new Hono<{ Bindings: Bindings }>();
 
@@ -57,12 +58,13 @@ auth.get('/google/callback', async (c) => {
     user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
   }
 
-  c.header('Set-Cookie', `session=${user!.id}; HttpOnly; Secure; SameSite=Lax; Path=/`);
+  const signedValue = await signSessionValue(user!.id as string, c.env.SESSION_SECRET);
+  c.header('Set-Cookie', `session=${signedValue}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`);
   return c.redirect(c.env.FRONTEND_ORIGIN);
 });
 
 auth.get('/me', async (c) => {
-  const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  const sessionUserId = await currentUserId(c);
   if (!sessionUserId) return c.json({ user: null });
   const user = await c.env.DB.prepare(
     `SELECT id, email, name, avatar_url, upi_id, showcase_slug, contact_link,
@@ -83,7 +85,7 @@ auth.get('/me', async (c) => {
 // edit their answers before you review them. Not allowed once 'approved' —
 // there's nothing left to apply for at that point.
 auth.post('/me/apply', async (c) => {
-  const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  const sessionUserId = await currentUserId(c);
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
 
   const user = await c.env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(sessionUserId).first<{ status: string }>();
@@ -139,7 +141,7 @@ const CONTACT_LINK_RE = /^https?:\/\//i;
 const UPI_ID_RE = /^[\w.-]{2,256}@[a-zA-Z]{2,64}$/;
 
 auth.patch('/me', async (c) => {
-  const sessionUserId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  const sessionUserId = await currentUserId(c);
   if (!sessionUserId) return c.json({ error: 'unauthenticated' }, 401);
   const body = await c.req
     .json<{ name?: string; upiId?: string; showcaseSlug?: string | null; contactLink?: string | null }>()

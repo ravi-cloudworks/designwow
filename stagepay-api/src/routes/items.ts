@@ -44,7 +44,7 @@ async function stageIsLocked(db: D1Database, projectId: string, stage: number): 
 }
 
 items.post('/projects/:projectId/items', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const projectId = c.req.param('projectId');
   if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
@@ -123,7 +123,7 @@ items.post('/projects/:projectId/items', async (c) => {
 });
 
 items.patch('/items/:id', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const item = await c.env.DB.prepare('SELECT project_id, stage FROM items WHERE id = ?').bind(id).first<{ project_id: string; stage: number }>();
@@ -155,7 +155,7 @@ items.patch('/items/:id', async (c) => {
 });
 
 items.delete('/items/:id', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const projectId = await itemProjectId(c.env.DB, id);
@@ -171,7 +171,7 @@ items.delete('/items/:id', async (c) => {
 // the frontend owns that schema (matches ugc-vip-6stage.html's per-card
 // field sets), this endpoint just stores whatever JSON object it's given.
 items.patch('/items/:id/version', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const itemId = c.req.param('id');
   const projectId = await itemProjectId(c.env.DB, itemId);

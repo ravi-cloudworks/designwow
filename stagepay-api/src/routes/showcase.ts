@@ -20,7 +20,7 @@ type MediaFileEntry = { key: string; fileName: string; kind: string };
 const SHOWCASE_MAX_ITEMS = 25;
 
 showcase.get('/showcase/candidates', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const { results: rows } = await c.env.DB.prepare(
@@ -56,7 +56,7 @@ showcase.get('/showcase/candidates', async (c) => {
 });
 
 showcase.get('/showcase', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const { results } = await c.env.DB.prepare(
     `SELECT id, file_name, mime_type, size_bytes, source_item_id, caption, thumbnail_r2_key, created_at
@@ -70,7 +70,7 @@ showcase.get('/showcase', async (c) => {
 
 showcase.post('/showcase', async (c) => {
   // Add from an existing eligible item (see the module comment above).
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const { sourceItemId, key, fileName, caption } = await c.req
     .json<{ sourceItemId?: string; key?: string; fileName?: string; caption?: string }>()
@@ -116,7 +116,7 @@ const SHOWCASE_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'video/mp4', 'video/q
 showcase.put('/showcase/upload/:filename', async (c) => {
   // Standalone promo upload — a demo reel, a personal intro — never tied to
   // an actual StagePay item, so there's no source item to verify against.
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM showcase_items WHERE user_id = ?').bind(userId).first<{ count: number }>();
@@ -150,7 +150,7 @@ const COVER_ACCEPT = ['image/png', 'image/jpeg'];
 // item gallery). Recommended 16:9 so it reads as roughly a quarter of a
 // phone screen on load and a normal hero-banner height on desktop.
 showcase.put('/showcase/cover', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const contentType = c.req.header('Content-Type') ?? '';
@@ -168,7 +168,7 @@ showcase.put('/showcase/cover', async (c) => {
 });
 
 showcase.delete('/showcase/cover', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const existing = await c.env.DB.prepare('SELECT showcase_cover_r2_key FROM users WHERE id = ?').bind(userId).first<{ showcase_cover_r2_key: string | null }>();
@@ -182,7 +182,7 @@ showcase.put('/showcase/:itemId/thumbnail', async (c) => {
   // A client-captured JPEG frame — mobile browsers often won't render a
   // <video preload="metadata"> frame reliably, so a stored image is the only
   // dependable preview. Always exclusively owned by this showcase item.
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const itemId = c.req.param('itemId');
 
@@ -202,7 +202,7 @@ showcase.put('/showcase/:itemId/thumbnail', async (c) => {
 });
 
 showcase.delete('/showcase/:itemId', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const itemId = c.req.param('itemId');
 

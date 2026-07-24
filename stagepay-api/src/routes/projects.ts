@@ -47,7 +47,7 @@ const REQUIRED_BRIEF_FIELDS = [
 const MAX_PROJECTS = 50;
 
 projects.post('/', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const countRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM projects WHERE user_id = ?').bind(userId).first<{ count: number }>();
   if ((countRow?.count ?? 0) >= MAX_PROJECTS) {
@@ -65,7 +65,7 @@ projects.post('/', async (c) => {
 });
 
 projects.get('/', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   // Correlated subquery so the list page can show "how much have I actually
   // been paid on this project" without a separate round trip per project.
@@ -125,7 +125,7 @@ projects.get('/', async (c) => {
 });
 
 projects.get('/:id', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const project = await c.env.DB.prepare('SELECT * FROM projects WHERE id = ?').bind(id).first<{ user_id: string }>();
@@ -177,7 +177,7 @@ projects.get('/:id', async (c) => {
 });
 
 projects.patch('/:id', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   type UpdateProjectBody = { name?: string };
@@ -209,7 +209,7 @@ projects.patch('/:id', async (c) => {
 // Both are cleaned up here, before the cascade deletes the rows this needs
 // to look them up by.
 projects.delete('/:id', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
 
@@ -250,7 +250,7 @@ projects.delete('/:id', async (c) => {
 });
 
 projects.patch('/:id/brief', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const owner = await c.env.DB.prepare('SELECT user_id FROM projects WHERE id = ?').bind(id).first<{ user_id: string }>();
@@ -323,7 +323,7 @@ projects.patch('/:id/brief', async (c) => {
 // so they're wiped rather than left silently inconsistent (see the "no
 // partial staleness tracking" call from earlier in this session).
 projects.post('/:id/unlock-brief', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const owner = await c.env.DB.prepare('SELECT user_id FROM projects WHERE id = ?').bind(id).first<{ user_id: string }>();
@@ -343,7 +343,7 @@ projects.post('/:id/unlock-brief', async (c) => {
 // Every stage's lock status at once — used to show "🔒 Validated" vs the
 // lock button per stage without one request per stage.
 projects.get('/:id/stage-locks', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const owner = await c.env.DB.prepare('SELECT user_id FROM projects WHERE id = ?').bind(id).first<{ user_id: string }>();
@@ -357,7 +357,7 @@ projects.get('/:id/stage-locks', async (c) => {
 });
 
 projects.post('/:id/stages/:stage/lock', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const stage = Number(c.req.param('stage'));
@@ -406,7 +406,7 @@ projects.post('/:id/stages/:stage/lock', async (c) => {
 // left silently stale. Stages before this one are untouched; they don't
 // depend on it.
 projects.post('/:id/stages/:stage/unlock', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const id = c.req.param('id');
   const stage = Number(c.req.param('stage'));

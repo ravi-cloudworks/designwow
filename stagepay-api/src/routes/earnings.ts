@@ -11,7 +11,7 @@ import { currentUserId } from '../lib/bindings';
 const earnings = new Hono<{ Bindings: Bindings }>();
 
 earnings.get('/earnings/summary', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const { results: entries } = await c.env.DB.prepare(
@@ -62,7 +62,7 @@ earnings.get('/earnings/summary', async (c) => {
 // once the target itself changes) — but stage prices, a durable business
 // fact about what this designer typically charges, are left untouched.
 earnings.put('/earnings/goal', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const body = await c.req.json<{ amountPaise?: number }>().catch(() => ({}) as { amountPaise?: number });
   if (!body.amountPaise || body.amountPaise <= 0) return c.json({ error: 'amount_required' }, 400);
@@ -81,7 +81,7 @@ earnings.put('/earnings/goal', async (c) => {
 // Explicit clear, distinct from "set a different amount" — goes all the way
 // back to no-goal-set, including the manual stage allocation built for it.
 earnings.delete('/earnings/goal', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   await c.env.DB.prepare("UPDATE users SET goal_amount_paise = 0, goal_set_at = NULL, stage_target_counts = '{}' WHERE id = ?")
     .bind(userId)
@@ -92,7 +92,7 @@ earnings.delete('/earnings/goal', async (c) => {
 // Durable — a designer's own typical price per stage doesn't reset when
 // they set a new goal, unlike stage_target_counts above.
 earnings.put('/earnings/stage-prices', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const body = await c.req.json<{ prices?: Record<string, number> }>().catch(() => ({}) as { prices?: Record<string, number> });
   if (!body.prices || typeof body.prices !== 'object') return c.json({ error: 'prices_required' }, 400);
@@ -103,7 +103,7 @@ earnings.put('/earnings/stage-prices', async (c) => {
 });
 
 earnings.put('/earnings/stage-counts', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const body = await c.req.json<{ counts?: Record<string, number> }>().catch(() => ({}) as { counts?: Record<string, number> });
   if (!body.counts || typeof body.counts !== 'object') return c.json({ error: 'counts_required' }, 400);

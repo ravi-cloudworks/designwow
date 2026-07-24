@@ -10,7 +10,7 @@ const config = new Hono<{ Bindings: Bindings }>();
 // Scene, and Movie (Character/Property/Background/Sound no longer have a
 // Setup form or Generate step — upload-only).
 config.get('/config/:stage', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const stage = Number(c.req.param('stage'));
   if (!Number.isInteger(stage)) return c.json({ error: 'invalid_stage' }, 400);

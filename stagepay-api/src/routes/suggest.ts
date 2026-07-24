@@ -209,7 +209,7 @@ function sanitizeAutoPopulateEntries(raw: unknown, secondaryKeys: string[]): Rec
 // and asks Gemini specifically to extract the auto-populate arrays from it,
 // callable any time, not tied to a generation.
 suggest.post('/auto-populate', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const body = await c.req.json<{ stage?: number; itemKey?: string; sourceText?: string; fields?: string[]; projectId?: string }>().catch(

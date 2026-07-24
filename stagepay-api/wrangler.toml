@@ -25,3 +25,4 @@ ADMIN_EMAIL = "ravi.cloudworks@gmail.com"
 # Secrets (set via `wrangler secret put`, not stored here):
 #   GEMINI_API_KEY
 #   GOOGLE_CLIENT_SECRET
+#   SESSION_SECRET (HMAC key for signing the session cookie — see bindings.ts)

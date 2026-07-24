@@ -12,7 +12,7 @@ const credits = new Hono<{ Bindings: Bindings }>();
 const CREDIT_PACKS: Record<number, number> = { 5: 24500, 10: 49000 };
 
 credits.get('/credits', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?')
@@ -36,7 +36,7 @@ credits.get('/credits', async (c) => {
 });
 
 credits.post('/credits/purchase-request', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
   const body = await c.req.json<{ packSize?: number; utr?: string }>().catch(() => ({}) as { packSize?: number; utr?: string });

@@ -8,7 +8,7 @@ import { currentUserId } from '../lib/bindings';
 const admin = new Hono<{ Bindings: Bindings }>();
 
 admin.use('*', async (c, next) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const user = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
   if (!user || user.email !== c.env.ADMIN_EMAIL) return c.json({ error: 'forbidden' }, 403);

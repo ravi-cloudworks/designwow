@@ -19,7 +19,7 @@ const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 // embeds the owning user id as its first segment, so the download route can
 // verify ownership without a separate metadata table.
 media.post('/media', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const projectId = c.req.query('projectId') || '';
   const fileName = c.req.query('fileName') || 'file';
@@ -39,7 +39,7 @@ media.post('/media', async (c) => {
 });
 
 media.get('/media/:key{.+}', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const key = c.req.param('key');
   if (!key.startsWith(`${userId}/`)) return c.json({ error: 'forbidden' }, 403);

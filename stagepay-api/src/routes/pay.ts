@@ -90,7 +90,7 @@ async function getOrCreateLink(db: D1Database, projectId: string): Promise<strin
 // amount set — covers both "show me the link to share" and "show me earned
 // so far per stage" in a single call.
 pay.get('/projects/:id/payment-link', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const projectId = c.req.param('id');
   if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
@@ -141,7 +141,7 @@ pay.get('/projects/:id/payment-link', async (c) => {
 // Set/update the amount for one stage. No "create" concept here — the link
 // itself already exists; this only ever touches that stage's row under it.
 pay.put('/projects/:id/payment-link/:stage', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const projectId = c.req.param('id');
   if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
@@ -214,7 +214,7 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
 // customer pays via UPI directly but never bothers clicking the public
 // page's own confirm button. Either side confirming marks it paid.
 pay.post('/projects/:id/payment-link/:stage/confirm-paid', async (c) => {
-  const userId = currentUserId(c);
+  const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
   const projectId = c.req.param('id');
   if (!(await projectBelongsToUser(c.env.DB, projectId, userId))) return c.json({ error: 'forbidden' }, 403);
