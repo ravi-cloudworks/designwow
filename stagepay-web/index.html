@@ -4078,17 +4078,17 @@ ${e.rawResponse || '—'}`;
   // are never translated — they're brand names, identical in every language.
   const LANDING_I18N = {
     en: {
-      headerTagline: 'Get paid every stage. Never work for free.', login: 'Login',
+      headerTagline: 'Get paid early, every stage. Never work for free.', login: 'Login',
       eyebrow: 'The Income Engine for UGC Creators',
-      heroH1: 'Get Paid Every Stage.<br>Never Work for Free.',
-      heroSub: 'The UGC production workflow that protects your time, your money, and your creative work — whether you generate it with AI or shoot it yourself. Start every project with confidence.',
+      heroH1: 'Get Paid Early. Every Stage.<br>Never Work for Free.',
+      heroSub: 'The UGC production workflow that protects your time, your money, and your creative work — whether you generate it with AI or shoot it yourself. Get paid in days, not months — start every project with confidence.',
       heroCta: 'Sign in with Google →',
       problemTitle: 'The Problem',
       problemLead: "Creating UGC videos — with AI, or filming it yourself — costs you real time before you ever see a rupee. Because clients disappear. Because revisions never end. Because you generate scenes that are never approved. Because you finish the entire project... ...and only then find out the client doesn't want it.",
       problemResultLabel: 'The result?',
       problemBullet1: '❌ Unpaid hours', problemBullet2: '❌ Wasted AI credits', problemBullet3: '❌ Endless revisions', problemBullet4: '❌ Scope creep', problemBullet5: '❌ Client ghosting',
       problemClosing: 'Every project becomes a gamble. StagePay changes the workflow.',
-      flowTitle: 'Instead of creating an entire video first...', flowSub: '...you build it one paid stage at a time.',
+      flowTitle: 'Instead of creating an entire video first...', flowSub: '...you build it one paid stage at a time — approved and paid in days, not months.',
       flowClientBrief: 'Client Brief', flowStoryboard: 'Storyboard', flowCustomerApproves: '↓ Customer approves ↓', flowYouGetPaid: 'You get paid',
       flowCharactersMusic: 'Characters &amp; Music', flowSceneBlueprint: 'Scene Blueprint', flowFinalMovie: 'Final Movie', flowYouGetPaidFinal: 'You get paid — project complete',
       flowNote: 'No approval. No payment. No generation.',
@@ -4135,6 +4135,9 @@ ${e.rawResponse || '—'}`;
       faqQ3_3: 'Isn’t ₹49 a lot to pay every time I charge my income?',
       faqA3_3: 'You only pay when you charge your income — whether it’s ₹1,000, ₹5,000, or ₹50,000, it’s just ₹49. No extra fees, no percentage of your income, no subscription.',
     },
+    /* hi/ta temporarily disabled while the English hero/flow copy is still
+       being iterated on (paid-early positioning) — re-enable once English
+       is final, updating these two translations to match at the same time.
     hi: {
       headerTagline: 'हर स्टेज पर पेमेंट पाएं। कभी मुफ़्त में काम न करें।', login: 'लॉगिन',
       eyebrow: 'UGC क्रिएटर्स के लिए इनकम इंजन',
@@ -4251,6 +4254,7 @@ ${e.rawResponse || '—'}`;
       faqQ3_3: 'ஒவ்வொரு முறையும் என் வருமானத்தை வசூலிக்கும்போது ₹49 அதிகமாக இல்லையா?',
       faqA3_3: 'நீங்கள் உங்கள் வருமானத்தை வசூலிக்கும்போது மட்டுமே பணம் செலுத்துகிறீர்கள் — அது ₹1,000 ஆனாலும், ₹5,000 ஆனாலும், அல்லது ₹50,000 ஆனாலும், அது வெறும் ₹49 தான். கூடுதல் கட்டணங்கள் இல்லை, உங்கள் வருமானத்தின் சதவீதம் இல்லை, சந்தா இல்லை.',
     },
+    */
   };
   // Positioned as "The Operating System for AI UGC Creators" — the product
   // grew well past a prompt-drafting tool (real payments, stage locks, per-
@@ -4270,8 +4274,10 @@ ${e.rawResponse || '—'}`;
           <div style="display:flex;align-items:center;gap:10px">
             <div class="landing-lang-switch">
               <button type="button" class="${lang === 'en' ? 'active' : ''}" data-landing-lang="en">EN</button>
+              <!-- हिं/த temporarily hidden alongside the disabled hi/ta translations above (see LANDING_I18N) — restore both together once English copy is final.
               <button type="button" class="${lang === 'hi' ? 'active' : ''}" data-landing-lang="hi">हिं</button>
               <button type="button" class="${lang === 'ta' ? 'active' : ''}" data-landing-lang="ta">த</button>
+              -->
             </div>
             <a class="btn btn-primary btn-sm" href="/api/auth/google" data-login-link>${t('login')}</a>
           </div>
@@ -4410,7 +4416,11 @@ ${e.rawResponse || '—'}`;
           <a class="landing-cta" href="/api/auth/google" data-login-link>${t('heroCta')}</a>
         </div>
 
-        <div class="landing-footer"><a href="/legal/terms">Terms &amp; Conditions</a> · <a href="/legal/privacy">Privacy Policy</a></div>
+        <div class="landing-section" style="padding-top:40px;padding-bottom:40px">
+          <p class="landing-lead">StagePay gets you paid early — in days, not months, stage by stage. If you're an AI-native UGC creator, StagePay Director (optional add-on) helps you generate premium, client-ready videos without wasting AI credits on bad prompts. <a href="/add-ons/director" style="color:var(--teal);font-weight:700">Explore Director →</a></p>
+        </div>
+
+        <div class="landing-footer"><a href="/legal/terms">Terms &amp; Conditions</a> · <a href="/legal/privacy">Privacy Policy</a> · <a href="/add-ons/director">Add-ons</a></div>
       </div>
       <div id="modalRoot"></div>`;
     renderFaqSectionInto();
@@ -4721,6 +4731,43 @@ ${e.rawResponse || '—'}`;
         <p>We may update this Privacy Policy from time to time, particularly during the beta period. We encourage you to review this page periodically. Continued use of the Service after a change constitutes acceptance of the updated Policy.</p>
 
         <div class="legal-page-nav"><a href="/legal/terms">Terms &amp; Conditions</a> · <a href="/">Back to StagePay</a></div>
+      </div></div>`;
+  }
+
+  // ---------- Add-ons (/add-ons/* — public, no login) ----------
+  // Deliberately separate from the main landing page's own narrative (get
+  // paid every stage) — this is a distinct pitch (efficient AI production)
+  // for a distinct, optional audience (AI creators only), so it gets its
+  // own page rather than diluting the core pitch. Only linked from the
+  // main landing footer, kept low-key on purpose.
+  function renderDirectorAddonPage() {
+    document.getElementById('app').innerHTML = `
+      <div class="legal-page-wrap"><div class="legal-page">
+        ${legalPageBrandHtml()}
+        <span class="landing-eyebrow" style="margin-bottom:14px">Add-on</span>
+        <h1>StagePay Director</h1>
+        <p class="legal-updated">AI Video Production Assistant for UGC Creators</p>
+        <p class="legal-intro">StagePay gets you paid early — in days, not months, stage by stage. Director is the optional add-on for when you also want to generate premium, client-ready videos without wasting AI credits on bad prompts. It's a Chrome extension that helps you produce the deliverable for any project stage where the content is generated with Google Flow or ChatGPT, instead of filmed.</p>
+
+        <h2>The problem</h2>
+        <p>Producing a UGC video ad with AI tools means writing prompts from scratch for every character, scene, and clip — and every bad or inconsistent generation burns real AI credits you've already paid for. Keeping a character's look consistent across a dozen scenes by hand is its own full-time job.</p>
+
+        <h2>What StagePay Director does</h2>
+        <ul>
+          <li><strong>Compiles ready-to-paste prompts</strong> from your project's Setup fields — no writing prompts from scratch for every character, scene, or clip.</li>
+          <li><strong>Locks reference images</strong> for every character, prop, and background, so continuity holds across the whole project.</li>
+          <li><strong>Organizes your Downloads automatically</strong> — connect a folder and pick up Flow's output with one click, no manual file-hunting.</li>
+          <li><strong>Sends the finished file straight back</strong> into StagePay as the deliverable for that stage.</li>
+        </ul>
+
+        <h2>Who it's for</h2>
+        <p>StagePay Director is entirely optional, and only relevant if you're producing with AI tools. Filmed-video creators don't need it at all — nothing else about StagePay changes. It's a separate, independent add-on for AI creators who want to accelerate premium AI-generated video production.</p>
+
+        <div style="text-align:center;margin:28px 0 8px">
+          <span style="display:inline-block;font-size:13px;font-weight:800;color:var(--moss);background:var(--moss-soft);border:1px solid var(--moss-line);border-radius:999px;padding:6px 16px">Coming soon to the Chrome Web Store</span>
+        </div>
+
+        <div class="legal-page-nav" style="text-align:center"><a href="/">Back to StagePay</a></div>
       </div></div>`;
   }
 
@@ -7418,6 +7465,7 @@ ${e.rawResponse || '—'}`;
     if (showcaseMatch) { await renderPublicShowcaseSwipePage(showcaseMatch[1]); return; }
     if (location.pathname === '/legal/terms') { renderTermsPage(); return; }
     if (location.pathname === '/legal/privacy') { renderPrivacyPage(); return; }
+    if (location.pathname === '/add-ons/director') { renderDirectorAddonPage(); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
     if (new URLSearchParams(location.search).get('screen') === 'admin') {

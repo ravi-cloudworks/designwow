@@ -1,4 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="26" fill="#14161b"/>
-  <text x="64" y="90" font-family="Helvetica, Arial, sans-serif" font-size="76" font-weight="800" fill="#eef1f2" text-anchor="middle">$</text>
+  <!-- clapperboard: board + hinged, striped clapper bar -->
+  <rect x="22" y="60" width="84" height="44" rx="6" fill="#eef1f2"/>
+  <g transform="rotate(-14 24 46)">
+    <rect x="16" y="32" width="96" height="24" rx="4" fill="#eef1f2"/>
+    <g fill="#14161b">
+      <polygon points="30,32 42,32 32,56 20,56"/>
+      <polygon points="56,32 68,32 58,56 46,56"/>
+      <polygon points="82,32 94,32 84,56 72,56"/>
+      <polygon points="104,32 112,32 106,56 98,56"/>
+    </g>
+  </g>
 </svg>
