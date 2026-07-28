@@ -145,7 +145,12 @@ async function init() {
 }
 
 async function refreshFromActiveTab(force) {
-  const projectId = await detectOpenProjectId();
+  const detected = await detectOpenProjectId();
+  if (detected && detected.conflict) {
+    await showProjectConflictWarning(detected.ids);
+    return;
+  }
+  const projectId = detected;
   if (!projectId) {
     statusEl.textContent = 'No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.';
     statusEl.className = 'status error';
@@ -162,11 +167,47 @@ async function refreshFromActiveTab(force) {
   render();
 }
 
+// Fires when two (or more) DIFFERENT projects are open across StagePay tabs
+// at once and this window's own active tab isn't StagePay itself, so there's
+// no unambiguous signal for which one this panel should show. Names the
+// conflicting projects (one extra /api/projects fetch, only paid in this
+// rare case) so the user knows exactly which tab to close, rather than a
+// generic "multiple projects" message.
+async function showProjectConflictWarning(ids) {
+  currentProjectId = null;
+  currentItems = [];
+  itemListEl.innerHTML = '';
+  landingIntroEl.hidden = false;
+  updateStageBanner();
+  let names = ids;
+  try {
+    const res = await fetch(`${API_BASE}/api/projects`, { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      const byId = {};
+      (data.projects || []).forEach((p) => { byId[p.id] = p.name; });
+      names = ids.map((id) => byId[id] || id);
+    }
+  } catch (e) { /* fine — falls back to raw ids below */ }
+  statusEl.textContent = `Multiple StagePay projects are open at once (${names.join(', ')}) — close all but one so Director knows which project to show.`;
+  statusEl.className = 'status warn';
+}
+
 // The web app already puts the open project's id in the URL as ?p=<id>
 // (added for its own refresh-persistence) — reading that is simpler and
 // more robust than trying to scrape the page for it. Prefers the tab that's
-// actually focused right now, since scanning "any StagePay tab" could
-// otherwise grab a different, unrelated project if more than one is open.
+// actually focused right now — if THIS window's active tab is itself a
+// StagePay project, that's unambiguous regardless of what other windows
+// have open, so it short-circuits below without even considering conflicts.
+// Only the fallback (this window's active tab isn't StagePay — e.g. it's on
+// Google Flow) scans across ALL windows, since a single login only ever has
+// one project open in the common case (StagePay in one window/monitor,
+// Flow in another) — restricting that scan to currentWindow would break
+// that entirely legitimate setup by finding nothing. The one real ambiguity
+// is when that scan turns up more than one DISTINCT project id — two
+// different projects open at once, anywhere — which is reported back as a
+// conflict instead of silently picking whichever tab happened to be found
+// first.
 async function detectOpenProjectId() {
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (activeTab && activeTab.url && activeTab.url.startsWith(API_BASE)) {
@@ -174,12 +215,14 @@ async function detectOpenProjectId() {
     if (p) return p;
   }
   const tabs = await chrome.tabs.query({ url: `${API_BASE}/*` });
+  const ids = [];
   for (const tab of tabs) {
     if (!tab.url) continue;
     const p = new URL(tab.url).searchParams.get('p');
-    if (p) return p;
+    if (p && !ids.includes(p)) ids.push(p);
   }
-  return null;
+  if (ids.length > 1) return { conflict: true, ids };
+  return ids[0] || null;
 }
 
 // Loads: (a) the project list, purely to read this one project's
