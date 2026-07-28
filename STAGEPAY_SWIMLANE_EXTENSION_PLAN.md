@@ -238,10 +238,37 @@ verified live, but the gallery/staging integration built on top of it has
 only been code-reviewed and syntax-checked (`node --check`), not
 click-tested end to end yet.
 
+**Addendum — reference-image coverage was incomplete (found after Chrome
+Web Store approval, fixed same session):** `mustAttachFiles()` only showed
+a partial, inconsistent set per item type (e.g. Character showed only the
+logo; Scene showed its featured refs + logo but no product photos or
+storyboard). Since the extension is meant to be self-sufficient — nobody
+should have to open StagePay itself just to check the brand's logo/product
+or the storyboard — every item type now also shows those as extra, clearly
+optional visual references. Deliberately NOT folded into
+`mustAttachFiles()` itself or into `compilePrompt()`'s "Reference images:
+..." text line: that text is only reliable because it only ever names
+files that are structurally required (a Scene's featured character/prop/
+background) and thus actually get attached in Flow. Promising an optional
+extra there risks a text/attachment mismatch that can make Flow render an
+inconsistent scene — wasted AI credits, exactly what this tool exists to
+prevent. Implemented as a separate `optionalExtraReferenceFiles(item)`,
+combined with the existing list only at the visual thumbnail-rendering call
+site (`loadMustAttach`), deduped by storage key. `mustAttachFiles()` itself
+is untouched, so `compilePrompt`/`buildChatGptMetaPrompt` behavior is
+unchanged. Note: `index.html`'s own copy of `mustAttachFiles` (used by the
+still-live swimlane Generate modal) was deliberately left as-is, not
+updated to match — that modal is going away in Phase 2 anyway, so chasing
+parity with it now isn't worth the risk of touching swimlane code.
+
 **Phase 2 — swimlane simplification (only after Phase 1 is built and
 tried on the beta user's own real project, so nobody loses the ability to
 produce a deliverable mid-transition):**
 
+0. Build the read-only "📄 View prompt" modal (see the now-resolved Open
+   Question above) — **before task 2 below**, so removing the Generate
+   modal's routes never creates a window where a locked stage's saved
+   prompt is briefly unreachable from anywhere.
 1. Remove the Generate/Upload mode toggle from `renderNumberedItemCard` and
    from Story's own card — every item type renders the plain upload-only
    view (`assetOnlyStep`-equivalent) unconditionally.
@@ -272,20 +299,20 @@ see will visibly change.
   creator, or should be reframed/skippable — raised earlier, not resolved,
   not blocking this plan (Scene stays a normal upload-only swimlane item
   either way).
-- **Where a saved prompt/Setup becomes visible once Phase 2 removes
-  Generate/Setup/prompt UI from the swimlane.** Today (pre-Phase 2), a
-  prompt saved via the extension is still visible in the swimlane's own
-  Generate modal, since both read/write the same `item_versions.prompt`/
-  `fields` columns. The extension itself only ever shows the *current*
-  stage's items — once a stage locks, its items drop out of the
-  extension's view entirely. So today there's still a fallback place to
-  check an old prompt (the swimlane's modal); after Phase 2 removes that
-  modal, a saved prompt for anything outside the current stage becomes
-  invisible in *both* places at once, even though it's still sitting in the
-  database. Needs a real answer before Phase 2 ships — e.g. some read-only
-  view of past prompts, reachable from either surface, for a stage that's
-  already locked. Explicitly deferred — revisit when Phase 2 actually
-  starts, not decided now.
+- ~~Where a saved prompt/Setup becomes visible once Phase 2 removes
+  Generate/Setup/prompt UI from the swimlane.~~ **Resolved:** a small
+  on-demand "📄 View prompt" button/link, shown only on items that actually
+  have a saved `prompt`, opening a plain read-only modal (prompt text +
+  Copy button, no Setup form, no Compile/Save/ChatGPT controls). Available
+  regardless of lock state — any item with a saved prompt gets it. Built as
+  a new, minimal, standalone renderer, not a stripped-down reuse of
+  `openGenerateModal`/`renderGenerateModal` (those stay defined-but-
+  unreachable per the "don't touch" list above). Justification for
+  read-only-text being sufficient: `compilePrompt()` already flattens every
+  Setup field into the final prompt text (confirmed by reading it) — no
+  structured-field view is needed alongside it. Not yet built — do this as
+  part of Phase 2's task list, before task 2 (removing the Generate modal
+  routes) ships, or locked-stage prompts become briefly unreachable.
 
 ## Future — not yet built
 

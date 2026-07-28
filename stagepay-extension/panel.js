@@ -355,6 +355,27 @@ function mustAttachFiles(item, fields) {
   return [];
 }
 
+// Storyboard + logo + product photos, shown as EXTRA optional visual
+// references on every item type (except Story itself, which IS the
+// storyboard) — so nobody has to leave the extension to check the brand's
+// look. Deliberately kept OUT of mustAttachFiles/compilePrompt's own
+// "Reference images: ..." text line: unlike a Scene's featured character/
+// prop/background (structurally required, reliably actually attached in
+// Flow), these are genuinely optional — the designer decides per item
+// whether to use them. Promising them in the compiled prompt text risks a
+// mismatch (text says a file is attached, designer didn't attach it in
+// Flow) that can render an inconsistent scene — wasted AI credits, exactly
+// what this tool exists to prevent. Visual-only, thumbnail row use only.
+function optionalExtraReferenceFiles(item) {
+  if (item.item_key === 'story') return [];
+  const b = currentBrief || {};
+  const story = currentItems.find((i) => i.stage === 2 && i.item_key === 'story');
+  const storyboardFiles = story ? (theVersion(story).media_files || []).map((f) => ({ ...f, icon: f.icon || '🖼️' })) : [];
+  const logoFiles = (b.logo_media && b.logo_media.key) ? [{ ...b.logo_media, icon: '🏷️' }] : [];
+  const productFiles = (b.product_photos || []).map((p) => ({ ...p, icon: '📷' }));
+  return [...storyboardFiles, ...logoFiles, ...productFiles];
+}
+
 // A compact one-line description of a Character/Property/Background/Sound
 // item, for a Scene to repeat as text alongside naming it — mirrors
 // index.html's describeItemForRef exactly: prefer the item's own stored
@@ -493,6 +514,10 @@ function render() {
     if (hasFlowPrompt(item)) loadMustAttach(item);
     wireItemCard(item);
   });
+  // Once per render, not per item — a global query, so wiring it inside the
+  // per-item loop above would double-attach listeners whenever more than
+  // one item happens to be expanded at once.
+  wireSeeAllButtons();
 }
 
 // ---------- downloads-folder gallery (File System Access API) ----------
@@ -773,6 +798,7 @@ function renderItemCard(item) {
       body: `
         ${(promptMode === 'custom' || !schema.length) ? modeToggleHtml : ''}
         <div class="must-attach-row" data-must-attach="${item.id}"></div>
+        <button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="must-attach">🔍 See all</button>
         ${promptMode === 'custom'
           ? `<p class="prompt-mode-note">Your own prompt/template — nothing here ever auto-changes it.</p>`
           : (schema.length ? `<p class="prompt-mode-note">Read-only — mirrors Setup above exactly. Switch to Custom to write or paste your own.</p>` : '')}
@@ -797,7 +823,7 @@ function renderItemCard(item) {
             return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${i}" title="${escapeHtml(t.name)}">${media}${videoBadge}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
           }).join('')}</div>`
         : `<p class="folder-gallery-empty">No recent images/videos found in that folder yet — click 🔄 after downloading something.</p>`;
-      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button></div>${galleryItems}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
+      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button></div>${galleryItems}${folderThumbnails.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="folder-gallery">🔍 See all</button>` : ''}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
     }
     if (folderPermissionState === 'needs-reconnect') {
       return `<div class="folder-gallery-head"><button type="button" data-reconnect-folder-btn>🔓 Reconnect "${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : 'downloads')}" folder</button></div>`;
@@ -813,6 +839,7 @@ function renderItemCard(item) {
       <div class="dropzone" data-dropzone="${item.id}">Or drag one or more files here, or click to choose manually</div>
       <input type="file" accept="${mediaAcceptFor(item.item_key)}" multiple style="display:none" data-file-input="${item.id}">
       <div class="staging-row" data-staging="${item.id}"></div>
+      ${staged.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="staging">🔍 See all</button>` : ''}
       <p class="staging-note" data-staging-note="${item.id}" ${stagingNotes[item.id] ? '' : 'hidden'}>${escapeHtml(stagingNotes[item.id] || '')}</p>
       <div class="row" data-staging-actions="${item.id}" ${staged.length ? '' : 'hidden'}>
         <button type="button" class="primary" data-send-staged-btn="${item.id}">⬆ Send ${staged.length} file(s) to StagePay</button>
@@ -824,7 +851,7 @@ function renderItemCard(item) {
     title: `${noun} Deliverable`,
     body: `
       <div class="thumb-row" data-thumbs="${item.id}"></div>
-      ${currentFiles.length ? '' : `<p class="deliverable-empty">Nothing sent yet — pick and send a file above.</p>`}`,
+      ${currentFiles.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="thumbs">🔍 See all</button>` : `<p class="deliverable-empty">Nothing sent yet — pick and send a file above.</p>`}`,
   });
 
   return steps.map((s, i) => `<div class="section-label">${i + 1}. ${s.title}</div>${s.body}`).join('');
@@ -872,7 +899,12 @@ async function loadMustAttach(item) {
   const row = document.querySelector(`[data-must-attach="${item.id}"]`);
   if (!row) return;
   const draft = draftFor(item);
-  const files = mustAttachFiles(item, draft.fields);
+  const required = mustAttachFiles(item, draft.fields);
+  // Extras appended after, deduped by storage key — the visual row is the
+  // only place these optional references show; compilePrompt/ChatGPT text
+  // generation still call mustAttachFiles directly and never see them.
+  const extras = optionalExtraReferenceFiles(item).filter((f) => !required.some((r) => r.key === f.key));
+  const files = [...required, ...extras];
   for (const f of files) {
     try {
       const mediaUrl = `${API_BASE}/api/media/${f.key}`;
@@ -905,6 +937,64 @@ async function loadMustAttach(item) {
       row.appendChild(wrap);
     } catch (e) { /* skip a file that failed to load */ }
   }
+}
+
+// "See all" reads whatever's already rendered in a given row rather than
+// tracking a separate list — every thumbnail here is a real <img>/<video>
+// with its src already set by the time a user could click the button, so
+// there's nothing to keep in sync, just read the DOM at click time.
+function collectRowMedia(row) {
+  if (!row) return [];
+  return Array.from(row.querySelectorAll('img, video')).map((el) => ({
+    url: el.src,
+    kind: el.tagName === 'VIDEO' ? 'video' : 'image',
+    title: el.title || '',
+  }));
+}
+
+// Bigger, on-demand view of a whole row at once — built specifically so
+// thumbnails (40-52px, several overlapping overlay buttons already) don't
+// also need a per-thumbnail enlarge icon crammed onto them. Videos open
+// paused with native controls, never autoplaying.
+function openMediaGalleryModal(title, items) {
+  const root = document.getElementById('galleryModalRoot');
+  if (!root || !items.length) return;
+  root.innerHTML = `<div class="gallery-modal-overlay" id="galleryModalOverlay">
+    <div class="gallery-modal-card">
+      <div class="gallery-modal-head"><strong>${escapeHtml(title)}</strong><button type="button" id="galleryModalCloseBtn">×</button></div>
+      <div class="gallery-modal-grid">
+        ${items.map((it) => it.kind === 'video'
+          ? `<video src="${it.url}" controls title="${escapeHtml(it.title)}"></video>`
+          : `<img src="${it.url}" title="${escapeHtml(it.title)}">`).join('')}
+      </div>
+    </div>
+  </div>`;
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('galleryModalCloseBtn').addEventListener('click', close);
+  document.getElementById('galleryModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'galleryModalOverlay') close(); });
+}
+
+const SEE_ALL_ROW_SELECTOR = {
+  'must-attach': (id) => `[data-must-attach="${id}"]`,
+  'thumbs': (id) => `[data-thumbs="${id}"]`,
+  'staging': (id) => `[data-staging="${id}"]`,
+  'folder-gallery': () => '.folder-gallery-row',
+};
+const SEE_ALL_TITLE = {
+  'must-attach': 'Reference images',
+  'thumbs': 'Deliverable',
+  'staging': 'Staged to send',
+  'folder-gallery': 'Downloads folder',
+};
+function wireSeeAllButtons() {
+  document.querySelectorAll('[data-see-all-btn]').forEach((btn) => btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-see-all-for');
+    const kind = btn.getAttribute('data-see-all-kind');
+    const row = document.querySelector(SEE_ALL_ROW_SELECTOR[kind](id));
+    const items = collectRowMedia(row);
+    if (!items.length) return;
+    openMediaGalleryModal(SEE_ALL_TITLE[kind], items);
+  }));
 }
 
 // Every uploaded file gets a wrap + remove button regardless of type — a
