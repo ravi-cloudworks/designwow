@@ -1488,6 +1488,47 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
   // auto-attach the right reference images), so this is a standalone, much
   // smaller modal instead of opening the full Setup form for fields that
   // would just be dead weight in this mode.
+  // Phase 2 prerequisite (STAGEPAY_SWIMLANE_EXTENSION_PLAN.md's "where does
+  // a saved prompt stay visible" open question): once the Generate modal's
+  // routes are removed from the swimlane, this becomes the only place left
+  // to check a saved prompt — for any item, locked or not, regardless of
+  // which stage it's in. Deliberately a small standalone read-only view,
+  // not a stripped-down reuse of openGenerateModal/renderGenerateModal —
+  // those stay defined-but-unreachable per the plan, not repurposed.
+  let viewPromptDraft = null;
+  function openViewPromptModal(item) {
+    viewPromptDraft = item;
+    renderViewPromptModal();
+  }
+  function closeViewPromptModal() {
+    viewPromptDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderViewPromptModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !viewPromptDraft) { if (root) root.innerHTML = ''; return; }
+    const item = viewPromptDraft;
+    const promptText = theVersion(item).prompt || '';
+    root.innerHTML = `
+      <div class="modal-overlay" id="viewPromptModalOverlay">
+        <div class="modal-card" style="max-width:520px">
+          <div class="modal-head"><strong>Prompt — ${esc(item.name || itemLabel(item.stage, item.item_key))}</strong><button class="modal-close" id="viewPromptModalCloseBtn">×</button></div>
+          <p class="modal-sub">Read-only — this is the saved prompt for this item.</p>
+          <textarea class="prompt-box" readonly style="min-height:220px">${esc(promptText)}</textarea>
+          <div class="modal-footer">
+            <button class="btn" id="viewPromptCopyBtn">📋 Copy</button>
+            <button class="btn btn-primary" id="viewPromptDoneBtn">Close</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('viewPromptModalCloseBtn').addEventListener('click', closeViewPromptModal);
+    document.getElementById('viewPromptModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'viewPromptModalOverlay') closeViewPromptModal(); });
+    document.getElementById('viewPromptDoneBtn').addEventListener('click', closeViewPromptModal);
+    document.getElementById('viewPromptCopyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(promptText).then(() => toast('Copied'));
+    });
+  }
   let sceneRefsDraft = null;
   function openSceneRefsModal(item) {
     const version = theVersion(item);
@@ -2115,21 +2156,20 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     const lock = stageLockFor(item.stage);
     const isLocked = !!(lock && lock.locked);
     const dis = isLocked ? 'disabled' : '';
-    // Upload already worked standalone (nothing required steps 1-3 first) —
-    // this toggle just makes that an explicit up-front choice instead of
-    // something you had to notice you were allowed to skip to.
-    // state.itemCardMode is only ever populated by a click this session — a
-    // fresh page load falls through to fields._uiMode, the persisted choice
-    // (see wireItemCard's toggle handler), so the toggle survives a reload.
-    const mode = state.itemCardMode[item.id] || (version.fields || {})._uiMode || 'generate';
-    // Character/Property/Background/Sound no longer generate anything via
-    // Flow — Gemini can't reliably infer visual specifics for an ambiguous
-    // character ("grandma", "a kid"), and designers already have their own
-    // reference libraries. These four types are upload-only: name + file,
-    // no mode toggle, no Setup, no Generate step at all. Final Video is the
-    // same for a different reason — it's stitched together externally from
-    // the approved per-scene clips, so there's nothing for Flow to generate.
-    const isUploadOnlyType = ['character', 'property', 'background', 'sound', 'final_video'].includes(item.item_key);
+    // Character/Property/Background/Sound: name + file only, nothing else —
+    // Gemini can't reliably infer visual specifics for an ambiguous character
+    // ("grandma", "a kid"), and designers already have their own reference
+    // libraries. Final Video is the same for a different reason — it's
+    // stitched together externally from the approved per-scene clips, so
+    // there's nothing for Flow to generate. Movie is the same shape too now
+    // (Phase 2 — Setup/Generate/Flow-prompting all moved to the StagePay
+    // Director extension, see STAGEPAY_SWIMLANE_EXTENSION_PLAN.md) — its old
+    // "Movie Details" button/modal route had nothing left to offer once
+    // Generate moved out, so it's grouped in here too. Scene is the one
+    // remaining exception (uploadOnlyStep, below) since "Featured in this
+    // scene" is a structural/continuity feature, not part of Generate, and
+    // stays in the swimlane permanently.
+    const isUploadOnlyType = ['character', 'property', 'background', 'sound', 'final_video', 'movie'].includes(item.item_key);
     // Exactly one file per item (every label in MEDIA_LABELS is singular —
     // "Character Reference", "Scene Video", never plural) — so no `multiple`,
     // and the upload button itself hides once a file exists rather than
@@ -2169,45 +2209,13 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
         </div>`;
     };
-    const generateSteps = `
-      <div class="story-step">
-        <span class="story-step-num">1</span>
-        <div class="story-step-body">
-          <div style="display:flex;gap:6px;align-items:center">
-            <button class="btn btn-sm btn-primary" data-open-generate="${item.id}" ${dis}>✨ Generate ${esc(itemLabel(item.stage, item.item_key))}</button>
-            <button type="button" class="icon-btn" data-copy-prompt="${item.id}" title="Copy prompt">📋</button>
-          </div>
-          <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">2</span>
-        <div class="story-step-body">
-          <button type="button" class="btn btn-sm${hasPrompt ? '' : ' btn-guard-disabled'}" data-download-item="${item.id}" data-requires-prompt="true" ${dis}>⬇ Download artifacts</button>
-          ${hasPrompt ? '' : `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to download yet.</p>`}
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">3</span>
-        <div class="story-step-body">
-          <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the ${esc(mediaLabel.toLowerCase())}.</p>
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">4</span>
-        <div class="story-step-body">${buildUploadWidget(true)}</div>
-      </div>`;
-    // Uploading your own image only skips the Flow-generation steps
-    // (prompt/download/paste-into-Flow) — the Setup details (gender/age/
-    // outfit etc.) still matter regardless of where the image came from,
-    // since Stage 4/5 pull from those fields (not the image) to describe
-    // this character/prop/background consistently in later scene prompts.
-    // Setup lives in the same modal as Generate — reused as-is here rather
-    // than duplicated, so nothing new crowds the swimlane card itself.
-    // A Scene skipping Flow generation has nothing to gain from the full
-    // Setup form (its content/shot fields only ever feed the compiled Flow
-    // prompt) — only "Featured in this scene" still matters here, so it
-    // gets its own small standalone modal instead (see openSceneRefsModal).
+    // Scene is the one type that still needs something above the plain
+    // upload widget: "Featured in this scene" is a structural/continuity
+    // decision (which approved character/prop/background belong to this
+    // scene), not a Generate/Setup concern, so it keeps its own small
+    // standalone modal permanently (see openSceneRefsModal) — everything
+    // else that used to live here (Setup form, Generate/Details button) is
+    // gone now that it's all handled in the StagePay Director extension.
     // Picking refs in the modal used to leave zero trace on this card — the
     // button/note text never changed, so there was no way to tell what (if
     // anything) was selected without reopening the modal. Show the picked
@@ -2219,13 +2227,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       <div class="story-step">
         <span class="story-step-num">1</span>
         <div class="story-step-body">
-          ${item.item_key === 'scene'
-            ? `<button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
-               ${sceneRefNames.length
-                 ? `<p class="story-step-note" style="margin-top:6px">Featured: ${sceneRefNames.map(esc).join(', ')}</p>`
-                 : `<p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`}`
-            : `<button class="btn btn-sm" data-open-generate="${item.id}" ${dis}>📋 ${esc(itemLabel(item.stage, item.item_key))} Details</button>
-               <p class="story-step-note" style="margin-top:6px">Fill in the details above so later scenes can describe this consistently.</p>`}
+          <button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
+          ${sceneRefNames.length
+            ? `<p class="story-step-note" style="margin-top:6px">Featured: ${sceneRefNames.map(esc).join(', ')}</p>`
+            : `<p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`}
         </div>
       </div>
       <div class="story-step">
@@ -2253,13 +2258,8 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <span class="chevron">›</span>
         </div>
         <div class="item-body">
-          ${isUploadOnlyType
-            ? assetOnlyStep
-            : `${hasFile ? '' : `<div class="item-mode-toggle">
-                <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${item.id}">✨ Generate</button>
-                <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${item.id}">📤 Upload my own</button>
-              </div>`}
-              ${mode === 'upload' ? uploadOnlyStep : generateSteps}`}
+          ${hasPrompt ? `<button type="button" class="btn btn-sm" data-view-prompt-btn="${item.id}" style="margin-bottom:8px">📄 View prompt</button>` : ''}
+          ${isUploadOnlyType ? assetOnlyStep : uploadOnlyStep}
         </div>
       </div>`;
   }
@@ -2295,19 +2295,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       renderTool();
     }));
     wireItemRename(item);
-    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
-      const mode = el.getAttribute('data-item-mode-btn');
-      state.itemCardMode[item.id] = mode;
-      const version = theVersion(item);
-      // Persisted to fields._uiMode (not just kept in memory) so the choice
-      // survives a reload — the backend replaces `fields` wholesale, so the
-      // existing fields have to be spread back in, not just this one key.
-      version.fields = { ...(version.fields || {}), _uiMode: mode };
-      renderTool();
-      await api.updateVersion(item.id, { fields: version.fields });
-    })));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
+    const viewPromptBtn = document.querySelector(`[data-view-prompt-btn="${item.id}"]`);
+    if (viewPromptBtn) viewPromptBtn.addEventListener('click', () => openViewPromptModal(item));
     const openSceneRefsBtn = document.querySelector(`[data-open-scene-refs="${item.id}"]`);
     if (openSceneRefsBtn) openSceneRefsBtn.addEventListener('click', () => openSceneRefsModal(item));
     const downloadItemBtn = document.querySelector(`[data-download-item="${item.id}"]`);
@@ -2359,11 +2350,10 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
           version.media_files = mediaFiles;
           const patch = { mediaFiles };
-          // Uploading your own file replaces what a Generate-flow prompt would
-          // have produced — that old prompt is now stale/unrelated, so clear
-          // it (Setup field values are left alone, in case of switching back).
-          const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
-          if (currentMode === 'upload' && version.prompt) {
+          // A fresh manual upload replaces whichever file (if any) a prompt
+          // saved via the extension was describing — that old prompt is now
+          // stale/unrelated to this new file, so clear it.
+          if (version.prompt) {
             version.prompt = '';
             patch.prompt = '';
           }
@@ -2374,6 +2364,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           toast(patch.prompt !== undefined ? 'Cleared the previous prompt — this item now uses your uploaded file directly.' : 'Saved');
         } finally {
           mutationsInFlight--;
+          stateGeneration++;
         }
       });
     }
@@ -2383,16 +2374,6 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       const mediaFiles = (version.media_files || []).filter((_, i) => i !== idx);
       version.media_files = mediaFiles;
       const patch = { mediaFiles };
-      // Deleting the LAST upload while in "Upload my own" mode releases the
-      // persisted choice — otherwise the item would stay stuck showing an
-      // empty upload-only view with no obvious way back to Generate.
-      const currentMode = state.itemCardMode[item.id] || (version.fields || {})._uiMode;
-      if (currentMode === 'upload' && !mediaFiles.length) {
-        delete state.itemCardMode[item.id];
-        const { _uiMode, ...restFields } = version.fields || {};
-        version.fields = restFields;
-        patch.fields = restFields;
-      }
       await api.updateVersion(item.id, patch);
       renderTool();
       toast('Saved');
@@ -2699,6 +2680,7 @@ ${e.rawResponse || '—'}`;
         toast('Saved');
       } finally {
         mutationsInFlight--;
+        stateGeneration++;
       }
     });
     const photosInput = document.getElementById('productPhotosInput');
@@ -2725,6 +2707,7 @@ ${e.rawResponse || '—'}`;
         toast('Saved');
       } finally {
         mutationsInFlight--;
+        stateGeneration++;
       }
     });
     document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', withMutationGuard(async () => {
@@ -2851,15 +2834,9 @@ ${e.rawResponse || '—'}`;
     const isLocked = !!(lock && lock.locked);
     const dis = isLocked ? 'disabled' : '';
     const amountEntry = state.paymentLinks.find(l => l.stage === 2) || null;
-    // Story's own Generate is already fully local/deterministic (no Gemini
-    // call), but a designer may still have made their storyboard externally
-    // (ChatGPT, hand-drawn, etc.) and just want to attach it — this mirrors
-    // Scene/Movie's Generate/Upload toggle so that's an explicit choice
-    // instead of a hidden shortcut buried in step 4 of a numbered list.
     // Story allows up to STORY_MAX_FILES storyboard images (unlike
     // single-file item types) — the upload button hides once that cap is
     // hit, same as every other item type hides once it has its one file.
-    const mode = state.itemCardMode[story.id] || (version.fields || {})._uiMode || 'generate';
     const atStoryFileCap = mediaFiles.length >= STORY_MAX_FILES;
     const uploadWidget = `
       <input type="file" accept="image/*" multiple style="display:none" data-media-upload-input="${story.id}" ${dis}>
@@ -2867,33 +2844,6 @@ ${e.rawResponse || '—'}`;
       <p class="story-step-note" style="margin-top:4px">Max ${STORY_MAX_FILES} storyboard images allowed. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
       <div class="attach-chip-row" style="margin-top:7px">
         ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${story.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
-      </div>`;
-    const generateStepsHtml = `
-      <div class="story-step">
-        <span class="story-step-num">1</span>
-        <div class="story-step-body">
-          <div style="display:flex;gap:6px;align-items:center">
-            <button class="btn btn-sm btn-primary" data-open-generate="${story.id}" ${dis}>✨ Generate Story</button>
-            <button type="button" class="icon-btn" data-copy-prompt="${story.id}" title="Copy prompt">📋</button>
-          </div>
-          <textarea class="prompt-box" readonly placeholder="Click Generate above...">${esc(version.prompt || '')}</textarea>
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">2</span>
-        <div class="story-step-body">
-          <button type="button" class="btn btn-sm" data-download-item="${story.id}" ${dis}>⬇ Download artifacts</button>
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">3</span>
-        <div class="story-step-body">
-          <p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p>
-        </div>
-      </div>
-      <div class="story-step">
-        <span class="story-step-num">4</span>
-        <div class="story-step-body">${uploadWidget}</div>
       </div>`;
     const uploadOnlyStepHtml = `
       <div class="story-step">
@@ -2903,7 +2853,7 @@ ${e.rawResponse || '—'}`;
           ${uploadWidget}
         </div>
       </div>`;
-    const nextStepStart = mode === 'upload' ? 2 : 5;
+    const nextStepStart = 2;
 
     return `<div class="item-row expanded story-card">
       <div class="item-row-head" style="cursor:default">
@@ -2913,11 +2863,8 @@ ${e.rawResponse || '—'}`;
           : `<span class="item-name">${esc(story.name || 'Story')}</span>${isLocked ? '' : `<button type="button" class="item-rename-btn" data-rename-btn="${story.id}" title="Rename">✏️</button>`}`}
       </div>
       <div class="item-body">
-        <div class="item-mode-toggle">
-          <button type="button" class="${mode === 'generate' ? 'active' : ''}" data-item-mode-btn="generate" data-item-id="${story.id}" ${dis}>✨ Generate</button>
-          <button type="button" class="${mode === 'upload' ? 'active' : ''}" data-item-mode-btn="upload" data-item-id="${story.id}" ${dis}>📤 Upload my own</button>
-        </div>
-        ${mode === 'upload' ? uploadOnlyStepHtml : generateStepsHtml}
+        ${(version.prompt && version.prompt.trim()) ? `<button type="button" class="btn btn-sm" data-view-prompt-btn="${story.id}" style="margin-bottom:8px">📄 View prompt</button>` : ''}
+        ${uploadOnlyStepHtml}
         <div class="story-step">
           <span class="story-step-num">${nextStepStart}</span>
           <div class="story-step-body">
@@ -2950,16 +2897,10 @@ ${e.rawResponse || '—'}`;
     const story = itemsFor(2, 'story')[0];
     if (!story) { wireStoryPlaceholderCard(); return; }
     wireItemRename(story);
-    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${story.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
-      const mode = el.getAttribute('data-item-mode-btn');
-      state.itemCardMode[story.id] = mode;
-      const version = theVersion(story);
-      version.fields = { ...(version.fields || {}), _uiMode: mode };
-      renderTool();
-      await api.updateVersion(story.id, { fields: version.fields });
-    })));
     const openGenBtn = document.querySelector(`[data-open-generate="${story.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(story));
+    const viewPromptBtn = document.querySelector(`[data-view-prompt-btn="${story.id}"]`);
+    if (viewPromptBtn) viewPromptBtn.addEventListener('click', () => openViewPromptModal(story));
     const copyBtn = document.querySelector(`[data-copy-prompt="${story.id}"]`);
     if (copyBtn) copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(theVersion(story).prompt || '').then(() => toast('Copied'));
@@ -2999,6 +2940,7 @@ ${e.rawResponse || '—'}`;
           toast('Saved');
         } finally {
           mutationsInFlight--;
+          stateGeneration++;
         }
       });
     }
@@ -6797,19 +6739,30 @@ ${e.rawResponse || '—'}`;
   async function refreshProjectData() {
     if (!state.project) return;
     const id = state.project.id;
+    // Captured before the fetch starts — compared after it resolves, below.
+    const generationAtStart = stateGeneration;
     const full = await api.getProject(id);
-    // Checked again here, not just by the caller before starting this fetch —
-    // a mutation (upload, delete, save, lock, etc.) can begin WHILE this
-    // await was in flight (confirmed live for uploads: a window-focus-
-    // triggered refresh started, then the file input's own change handler
-    // incremented the flag before this fetch resolved — the same shape
-    // applies to any other guarded mutation). Continuing past this point
-    // would replace state.items/brief with data fetched before that
-    // mutation's own write committed, detaching the object reference it's
-    // about to mutate — so its own renderTool() afterward would draw from
-    // stale state. Bailing out here is strictly safer than finishing with
-    // data that's already out of date.
-    if (mutationsInFlight > 0) return;
+    // Two checks, not one, catching two different orderings — a mutation
+    // (upload, delete, save, lock, etc.) can affect this refresh's outcome
+    // whether it's still running or has already finished:
+    //  - mutationsInFlight > 0: a mutation started WHILE this fetch was in
+    //    flight and hasn't settled yet (confirmed live for uploads: a
+    //    window-focus-triggered refresh started, then the file input's own
+    //    change handler incremented the flag before this fetch resolved).
+    //  - stateGeneration !== generationAtStart: a mutation started AND
+    //    fully finished (mutationsInFlight back to 0) while this fetch was
+    //    still in flight, if the fetch just took longer than the mutation's
+    //    whole round-trip — the first check alone misses this (confirmed
+    //    live: an upload's "Saved" toast fires immediately, but the file
+    //    doesn't visually appear until the next focus event triggers a
+    //    second, un-raced refresh — this fetch's response was already
+    //    stale by the time it arrived, silently reverting the upload).
+    // Either way, continuing past this point would replace state.items/
+    // brief with data fetched before that mutation's own write committed,
+    // detaching the object reference it's about to mutate — so its own
+    // renderTool() afterward would draw from stale state. Bailing out here
+    // is strictly safer than finishing with data that's already out of date.
+    if (mutationsInFlight > 0 || stateGeneration !== generationAtStart) return;
     state.project = full.project; state.brief = full.brief; state.items = full.items;
     const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
@@ -7571,19 +7524,36 @@ ${e.rawResponse || '—'}`;
   // refreshProjectData() had already started its fetch, the flag still 0 at
   // that moment, before the upload incremented it moments later — the exact
   // same shape later reproduced with delete's confirm() dialog instead of a
-  // file picker). The real guard is the second check inside
-  // refreshProjectData() itself, right before it touches state.items — this
-  // one just avoids starting a redundant new fetch while one's already known
-  // to be running. Any handler that mutates project/item state while on the
+  // file picker). Any handler that mutates project/item state while on the
   // tool screen should be wrapped with withMutationGuard below, not just
   // uploads and deletes — the same race is latent in all of them, just less
   // likely to be hit without a focus-stealing dialog in the middle.
+  //
+  // mutationsInFlight alone still isn't the full guard, though — confirmed
+  // live: a refresh's OWN request can start (mutationsInFlight still 0, per
+  // the focus-fires-before-change-handler quirk above), then a mutation
+  // starts+finishes entirely (increments AND decrements back to 0) WHILE
+  // that refresh's fetch is still in flight, if the refresh's request just
+  // happens to take longer than the mutation's whole round-trip. By the
+  // time the refresh's response arrives, mutationsInFlight reads 0 again —
+  // passing the in-flight check — but the response itself was fetched
+  // before the mutation committed, so applying it silently reverts the
+  // mutation (confirmed live: an upload's "Saved" toast fires immediately,
+  // but the file doesn't visually appear until the next focus/visibility
+  // event triggers a second, un-raced refresh). stateGeneration closes this:
+  // it bumps every time ANY guarded mutation settles, so a refresh can
+  // detect "something committed at any point during my own request," not
+  // just "something is committing right this instant."
   let mutationsInFlight = 0;
+  let stateGeneration = 0;
   // Wraps an event handler so mutationsInFlight is incremented before it
   // runs and decremented once it settles (success or failure) — a `finally`
   // guarantees the decrement even if the handler throws, so a failed
   // request can never leave the flag stuck >0 and refreshes permanently
-  // disabled for the rest of the session.
+  // disabled for the rest of the session. stateGeneration bumps in the same
+  // finally, unconditionally (success or failure) — a failed mutation didn't
+  // necessarily change nothing (e.g. partial writes), and the cost of an
+  // unnecessary bump is nothing worse than one skipped refresh.
   function withMutationGuard(handler) {
     return async (...args) => {
       mutationsInFlight++;
@@ -7591,6 +7561,7 @@ ${e.rawResponse || '—'}`;
         return await handler(...args);
       } finally {
         mutationsInFlight--;
+        stateGeneration++;
       }
     };
   }
