@@ -1524,7 +1524,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       sceneRefsDraft.refs = sceneRefsDraft.refs.includes(id) ? sceneRefsDraft.refs.filter(r => r !== id) : [...sceneRefsDraft.refs, id];
       renderSceneRefsModal();
     }));
-    document.getElementById('sceneRefsSaveBtn').addEventListener('click', async () => {
+    document.getElementById('sceneRefsSaveBtn').addEventListener('click', withMutationGuard(async () => {
       const { item: it, refs: selectedRefs } = sceneRefsDraft;
       const version = theVersion(it);
       version.fields = { ...(version.fields || {}), refs: selectedRefs };
@@ -1532,7 +1532,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       closeSceneRefsModal();
       renderTool();
       toast('Saved');
-    });
+    }));
   }
   function renderFieldsForm(item, fields) {
     const ic = itemConfigFor(item);
@@ -1740,7 +1740,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       genModalDraft.fields._chatgpt_snapshot = fieldsSignature(genModalDraft.fields);
       refreshGenModalFields();
     });
-    document.getElementById('genModalSaveBtn').addEventListener('click', async () => {
+    document.getElementById('genModalSaveBtn').addEventListener('click', withMutationGuard(async () => {
       const item = genModalDraft.item;
       const promptVal = trimBlankLines(document.getElementById('genModalPromptArea').value);
       // Generate mode has nothing to show downstream (Stage 4/5 references,
@@ -1764,7 +1764,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       closeGenerateModal();
       renderTool();
       toast('Saved');
-    });
+    }));
   }
 
   // ---------- Auto-populate confirmation (Story -> Visual & Music / Scene Blueprint) ----------
@@ -1869,7 +1869,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       const checkedCount = document.querySelectorAll('[data-ap-check]:checked').length;
       confirmBtn.textContent = `Create ${checkedCount} item${checkedCount === 1 ? '' : 's'}`;
     }));
-    confirmBtn.addEventListener('click', async () => {
+    confirmBtn.addEventListener('click', withMutationGuard(async () => {
       const { groups } = autoPopulateDraft;
       const cancelBtn = document.getElementById('apModalCancelBtn');
       const closeBtn = document.getElementById('apModalCloseBtn');
@@ -1930,7 +1930,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       state.items = full.items;
       renderTool();
       showAutoPopulateDoneScreen(toCreate.length);
-    });
+    }));
   }
   // A little empathy for what is genuinely painstaking manual work when done
   // by hand (naming, describing, and wiring up every character/prop/scene
@@ -2274,7 +2274,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     if (renameInput) {
       renameInput.focus(); renameInput.select();
       renameInput.addEventListener('click', (e) => e.stopPropagation());
-      const saveRename = async () => {
+      const saveRename = withMutationGuard(async () => {
         if (state.renamingItemId !== item.id) return;
         state.renamingItemId = null;
         const newName = renameInput.value.trim();
@@ -2283,7 +2283,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           await api.updateItem(item.id, { name: newName });
         }
         renderTool();
-      };
+      });
       renameInput.addEventListener('blur', saveRename);
       renameInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') renameInput.blur(); });
     }
@@ -2295,7 +2295,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       renderTool();
     }));
     wireItemRename(item);
-    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${item.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const mode = el.getAttribute('data-item-mode-btn');
       state.itemCardMode[item.id] = mode;
       const version = theVersion(item);
@@ -2305,7 +2305,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       version.fields = { ...(version.fields || {}), _uiMode: mode };
       renderTool();
       await api.updateVersion(item.id, { fields: version.fields });
-    }));
+    })));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
     const openSceneRefsBtn = document.querySelector(`[data-open-scene-refs="${item.id}"]`);
@@ -2350,7 +2350,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
         const file = files[0];
         if (!checkFileSize(file, maxUploadMb(item.item_key))) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
-        uploadsInFlight++;
+        mutationsInFlight++;
         try {
           const mediaFiles = [];
           const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
@@ -2373,11 +2373,11 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           renderTool();
           toast(patch.prompt !== undefined ? 'Cleared the previous prompt — this item now uses your uploaded file directly.' : 'Saved');
         } finally {
-          uploadsInFlight--;
+          mutationsInFlight--;
         }
       });
     }
-    document.querySelectorAll(`[data-remove-media="${item.id}"]`).forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll(`[data-remove-media="${item.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const idx = Number(el.getAttribute('data-index'));
       const version = theVersion(item);
       const mediaFiles = (version.media_files || []).filter((_, i) => i !== idx);
@@ -2396,15 +2396,15 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       await api.updateVersion(item.id, patch);
       renderTool();
       toast('Saved');
-    }));
+    })));
     const deleteBtn = document.querySelector(`[data-delete-item="${item.id}"]`);
-    if (deleteBtn) deleteBtn.addEventListener('click', async (e) => {
+    if (deleteBtn) deleteBtn.addEventListener('click', withMutationGuard(async (e) => {
       e.stopPropagation();
       if (!confirm(`Remove "${item.name}"?`)) return;
       await api.deleteItem(item.id);
       state.items = state.items.filter(i => i.id !== item.id && i.parent_item_id !== item.id);
       renderTool();
-    });
+    }));
   }
 
   // ---------- Debug console (Gemini request/response log, in-memory only) ----------
@@ -2637,7 +2637,7 @@ ${e.rawResponse || '—'}`;
       renderTool();
     }));
     const sampleSelect = document.getElementById('sampleBriefSelect');
-    if (sampleSelect) sampleSelect.addEventListener('change', async () => {
+    if (sampleSelect) sampleSelect.addEventListener('change', withMutationGuard(async () => {
       const key = sampleSelect.value;
       if (!key || !SAMPLE_BRIEFS[key]) return;
       const sample = SAMPLE_BRIEFS[key];
@@ -2648,8 +2648,8 @@ ${e.rawResponse || '—'}`;
       await api.updateBrief(state.project.id, patch);
       renderTool();
       toast('Sample data loaded — logo/product photos still need a real upload');
-    });
-    document.querySelectorAll('[data-brief-text]').forEach(el => el.addEventListener('change', async () => {
+    }));
+    document.querySelectorAll('[data-brief-text]').forEach(el => el.addEventListener('change', withMutationGuard(async () => {
       const key = el.getAttribute('data-brief-text');
       const val = key === 'duration' ? Number(el.value) : trimBlankLines(el.value);
       el.value = val;
@@ -2658,29 +2658,29 @@ ${e.rawResponse || '—'}`;
       await api.updateBrief(state.project.id, { [camel]: val });
       if (key === 'storyboard') renderTool();
       toast('Saved');
-    }));
+    })));
     const storyboardTemplateBtn = document.getElementById('storyboardTemplateBtn');
     if (storyboardTemplateBtn) storyboardTemplateBtn.addEventListener('click', () => {
       const prompt = buildStoryboardChatGptPrompt(state.brief);
       window.open(`https://chatgpt.com/?q=${encodeURIComponent(prompt)}`, '_blank', 'noopener');
       toast('Opened in ChatGPT with your brand details already filled in — copy the result back here');
     });
-    document.querySelectorAll('[data-brief-pick]').forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll('[data-brief-pick]').forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const key = el.getAttribute('data-brief-pick');
       state.brief[key] = el.getAttribute('data-value');
       const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
       await api.updateBrief(state.project.id, { [camel]: state.brief[key] });
       renderTool();
       toast('Saved');
-    }));
-    document.querySelectorAll('[data-brief-color], [data-brief-hex]').forEach(el => el.addEventListener('change', async () => {
+    })));
+    document.querySelectorAll('[data-brief-color], [data-brief-hex]').forEach(el => el.addEventListener('change', withMutationGuard(async () => {
       const key = el.getAttribute('data-brief-color') || el.getAttribute('data-brief-hex');
       state.brief[key] = el.value;
       const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
       await api.updateBrief(state.project.id, { [camel]: el.value });
       renderTool();
       toast('Saved');
-    }));
+    })));
     const logoInput = document.getElementById('logoFileInput');
     const chooseLogoBtn = document.getElementById('chooseLogoBtn');
     if (chooseLogoBtn) chooseLogoBtn.addEventListener('click', () => logoInput.click());
@@ -2689,7 +2689,7 @@ ${e.rawResponse || '—'}`;
       if (!file) return;
       if (!checkFileSize(file, DEFAULT_MEDIA_MAX_MB)) { logoInput.value = ''; return; }
       chooseLogoBtn.disabled = true; chooseLogoBtn.textContent = 'Uploading…';
-      uploadsInFlight++;
+      mutationsInFlight++;
       try {
         const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
         state.brief.logo_media = { key: uploaded.key, fileName: uploaded.fileName };
@@ -2698,7 +2698,7 @@ ${e.rawResponse || '—'}`;
         renderTool();
         toast('Saved');
       } finally {
-        uploadsInFlight--;
+        mutationsInFlight--;
       }
     });
     const photosInput = document.getElementById('productPhotosInput');
@@ -2710,7 +2710,7 @@ ${e.rawResponse || '—'}`;
       const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
       if (oversized) { photosInput.value = ''; return; }
       choosePhotosBtn.disabled = true; choosePhotosBtn.textContent = 'Uploading…';
-      uploadsInFlight++;
+      mutationsInFlight++;
       try {
         const photos = [...(state.brief.product_photos || [])];
         for (const file of files) {
@@ -2724,18 +2724,18 @@ ${e.rawResponse || '—'}`;
         renderTool();
         toast('Saved');
       } finally {
-        uploadsInFlight--;
+        mutationsInFlight--;
       }
     });
-    document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const i = Number(el.getAttribute('data-remove-photo'));
       state.brief.product_photos.splice(i, 1);
       await api.updateBrief(state.project.id, { productPhotos: state.brief.product_photos });
       renderTool();
       toast('Saved');
-    }));
+    })));
     const lockBtn = document.getElementById('lockBriefBtn');
-    if (lockBtn) lockBtn.addEventListener('click', async () => {
+    if (lockBtn) lockBtn.addEventListener('click', withMutationGuard(async () => {
       const missing = briefMissingFields();
       if (missing.length) { toast(`Fill in before locking: ${missing.join(', ')}`); return; }
       const res = await api.updateBrief(state.project.id, { lock: true });
@@ -2752,9 +2752,9 @@ ${e.rawResponse || '—'}`;
       }
       renderTool();
       toast('Brief locked — Story added in Stage 2, ready to Generate');
-    });
+    }));
     const unlockBtn = document.getElementById('unlockBriefBtn');
-    if (unlockBtn) unlockBtn.addEventListener('click', async () => {
+    if (unlockBtn) unlockBtn.addEventListener('click', withMutationGuard(async () => {
       if (!(await showUnlockWarningModal([2, 3, 4, 5]))) return;
       unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       await api.unlockBrief(state.project.id);
@@ -2763,7 +2763,7 @@ ${e.rawResponse || '—'}`;
       state.items = full.items;
       renderTool();
       toast('Unlocked — Stage 2-5 cleared');
-    });
+    }));
   }
 
   // Stage 3 (Characters/Properties/Backgrounds/Sounds — one shared budget,
@@ -2784,7 +2784,7 @@ ${e.rawResponse || '—'}`;
       : `Stage 4 already has the maximum of ${cap} scenes — remove one to add another.`;
   }
   function wireAddRepeatable(laneId) {
-    document.querySelectorAll(`#${laneId} [data-add-repeatable]`).forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll(`#${laneId} [data-add-repeatable]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const itemKey = el.getAttribute('data-add-repeatable');
       const stage = Number(el.getAttribute('data-stage'));
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before adding here`); return; }
@@ -2796,7 +2796,7 @@ ${e.rawResponse || '—'}`;
       const full = await api.getProject(state.project.id);
       state.items = full.items;
       renderTool();
-    }));
+    })));
   }
 
   // ---------- Lane 2: Story Board ----------
@@ -2950,14 +2950,14 @@ ${e.rawResponse || '—'}`;
     const story = itemsFor(2, 'story')[0];
     if (!story) { wireStoryPlaceholderCard(); return; }
     wireItemRename(story);
-    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${story.id}"]`).forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll(`[data-item-mode-btn][data-item-id="${story.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const mode = el.getAttribute('data-item-mode-btn');
       state.itemCardMode[story.id] = mode;
       const version = theVersion(story);
       version.fields = { ...(version.fields || {}), _uiMode: mode };
       renderTool();
       await api.updateVersion(story.id, { fields: version.fields });
-    }));
+    })));
     const openGenBtn = document.querySelector(`[data-open-generate="${story.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(story));
     const copyBtn = document.querySelector(`[data-copy-prompt="${story.id}"]`);
@@ -2983,7 +2983,7 @@ ${e.rawResponse || '—'}`;
         const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
         if (oversized) { uploadInput.value = ''; return; }
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
-        uploadsInFlight++;
+        mutationsInFlight++;
         try {
           for (const file of files) {
             const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
@@ -2998,11 +2998,11 @@ ${e.rawResponse || '—'}`;
           renderTool();
           toast('Saved');
         } finally {
-          uploadsInFlight--;
+          mutationsInFlight--;
         }
       });
     }
-    document.querySelectorAll(`[data-remove-media="${story.id}"]`).forEach(el => el.addEventListener('click', async () => {
+    document.querySelectorAll(`[data-remove-media="${story.id}"]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
       const idx = Number(el.getAttribute('data-index'));
       const version = theVersion(story);
       const mediaFiles = (version.media_files || []).filter((_, i) => i !== idx);
@@ -3010,7 +3010,7 @@ ${e.rawResponse || '—'}`;
       await api.updateVersion(story.id, { mediaFiles });
       renderTool();
       toast('Saved');
-    }));
+    })));
     const amountBtn = document.getElementById('storyAmountBtn');
     if (amountBtn) amountBtn.addEventListener('click', () => openStageAmountModal(2));
     const confirmPaidBtn = document.getElementById('storyConfirmPaidBtn');
@@ -3018,7 +3018,7 @@ ${e.rawResponse || '—'}`;
     // click here is before the customer has confirmed anything on their
     // own link — showConfirmPaymentReceivedModal makes that acknowledgment
     // explicit instead of an easy-to-miss "click again" toast.
-    if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
+    if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', withMutationGuard(async () => {
       if (!(await showConfirmPaymentReceivedModal())) return;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
       const res = await api.confirmPaid(state.project.id, 2);
@@ -3032,9 +3032,9 @@ ${e.rawResponse || '—'}`;
       } else {
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
-    });
+    }));
     const lockBtn = document.getElementById('storyLockBtn');
-    if (lockBtn) lockBtn.addEventListener('click', async () => {
+    if (lockBtn) lockBtn.addEventListener('click', withMutationGuard(async () => {
       const mediaFiles = theVersion(story).media_files || [];
       const amountEntry = state.paymentLinks.find(l => l.stage === 2) || null;
       const missing = [];
@@ -3054,9 +3054,9 @@ ${e.rawResponse || '—'}`;
         toast(body.message || 'Could not lock stage');
         lockBtn.disabled = false;
       }
-    });
+    }));
     const unlockBtn = document.getElementById('storyUnlockBtn');
-    if (unlockBtn) unlockBtn.addEventListener('click', async () => {
+    if (unlockBtn) unlockBtn.addEventListener('click', withMutationGuard(async () => {
       if (!(await showUnlockWarningModal([3, 4, 5]))) return;
       unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       const res = await api.unlockStage(state.project.id, 2);
@@ -3071,7 +3071,7 @@ ${e.rawResponse || '—'}`;
       } else {
         unlockBtn.disabled = false; unlockBtn.textContent = '🔓 Unlock to edit';
       }
-    });
+    }));
   }
 
   // ---------- Lane 3: Visual & Music ----------
@@ -3262,7 +3262,7 @@ ${e.rawResponse || '—'}`;
     // click here is, by definition, before the customer has confirmed
     // anything on their own public link — showConfirmPaymentReceivedModal
     // makes that acknowledgment explicit instead of an easy-to-miss toast.
-    if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', async () => {
+    if (confirmPaidBtn) confirmPaidBtn.addEventListener('click', withMutationGuard(async () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before confirming payment here`); return; }
       if (!(await showConfirmPaymentReceivedModal())) return;
       confirmPaidBtn.disabled = true; confirmPaidBtn.textContent = 'Saving…';
@@ -3277,9 +3277,9 @@ ${e.rawResponse || '—'}`;
       } else {
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
-    });
+    }));
     const lockBtn = document.querySelector(`#${laneId} [data-stage-lock-btn]`);
-    if (lockBtn) lockBtn.addEventListener('click', async () => {
+    if (lockBtn) lockBtn.addEventListener('click', withMutationGuard(async () => {
       if (!previousStageLocked(stage)) { toast(`Lock Stage ${stage - 1} first — paid and approved by the customer — before locking this stage`); return; }
       const stageItems = state.items.filter(i => i.stage === stage);
       const missing = [];
@@ -3335,9 +3335,9 @@ ${e.rawResponse || '—'}`;
         toast(body.message || 'Could not lock stage');
         lockBtn.disabled = false;
       }
-    });
+    }));
     const unlockBtn = document.querySelector(`#${laneId} [data-stage-unlock-btn]`);
-    if (unlockBtn) unlockBtn.addEventListener('click', async () => {
+    if (unlockBtn) unlockBtn.addEventListener('click', withMutationGuard(async () => {
       // Unlocking only ever deletes stages strictly AFTER this one (never
       // this stage itself) — so unlocking Stage 5 deletes nothing at all
       // (there's no Stage 6), and shouldn't warn as if it did.
@@ -3356,7 +3356,7 @@ ${e.rawResponse || '—'}`;
       } else {
         unlockBtn.disabled = false; unlockBtn.textContent = '🔓 Unlock to edit';
       }
-    });
+    }));
   }
 
   // ---------- Lane 4: Scene Blueprint (content + camera/shot fields merged) ----------
@@ -3383,7 +3383,7 @@ ${e.rawResponse || '—'}`;
     const scenes = itemsFor(4, 'scene');
     scenes.forEach(s => wireItemCard(s));
     const addBtn = document.getElementById('addSceneBtn');
-    if (addBtn) addBtn.addEventListener('click', async () => {
+    if (addBtn) addBtn.addEventListener('click', withMutationGuard(async () => {
       if (!previousStageLocked(4)) { toast('Lock Stage 3 first — paid and approved by the customer — before adding scenes'); return; }
       if (stageItemCapReached(4)) { toast(stageItemCapMessage(4)); return; }
       const name = prompt('Scene name?', `Scene ${scenes.length + 1}`);
@@ -3403,7 +3403,7 @@ ${e.rawResponse || '—'}`;
       const full = await api.getProject(state.project.id);
       state.items = full.items;
       renderTool();
-    });
+    }));
     wireStagePaymentCard('lane4', 4);
   }
 
@@ -3635,7 +3635,7 @@ ${e.rawResponse || '—'}`;
     document.getElementById('emptyItemsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'emptyItemsModalOverlay') closeEmptyItemsModal(); });
     document.getElementById('emptyItemsCancelBtn').addEventListener('click', closeEmptyItemsModal);
     const deleteBtn = document.getElementById('emptyItemsDeleteBtn');
-    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+    if (deleteBtn) deleteBtn.addEventListener('click', withMutationGuard(async () => {
       const { stage, deletable: toDelete, mandatory: stillMandatory, onProceed } = emptyItemsDraft;
       deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…';
       for (const it of toDelete) { await api.deleteItem(it.id); }
@@ -3645,7 +3645,7 @@ ${e.rawResponse || '—'}`;
       renderTool();
       toast(`Removed ${toDelete.length} empty item${toDelete.length === 1 ? '' : 's'}`);
       if (!stillMandatory.length) onProceed(stage);
-    });
+    }));
   }
   function openStageAmountModal(stage) {
     if (!stageHasDeliverable(stage)) {
@@ -3957,7 +3957,7 @@ ${e.rawResponse || '—'}`;
     if (state.renamingProject) {
       const input = document.getElementById('projectInfoNameInput');
       input.focus(); input.select();
-      const save = async () => {
+      const save = withMutationGuard(async () => {
         if (!state.renamingProject) return;
         state.renamingProject = false;
         const newName = input.value.trim();
@@ -3966,7 +3966,7 @@ ${e.rawResponse || '—'}`;
           await api.updateProject(state.project.id, { name: newName });
         }
         renderProjectInfoBar();
-      };
+      });
       input.addEventListener('blur', save);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
     } else {
@@ -6799,15 +6799,17 @@ ${e.rawResponse || '—'}`;
     const id = state.project.id;
     const full = await api.getProject(id);
     // Checked again here, not just by the caller before starting this fetch —
-    // an upload can begin WHILE this await was in flight (confirmed live: a
-    // window-focus-triggered refresh started, then the file input's own
-    // change handler incremented uploadsInFlight before this fetch resolved).
-    // Continuing past this point would replace state.items with data fetched
-    // before the upload's own api.updateVersion() committed, detaching the
-    // object reference the upload is about to mutate — so its own renderTool()
-    // afterward would draw from stale state. Bailing out here is strictly
-    // safer than finishing with data that's already out of date.
-    if (uploadsInFlight > 0) return;
+    // a mutation (upload, delete, save, lock, etc.) can begin WHILE this
+    // await was in flight (confirmed live for uploads: a window-focus-
+    // triggered refresh started, then the file input's own change handler
+    // incremented the flag before this fetch resolved — the same shape
+    // applies to any other guarded mutation). Continuing past this point
+    // would replace state.items/brief with data fetched before that
+    // mutation's own write committed, detaching the object reference it's
+    // about to mutate — so its own renderTool() afterward would draw from
+    // stale state. Bailing out here is strictly safer than finishing with
+    // data that's already out of date.
+    if (mutationsInFlight > 0) return;
     state.project = full.project; state.brief = full.brief; state.items = full.items;
     const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
@@ -7560,19 +7562,40 @@ ${e.rawResponse || '—'}`;
   // this tab's perspective in that layout — the manual Refresh button above
   // covers that case instead.
   //
-  // uploadsInFlight guards a real race this exposed: opening a native file
-  // picker (any upload button, anywhere) blurs then re-focuses the window —
-  // completely normal OS dialog behavior — and that focus can fire BEFORE
-  // the upload's own change handler has even started, so checking the flag
-  // only here isn't enough (confirmed live via logging: a focus-triggered
-  // refreshProjectData() had already started its fetch, uploadsInFlight
-  // still 0 at that moment, before the upload incremented it moments later).
-  // The real guard is the second check inside refreshProjectData() itself,
-  // right before it touches state.items — this one just avoids starting a
-  // redundant new fetch while one's already known to be running.
-  let uploadsInFlight = 0;
+  // mutationsInFlight guards a real race this exposed: opening a native file
+  // picker (any upload button, anywhere) OR a native confirm() dialog (e.g.
+  // deleting an item) blurs then re-focuses the window — completely normal
+  // OS dialog behavior — and that focus can fire BEFORE the mutation's own
+  // handler has even started, so checking the flag only here isn't enough
+  // (confirmed live via logging, originally for uploads: a focus-triggered
+  // refreshProjectData() had already started its fetch, the flag still 0 at
+  // that moment, before the upload incremented it moments later — the exact
+  // same shape later reproduced with delete's confirm() dialog instead of a
+  // file picker). The real guard is the second check inside
+  // refreshProjectData() itself, right before it touches state.items — this
+  // one just avoids starting a redundant new fetch while one's already known
+  // to be running. Any handler that mutates project/item state while on the
+  // tool screen should be wrapped with withMutationGuard below, not just
+  // uploads and deletes — the same race is latent in all of them, just less
+  // likely to be hit without a focus-stealing dialog in the middle.
+  let mutationsInFlight = 0;
+  // Wraps an event handler so mutationsInFlight is incremented before it
+  // runs and decremented once it settles (success or failure) — a `finally`
+  // guarantees the decrement even if the handler throws, so a failed
+  // request can never leave the flag stuck >0 and refreshes permanently
+  // disabled for the rest of the session.
+  function withMutationGuard(handler) {
+    return async (...args) => {
+      mutationsInFlight++;
+      try {
+        return await handler(...args);
+      } finally {
+        mutationsInFlight--;
+      }
+    };
+  }
   function refreshIfOnToolScreen() {
-    if (uploadsInFlight > 0) return;
+    if (mutationsInFlight > 0) return;
     if (state.screen === 'tool' && state.project) refreshProjectData();
   }
   document.addEventListener('visibilitychange', () => {
