@@ -235,12 +235,19 @@ projects.delete('/:id', async (c) => {
 
   // Every media file this project ever generated (item uploads, brief
   // logo/product photos) shares the same `${userId}/${projectId}/` key
-  // prefix — sweep and delete all of them.
+  // prefix — sweep and delete all of them. allSettled, not all: one R2
+  // hiccup on a single key shouldn't abort the whole delete (Promise.all
+  // would reject and leave the project itself undeleted too) — better to
+  // finish deleting the project and log exactly which key(s) didn't clean
+  // up than to block the user's delete entirely over one flaky object.
   let cursor: string | undefined;
   do {
     const listed = await c.env.MEDIA.list({ prefix: `${userId}/${id}/`, cursor });
     if (listed.objects.length) {
-      await Promise.all(listed.objects.map((o) => c.env.MEDIA.delete(o.key)));
+      const results = await Promise.allSettled(listed.objects.map((o) => c.env.MEDIA.delete(o.key)));
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') console.error('R2 delete failed for', listed.objects[i].key, r.reason);
+      });
     }
     cursor = listed.truncated ? listed.cursor : undefined;
   } while (cursor);
