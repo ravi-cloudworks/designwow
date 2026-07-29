@@ -1135,7 +1135,7 @@ function renderItemCard(item) {
       ${staged.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="staging">🔍 See all</button>` : ''}
       <p class="staging-note" data-staging-note="${item.id}" ${stagingNotes[item.id] ? '' : 'hidden'}>${escapeHtml(stagingNotes[item.id] || '')}</p>
       <div class="row" data-staging-actions="${item.id}" ${staged.length ? '' : 'hidden'}>
-        <button type="button" class="primary" data-send-staged-btn="${item.id}">⬆ Send ${staged.length} file(s) to StagePay</button>
+        <button type="button" class="primary" data-send-staged-btn="${item.id}">⬆ Send ${staged.length} ${escapeHtml(itemDisplayName(item))} file(s) to StagePay</button>
       </div>`,
   });
 
@@ -1663,7 +1663,13 @@ function updateStagingActions(itemId) {
   const btn = document.querySelector(`[data-send-staged-btn="${itemId}"]`);
   const count = (stagingFiles[itemId] || []).length;
   if (actionsEl) actionsEl.hidden = count === 0;
-  if (btn) btn.textContent = `⬆ Send ${count} file(s) to StagePay`;
+  // Names the item in the button itself (not just the section title above
+  // it) — confirmed as a real human-error risk with many similar items
+  // (e.g. 15 characters) open at once: StagePay is what actually reaches
+  // the customer, so the button you click to send should say exactly what
+  // it's about to send, not a generic count.
+  const item = itemById(itemId);
+  if (btn) btn.textContent = `⬆ Send ${count} ${item ? itemDisplayName(item) : ''} file(s) to StagePay`;
 }
 
 // Blob URLs created here are intentionally never revoked — a bounded,
@@ -1702,7 +1708,7 @@ async function sendStagedFiles(itemId) {
   const existingCount = (theVersion(item).media_files || []).length;
   const uploaded = [];
   for (let i = 0; i < files.length; i++) {
-    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = `Uploading ${i + 1}/${files.length}…`; }
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = `Uploading ${itemDisplayName(item)} ${i + 1}/${files.length}…`; }
     const file = files[i];
     try {
       const cleanName = cleanUploadFileName(item, file.name, existingCount + uploaded.length);
@@ -1715,11 +1721,11 @@ async function sendStagedFiles(itemId) {
       const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
       uploaded.push({ key: result.key, fileName: result.fileName || cleanName, kind });
     } catch (e) {
-      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = `Upload failed on file ${i + 1} — try again`; }
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = `Upload failed on ${itemDisplayName(item)} file ${i + 1} — try again`; }
       stagingFiles[itemId] = files.slice(i); // keep whatever didn't make it, so nothing's silently lost
       renderStaging(item);
       updateStagingActions(itemId);
-      openUploadErrorModal(`Upload failed on file ${i + 1} of ${files.length} ("${file.name}") — the rest weren't sent either. Try again.`);
+      openUploadErrorModal(`Upload failed on ${itemDisplayName(item)} file ${i + 1} of ${files.length} ("${file.name}") — the rest weren't sent either. Try again.`);
       return;
     }
   }
