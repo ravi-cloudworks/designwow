@@ -407,7 +407,11 @@ async function loadProject() {
     } catch (e) { /* fine — falls back to upload-only rendering below */ }
   }
 
-  setStatus('Connected', 'ok'); // project + stage now live once, in the stage banner below — no need to repeat it here
+  // Names the account explicitly rather than just "Connected" — with
+  // multiple StagePay accounts in play across different Chrome profiles
+  // (see the earlier multi-project conflict work), it's useful to see at a
+  // glance whose Director session this panel is actually running under.
+  setStatus(`Connected to ${currentUserEmail || 'your account'}`, 'ok'); // project + stage now live once, in the stage banner below — no need to repeat it here
   landingIntroEl.hidden = true;
   // The gallery is scoped to the CURRENT project's own subfolder (see
   // scanDownloadsFolder) — without this, switching to a different project
