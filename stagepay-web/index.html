@@ -977,8 +977,10 @@ Rules:
       const r = await fetch(`${API_BASE}/api/admin/waitlist`, { credentials: 'include' });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
     },
-    async adminApproveWaitlist(userId) {
-      const r = await fetch(`${API_BASE}/api/admin/waitlist/${userId}/approve`, { method: 'POST', credentials: 'include' });
+    async adminApproveWaitlist(userId, grant) {
+      const r = await fetch(`${API_BASE}/api/admin/waitlist/${userId}/approve`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(grant || {}),
+      });
       return r.ok;
     },
     async adminListCreditRequests() {
@@ -1005,7 +1007,7 @@ Rules:
     },
     async adminSuspendUser(userId) {
       const r = await fetch(`${API_BASE}/api/admin/users/${userId}/suspend`, { method: 'POST', credentials: 'include' });
-      return r.ok;
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
     },
     async adminUnsuspendUser(userId) {
       const r = await fetch(`${API_BASE}/api/admin/users/${userId}/unsuspend`, { method: 'POST', credentials: 'include' });
@@ -4986,6 +4988,7 @@ ${e.rawResponse || '—'}`;
   // ---------- Admin queue (?screen=admin) ----------
   let adminTab = 'waitlist';
   let adminData = { applicants: [], creditRequests: [], users: [] };
+  let adminUserSearch = '';
   async function renderAdminScreen() {
     const app = document.getElementById('app');
     app.style.cssText = '';
@@ -5013,9 +5016,85 @@ ${e.rawResponse || '—'}`;
           <button data-admin-tab="users" class="${adminTab === 'users' ? 'active' : ''}">Users (${adminData.users.length})</button>
         </div>
         ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : adminTab === 'credits' ? renderAdminCreditsTab() : renderAdminUsersTab()}
-      </div>`;
+      </div>
+      <div id="modalRoot"></div>`;
     renderTopbar();
     wireAdminScreen();
+  }
+  // ---------- Approve Waitlist modal ----------
+  // Lets an approval set entitlements right there instead of a separate
+  // follow-up visit to the Users tab: whether to grant the Director addon
+  // now, how many income credits (10/15/25 quick-picks, 10 is the
+  // longstanding default), and one shared access-expiry date (14 days/1
+  // month/3 months quick-picks, blank = no limit) applied to StagePay and,
+  // if Director is checked, Director too — both can still be split apart
+  // independently later from the Users tab.
+  let approveWaitlistDraft = null; // { applicant, freeCredits, hasDirectorAccess, accessUntil }
+  function openApproveWaitlistModal(applicant) {
+    approveWaitlistDraft = { applicant, freeCredits: 10, hasDirectorAccess: false, accessUntil: '' };
+    renderApproveWaitlistModal();
+  }
+  function closeApproveWaitlistModal() {
+    approveWaitlistDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderApproveWaitlistModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !approveWaitlistDraft) { if (root) root.innerHTML = ''; return; }
+    const { applicant, freeCredits, hasDirectorAccess, accessUntil } = approveWaitlistDraft;
+    root.innerHTML = `
+      <div class="modal-overlay" id="approveWaitlistOverlay">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-head"><strong>✅ Approve ${esc(applicant.name)}</strong><button class="modal-close" id="approveWaitlistCloseBtn">×</button></div>
+          <div style="padding:16px">
+            <div class="field">
+              <label><input type="checkbox" id="approveDirectorToggle" ${hasDirectorAccess ? 'checked' : ''}> Include Director addon access</label>
+            </div>
+            <div class="field">
+              <label for="approveCreditsInput">Income credits to grant</label>
+              <div class="pill-row" style="margin-bottom:8px">
+                ${[10, 15, 25].map((n) => `<button type="button" class="pill ${freeCredits === n ? 'selected' : ''}" data-credits-pill="${n}">${n}</button>`).join('')}
+              </div>
+              <input id="approveCreditsInput" type="number" min="1" value="${freeCredits}">
+            </div>
+            <div class="field">
+              <label for="approveAccessUntilInput">Access expires (blank = no limit)</label>
+              <div class="pill-row" style="margin-bottom:8px">
+                <button type="button" class="pill" data-expiry-pill="14">14 days</button>
+                <button type="button" class="pill" data-expiry-pill="30">1 month</button>
+                <button type="button" class="pill" data-expiry-pill="90">3 months</button>
+              </div>
+              <input id="approveAccessUntilInput" type="date" value="${esc(accessUntil)}">
+            </div>
+            <button class="btn btn-primary" id="approveWaitlistSubmitBtn" style="width:100%;margin-top:6px">Approve</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('approveWaitlistCloseBtn').addEventListener('click', closeApproveWaitlistModal);
+    document.getElementById('approveWaitlistOverlay').addEventListener('click', (e) => { if (e.target.id === 'approveWaitlistOverlay') closeApproveWaitlistModal(); });
+    document.querySelectorAll('[data-credits-pill]').forEach((el) => el.addEventListener('click', () => {
+      document.getElementById('approveCreditsInput').value = el.getAttribute('data-credits-pill');
+    }));
+    document.querySelectorAll('[data-expiry-pill]').forEach((el) => el.addEventListener('click', () => {
+      const days = Number(el.getAttribute('data-expiry-pill'));
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      document.getElementById('approveAccessUntilInput').value = d.toISOString().slice(0, 10);
+    }));
+    document.getElementById('approveWaitlistSubmitBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('approveWaitlistSubmitBtn');
+      const freeCreditsVal = Math.max(1, Math.round(Number(document.getElementById('approveCreditsInput').value) || 10));
+      const hasDirectorAccessVal = document.getElementById('approveDirectorToggle').checked;
+      const accessUntilVal = document.getElementById('approveAccessUntilInput').value || null;
+      btn.disabled = true; btn.textContent = 'Approving…';
+      const ok = await api.adminApproveWaitlist(applicant.id, { freeCredits: freeCreditsVal, hasDirectorAccess: hasDirectorAccessVal, accessUntil: accessUntilVal });
+      if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
+      adminData.applicants = adminData.applicants.filter((x) => x.id !== applicant.id);
+      closeApproveWaitlistModal();
+      toast(`Approved — ${freeCreditsVal} income credits granted${hasDirectorAccessVal ? ' + Director access' : ''}`);
+      renderAdminScreenInto();
+    });
   }
   function renderAdminWaitlistTab() {
     if (!adminData.applicants.length) return '<p class="empty-note">No pending applications.</p>';
@@ -5053,9 +5132,24 @@ ${e.rawResponse || '—'}`;
   // already-live payment link keeps working) — Suspend is the separate,
   // blunter kill switch for misuse (blocks the account's own dashboard/API
   // immediately, and pauses showcase/payment link even if already live).
+  function adminFilteredUsers() {
+    const q = adminUserSearch.trim().toLowerCase();
+    if (!q) return adminData.users;
+    return adminData.users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }
+  // The search input lives OUTSIDE the rows container deliberately — typing
+  // only re-renders #adminUsersListContainer (see wireAdminScreen's `input`
+  // listener below), not the whole tab, so the input itself is never
+  // recreated and never loses focus/cursor position mid-keystroke.
   function renderAdminUsersTab() {
+    return `
+      <input type="text" id="adminUserSearchInput" placeholder="Search by name or email…" value="${esc(adminUserSearch)}" style="width:100%;margin-bottom:10px">
+      <div id="adminUsersListContainer">${renderAdminUsersRows(adminFilteredUsers())}</div>`;
+  }
+  function renderAdminUsersRows(users) {
     if (!adminData.users.length) return '<p class="empty-note">No approved users yet.</p>';
-    return adminData.users.map((u) => `
+    if (!users.length) return '<p class="empty-note">No users match that search.</p>';
+    return users.map((u) => `
       <div class="admin-row" data-admin-user-row="${u.id}">
         <div class="admin-row-head">
           <strong>${esc(u.name)}</strong> <span style="color:var(--text-faint);font-size:11.5px">(${esc(u.email)})</span>
@@ -5078,14 +5172,10 @@ ${e.rawResponse || '—'}`;
       adminTab = btn.getAttribute('data-admin-tab');
       renderAdminScreenInto();
     }));
-    document.querySelectorAll('[data-admin-approve-waitlist]').forEach((btn) => btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-admin-approve-waitlist]').forEach((btn) => btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-admin-approve-waitlist');
-      btn.disabled = true; btn.textContent = 'Approving…';
-      const ok = await api.adminApproveWaitlist(id);
-      if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
-      adminData.applicants = adminData.applicants.filter((a) => a.id !== id);
-      toast('Approved — 10 income credits granted');
-      renderAdminScreenInto();
+      const applicant = adminData.applicants.find((a) => a.id === id);
+      if (applicant) openApproveWaitlistModal(applicant);
     }));
     document.querySelectorAll('[data-admin-approve-credit]').forEach((btn) => btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-admin-approve-credit');
@@ -5106,6 +5196,20 @@ ${e.rawResponse || '—'}`;
       toast('Request rejected');
       renderAdminScreenInto();
     }));
+    wireAdminUsersRows();
+    const searchInput = document.getElementById('adminUserSearchInput');
+    if (searchInput) {
+      // Only re-renders #adminUsersListContainer, not the whole screen — a
+      // full renderAdminScreenInto() here would recreate this very input on
+      // every keystroke, resetting focus and cursor position each time.
+      searchInput.addEventListener('input', () => {
+        adminUserSearch = searchInput.value;
+        document.getElementById('adminUsersListContainer').innerHTML = renderAdminUsersRows(adminFilteredUsers());
+        wireAdminUsersRows();
+      });
+    }
+  }
+  function wireAdminUsersRows() {
     document.querySelectorAll('[data-admin-save-entitlements]').forEach((btn) => btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-admin-save-entitlements');
       const row = document.querySelector(`[data-admin-user-row="${id}"]`);
@@ -5125,8 +5229,8 @@ ${e.rawResponse || '—'}`;
       const u = adminData.users.find((x) => x.id === id);
       if (!confirm(`Suspend ${u ? u.name : 'this user'}? This immediately blocks their dashboard access and pauses their showcase/payment link, even ones already live.`)) return;
       btn.disabled = true; btn.textContent = 'Suspending…';
-      const ok = await api.adminSuspendUser(id);
-      if (!ok) { toast('Could not suspend', true); btn.disabled = false; btn.textContent = 'Suspend'; return; }
+      const { ok, body } = await api.adminSuspendUser(id);
+      if (!ok) { toast(body && body.error === 'cannot_suspend_admin' ? "Can't suspend the admin account" : 'Could not suspend', true); btn.disabled = false; btn.textContent = 'Suspend'; return; }
       if (u) u.suspended = 1;
       toast('User suspended');
       renderAdminScreenInto();

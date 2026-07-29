@@ -23,13 +23,27 @@ admin.get('/admin/waitlist', async (c) => {
   return c.json({ applicants: results });
 });
 
+// Same three entitlement fields as POST /admin/users/:userId/entitlements,
+// set at the moment of approval instead of needing a separate follow-up
+// visit to the Users tab. accessUntil is one shared date applied to
+// BOTH stagepay_access_until and (only if hasDirectorAccess)
+// director_access_until — the admin UI can still split them apart
+// independently afterward from the Users tab if needed.
 admin.post('/admin/waitlist/:userId/approve', async (c) => {
   const userId = c.req.param('userId');
+  const body = await c.req
+    .json<{ freeCredits?: number; hasDirectorAccess?: boolean; accessUntil?: string | null }>()
+    .catch(() => ({}) as { freeCredits?: number; hasDirectorAccess?: boolean; accessUntil?: string | null });
+  const freeCredits = Number.isFinite(body.freeCredits) && (body.freeCredits as number) > 0 ? Math.floor(body.freeCredits as number) : 10;
+  const hasDirectorAccess = body.hasDirectorAccess ? 1 : 0;
+  const accessUntil = body.accessUntil || null;
   const result = await c.env.DB.prepare(
-    `UPDATE users SET status = 'approved', free_credits_remaining = 10, approved_at = datetime('now')
+    `UPDATE users
+     SET status = 'approved', free_credits_remaining = ?, has_director_access = ?,
+         stagepay_access_until = ?, director_access_until = ?, approved_at = datetime('now')
      WHERE id = ? AND status = 'waitlisted'`
   )
-    .bind(userId)
+    .bind(freeCredits, hasDirectorAccess, accessUntil, hasDirectorAccess ? accessUntil : null, userId)
     .run();
   if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });
@@ -117,6 +131,14 @@ admin.post('/admin/users/:userId/suspend', async (c) => {
   // offering it by mistake.
   const callerId = await currentUserId(c);
   if (userId === callerId) return c.json({ error: 'cannot_suspend_self' }, 400);
+  // Belt-and-suspenders on top of the id check above: refuses by email
+  // against the CURRENT ADMIN_EMAIL binding, not just "is this the caller's
+  // own id" — still correct if ADMIN_EMAIL is ever rotated to a different
+  // account, and correct even if this route is ever reachable some other
+  // way in the future (a second admin, a script, etc.) that isn't just "the
+  // logged-in admin clicking their own row."
+  const target = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
+  if (target && target.email === c.env.ADMIN_EMAIL) return c.json({ error: 'cannot_suspend_admin' }, 400);
   const result = await c.env.DB.prepare("UPDATE users SET suspended = 1 WHERE id = ? AND status = 'approved'").bind(userId).run();
   if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });
