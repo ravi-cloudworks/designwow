@@ -1017,6 +1017,29 @@ function openMediaGalleryModal(title, items) {
   document.getElementById('galleryModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'galleryModalOverlay') close(); });
 }
 
+// addToStaging()'s validation messages also land in the small inline
+// staging-note text, but that's easy to blow past when rapid-clicking to
+// get files uploaded — confirmed live: users kept re-clicking "Send" without
+// noticing why nothing happened. This blocks on the same message instead of
+// just quietly printing it, then leaves the inline note in place underneath
+// (still rendered from stagingNotes as before) as a persistent reminder once
+// the modal's dismissed, in case the user forgets what it said.
+function openUploadErrorModal(message) {
+  const root = document.getElementById('uploadErrorModalRoot');
+  if (!root) return;
+  root.innerHTML = `<div class="gallery-modal-overlay" id="uploadErrorModalOverlay">
+    <div class="gallery-modal-card upload-error-modal-card">
+      <div class="gallery-modal-head"><strong>⚠ Couldn't add file(s)</strong><button type="button" id="uploadErrorModalCloseBtn">×</button></div>
+      <p class="upload-error-modal-body">${escapeHtml(message)}</p>
+      <button type="button" class="upload-error-modal-ok" id="uploadErrorModalOkBtn">OK</button>
+    </div>
+  </div>`;
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('uploadErrorModalCloseBtn').addEventListener('click', close);
+  document.getElementById('uploadErrorModalOkBtn').addEventListener('click', close);
+  document.getElementById('uploadErrorModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'uploadErrorModalOverlay') close(); });
+}
+
 const SEE_ALL_ROW_SELECTOR = {
   'must-attach': (id) => `[data-must-attach="${id}"]`,
   'thumbs': (id) => `[data-thumbs="${id}"]`,
@@ -1376,6 +1399,7 @@ function addToStaging(itemId, files) {
   }
   stagingNotes[itemId] = notes.length ? notes.join(' ') : null;
   render(); // full re-render — not just the staging row — so a gallery thumbnail's tick mark (and this note) stay in sync with actual state, not a one-off DOM mutation render() would immediately overwrite
+  if (notes.length) openUploadErrorModal(notes.join(' '));
 }
 
 function updateStagingActions(itemId) {

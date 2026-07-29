@@ -167,6 +167,11 @@ header strong { font-size: 14px; }
 .gallery-modal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 420px; }
 .gallery-modal-grid img, .gallery-modal-grid video { width: 100%; border-radius: 8px; border: 1px solid #dbdfe2; background: #14161b; display: block; }
 
+.upload-error-modal-card { max-width: 300px; }
+.upload-error-modal-card .gallery-modal-head strong { color: #b23a37; }
+.upload-error-modal-body { font-size: 12.5px; line-height: 1.5; color: #14161b; margin: 0 0 14px; }
+.upload-error-modal-card button.upload-error-modal-ok { width: 100%; border: none; background: #176b5e; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+
 .last-copied { padding: 10px; background: #fbeedb; border-top: 1px solid #eccd9a; border-bottom: 1px solid #eccd9a; }
 .last-copied h2 { font-size: 12px; margin: 0 0 2px; color: #a05f10; }
 .last-copied .hint { font-size: 11px; color: #a05f10; margin: 0 0 8px; }
