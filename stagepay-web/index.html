@@ -993,6 +993,24 @@ Rules:
       const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/reject`, { method: 'POST', credentials: 'include' });
       return r.ok;
     },
+    async adminListUsers() {
+      const r = await fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminUpdateEntitlements(userId, patch) {
+      const r = await fetch(`${API_BASE}/api/admin/users/${userId}/entitlements`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      });
+      return r.ok;
+    },
+    async adminSuspendUser(userId) {
+      const r = await fetch(`${API_BASE}/api/admin/users/${userId}/suspend`, { method: 'POST', credentials: 'include' });
+      return r.ok;
+    },
+    async adminUnsuspendUser(userId) {
+      const r = await fetch(`${API_BASE}/api/admin/users/${userId}/unsuspend`, { method: 'POST', credentials: 'include' });
+      return r.ok;
+    },
   };
 
   // ---------- App state ----------
@@ -4724,6 +4742,26 @@ ${e.rawResponse || '—'}`;
     const found = WAITLIST_ROLES.find(([k]) => k === key);
     return found ? found[1] : '—';
   }
+  // Misuse kill switch — reached only when GET /auth/me itself returns
+  // suspended: true (see boot()). Deliberately minimal: no dashboard chrome,
+  // no explanation of why (that's a conversation to have off-platform, not
+  // something to spell out here), just an exit.
+  function renderSuspendedScreen() {
+    document.getElementById('app').innerHTML = `
+      <div style="max-width:420px;margin:15vh auto;text-align:center;padding:0 20px">
+        <p style="font-size:32px;margin:0 0 12px">🚫</p>
+        <h1 style="font-size:18px;margin:0 0 8px">Account suspended</h1>
+        <p style="color:var(--text-faint);font-size:13.5px;margin:0 0 20px">Your StagePay account has been suspended. Contact support if you believe this is a mistake.</p>
+        <button class="btn btn-primary" id="suspendedLogoutBtn">Log out</button>
+      </div>`;
+    document.getElementById('suspendedLogoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      state.user = null;
+      history.replaceState(null, '', location.pathname);
+      state.screen = 'login';
+      renderApp();
+    });
+  }
   let waitlistFormDraft = null; // { name, role, instagramUrl, youtubeUrl, ugcDescription } — only while the form is open
   async function renderWaitlistScreen() {
     const app = document.getElementById('app');
@@ -4947,19 +4985,20 @@ ${e.rawResponse || '—'}`;
 
   // ---------- Admin queue (?screen=admin) ----------
   let adminTab = 'waitlist';
-  let adminData = { applicants: [], creditRequests: [] };
+  let adminData = { applicants: [], creditRequests: [], users: [] };
   async function renderAdminScreen() {
     const app = document.getElementById('app');
     app.style.cssText = '';
     app.innerHTML = `<div id="topbar" class="topbar"></div><div class="admin-page"><p>Loading…</p></div>`;
     renderTopbar();
-    const [waitlistRes, creditsRes] = await Promise.all([api.adminListWaitlist(), api.adminListCreditRequests()]);
-    if (!waitlistRes.ok || !creditsRes.ok) {
+    const [waitlistRes, creditsRes, usersRes] = await Promise.all([api.adminListWaitlist(), api.adminListCreditRequests(), api.adminListUsers()]);
+    if (!waitlistRes.ok || !creditsRes.ok || !usersRes.ok) {
       document.querySelector('.admin-page').innerHTML = `<p>You don't have access to this page.</p>`;
       return;
     }
     adminData.applicants = waitlistRes.body.applicants || [];
     adminData.creditRequests = creditsRes.body.requests || [];
+    adminData.users = usersRes.body.users || [];
     renderAdminScreenInto();
   }
   function renderAdminScreenInto() {
@@ -4971,8 +5010,9 @@ ${e.rawResponse || '—'}`;
         <div class="admin-tabs">
           <button data-admin-tab="waitlist" class="${adminTab === 'waitlist' ? 'active' : ''}">Waitlist (${adminData.applicants.length})</button>
           <button data-admin-tab="credits" class="${adminTab === 'credits' ? 'active' : ''}">Income Credit Requests (${adminData.creditRequests.length})</button>
+          <button data-admin-tab="users" class="${adminTab === 'users' ? 'active' : ''}">Users (${adminData.users.length})</button>
         </div>
-        ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : renderAdminCreditsTab()}
+        ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : adminTab === 'credits' ? renderAdminCreditsTab() : renderAdminUsersTab()}
       </div>`;
     renderTopbar();
     wireAdminScreen();
@@ -5003,6 +5043,33 @@ ${e.rawResponse || '—'}`;
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn btn-sm" data-admin-reject-credit="${r.id}">Reject</button>
           <button class="btn btn-sm btn-primary" data-admin-approve-credit="${r.id}">Approve</button>
+        </div>
+      </div>`).join('');
+  }
+  // Director is an addon, not a standalone product — the toggle + its own
+  // optional end date only matter for the extension's Setup/Generate
+  // features. stagepayAccessUntil is graceful (mirrors running out of
+  // income credits: showcase pauses, pricing a NEW stage is blocked, but an
+  // already-live payment link keeps working) — Suspend is the separate,
+  // blunter kill switch for misuse (blocks the account's own dashboard/API
+  // immediately, and pauses showcase/payment link even if already live).
+  function renderAdminUsersTab() {
+    if (!adminData.users.length) return '<p class="empty-note">No approved users yet.</p>';
+    return adminData.users.map((u) => `
+      <div class="admin-row" data-admin-user-row="${u.id}">
+        <div class="admin-row-head">
+          <strong>${esc(u.name)}</strong> <span style="color:var(--text-faint);font-size:11.5px">(${esc(u.email)})</span>
+          ${u.suspended ? '<span style="margin-left:6px;color:var(--crimson);font-weight:700">Suspended</span>' : ''}
+        </div>
+        <div class="admin-row-meta">${u.free_credits_remaining} income credits remaining</div>
+        <div class="field" style="margin-top:8px"><label><input type="checkbox" data-admin-director-toggle="${u.id}" ${u.has_director_access ? 'checked' : ''}> Director addon access</label></div>
+        <div class="field"><label>StagePay access until (blank = no limit)</label><input type="date" data-admin-stagepay-until="${u.id}" value="${esc(u.stagepay_access_until || '')}"></div>
+        <div class="field"><label>Director access until (blank = no limit)</label><input type="date" data-admin-director-until="${u.id}" value="${esc(u.director_access_until || '')}"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-sm btn-primary" data-admin-save-entitlements="${u.id}">Save</button>
+          ${u.suspended
+            ? `<button class="btn btn-sm" data-admin-unsuspend="${u.id}">Unsuspend</button>`
+            : `<button class="btn btn-sm btn-danger" data-admin-suspend="${u.id}">Suspend</button>`}
         </div>
       </div>`).join('');
   }
@@ -5037,6 +5104,41 @@ ${e.rawResponse || '—'}`;
       if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
       adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
       toast('Request rejected');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-save-entitlements]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-save-entitlements');
+      const row = document.querySelector(`[data-admin-user-row="${id}"]`);
+      const hasDirectorAccess = row.querySelector('[data-admin-director-toggle]').checked;
+      const stagepayAccessUntil = row.querySelector('[data-admin-stagepay-until]').value || null;
+      const directorAccessUntil = row.querySelector('[data-admin-director-until]').value || null;
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const ok = await api.adminUpdateEntitlements(id, { hasDirectorAccess, stagepayAccessUntil, directorAccessUntil });
+      btn.disabled = false; btn.textContent = 'Save';
+      if (!ok) { toast('Could not save', true); return; }
+      const u = adminData.users.find((x) => x.id === id);
+      if (u) { u.has_director_access = hasDirectorAccess ? 1 : 0; u.stagepay_access_until = stagepayAccessUntil; u.director_access_until = directorAccessUntil; }
+      toast('Saved');
+    }));
+    document.querySelectorAll('[data-admin-suspend]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-suspend');
+      const u = adminData.users.find((x) => x.id === id);
+      if (!confirm(`Suspend ${u ? u.name : 'this user'}? This immediately blocks their dashboard access and pauses their showcase/payment link, even ones already live.`)) return;
+      btn.disabled = true; btn.textContent = 'Suspending…';
+      const ok = await api.adminSuspendUser(id);
+      if (!ok) { toast('Could not suspend', true); btn.disabled = false; btn.textContent = 'Suspend'; return; }
+      if (u) u.suspended = 1;
+      toast('User suspended');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-unsuspend]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-unsuspend');
+      btn.disabled = true; btn.textContent = 'Unsuspending…';
+      const ok = await api.adminUnsuspendUser(id);
+      if (!ok) { toast('Could not unsuspend', true); btn.disabled = false; btn.textContent = 'Unsuspend'; return; }
+      const u = adminData.users.find((x) => x.id === id);
+      if (u) u.suspended = 0;
+      toast('User unsuspended');
       renderAdminScreenInto();
     }));
   }
@@ -6778,6 +6880,7 @@ ${e.rawResponse || '—'}`;
   async function renderApp() {
     const app = document.getElementById('app');
     if (state.screen === 'login') { app.style.cssText = ''; renderLoginScreen(); return; }
+    if (state.screen === 'suspended') { app.style.cssText = ''; renderSuspendedScreen(); return; }
     if (state.screen === 'waitlist') { app.style.cssText = ''; await renderWaitlistScreen(); return; }
     if (state.screen === 'admin') { app.style.cssText = ''; await renderAdminScreen(); return; }
     if (state.screen === 'projects') { app.style.cssText = ''; await renderProjectsScreen(); return; }
@@ -6883,6 +6986,14 @@ ${e.rawResponse || '—'}`;
       return;
     }
     const info = await r.json();
+    // Same shape/wording as the showcase page's own pause state (see
+    // renderPublicShowcaseSwipePage) — covers a suspended designer's
+    // account here (see pay.ts's public GET /pay/:token), deliberately
+    // uninformative to the customer either way.
+    if (info.unavailable) {
+      app.innerHTML = `<div class="pay-page"><p style="margin:auto;color:var(--text-faint)">This payment link is temporarily unavailable — check back soon.</p></div>`;
+      return;
+    }
     // Chronological (stage 2 → 5), latest one open by default — everything
     // earlier collapses into a compact summary row, revealed on click.
     const stages = [...info.stages].sort((a, b) => a.stage - b.stage);
@@ -7423,6 +7534,12 @@ ${e.rawResponse || '—'}`;
     if (location.pathname === '/add-ons/director') { renderDirectorAddonPage(); return; }
     state.user = await api.me();
     if (!state.user) { state.screen = 'login'; renderApp(); return; }
+    // Checked before anything else, including the admin-screen shortcut
+    // below — a suspended account (misuse) shouldn't reach any part of the
+    // dashboard. The admin route that sets this flag refuses to let an
+    // admin suspend their own account (see admin.ts), so this can't
+    // accidentally lock out the real admin with no way back in.
+    if (state.user.suspended) { state.screen = 'suspended'; renderApp(); return; }
     if (new URLSearchParams(location.search).get('screen') === 'admin') {
       state.screen = 'admin';
       renderApp();

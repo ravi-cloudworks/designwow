@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS users (
   applied_at TEXT,
   approved_at TEXT,
   free_credits_remaining INTEGER NOT NULL DEFAULT 0, -- income credits: spent when pricing a stage that isn't already an open, unpaid receivable
+  has_director_access INTEGER NOT NULL DEFAULT 0, -- Director is an addon, not standalone — gates the extension's Setup/Generate features
+  stagepay_access_until TEXT, -- optional expiry ('YYYY-MM-DD') — past this, showcase pauses and new stages can't be priced, same as running out of credits; existing payment links keep working
+  director_access_until TEXT, -- optional expiry ('YYYY-MM-DD') for the Director addon specifically — extension-side only
+  suspended INTEGER NOT NULL DEFAULT 0, -- misuse kill switch — blocks dashboard/API access immediately AND pauses showcase/payment link even if already live, unlike the graceful expiries above
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_showcase_slug ON users(showcase_slug);

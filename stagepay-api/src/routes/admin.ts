@@ -70,4 +70,63 @@ admin.post('/admin/credit-requests/:id/reject', async (c) => {
   return c.json({ ok: true });
 });
 
+// Approved users only — waitlisted/pending applicants have nothing to
+// entitle yet (they show up in the Waitlist tab instead).
+admin.get('/admin/users', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, name, email, free_credits_remaining, has_director_access, stagepay_access_until, director_access_until, suspended
+     FROM users WHERE status = 'approved' ORDER BY name ASC`
+  ).all();
+  return c.json({ users: results });
+});
+
+// One combined endpoint for all three entitlement fields — only whichever
+// keys are present in the body get updated, so the admin UI can save a
+// single field (e.g. just the Director toggle) without needing to resend
+// the other two untouched.
+admin.post('/admin/users/:userId/entitlements', async (c) => {
+  const userId = c.req.param('userId');
+  const body = await c.req
+    .json<{ hasDirectorAccess?: boolean; stagepayAccessUntil?: string | null; directorAccessUntil?: string | null }>()
+    .catch(() => ({}) as { hasDirectorAccess?: boolean; stagepayAccessUntil?: string | null; directorAccessUntil?: string | null });
+
+  const sets: string[] = [];
+  const binds: (string | number | null)[] = [];
+  if (body.hasDirectorAccess !== undefined) { sets.push('has_director_access = ?'); binds.push(body.hasDirectorAccess ? 1 : 0); }
+  if (body.stagepayAccessUntil !== undefined) { sets.push('stagepay_access_until = ?'); binds.push(body.stagepayAccessUntil || null); }
+  if (body.directorAccessUntil !== undefined) { sets.push('director_access_until = ?'); binds.push(body.directorAccessUntil || null); }
+  if (!sets.length) return c.json({ error: 'nothing_to_update' }, 400);
+
+  binds.push(userId);
+  const result = await c.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ? AND status = 'approved'`).bind(...binds).run();
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+  return c.json({ ok: true });
+});
+
+// Deliberately separate from the entitlements route above — suspension is a
+// blunt, immediate kill switch (index.ts's global middleware blocks the
+// account's own session right away; showcase.ts/pay.ts pause their public
+// pages, including already-live ones), not a graceful expiry, so it isn't
+// folded in alongside the two access-until dates.
+admin.post('/admin/users/:userId/suspend', async (c) => {
+  const userId = c.req.param('userId');
+  // Suspending yourself would lock you out immediately (index.ts's global
+  // middleware blocks a suspended session's own API access with no
+  // exception for admins) with no way back in except a direct DB edit —
+  // guard against it here rather than relying on the admin UI alone never
+  // offering it by mistake.
+  const callerId = await currentUserId(c);
+  if (userId === callerId) return c.json({ error: 'cannot_suspend_self' }, 400);
+  const result = await c.env.DB.prepare("UPDATE users SET suspended = 1 WHERE id = ? AND status = 'approved'").bind(userId).run();
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+  return c.json({ ok: true });
+});
+
+admin.post('/admin/users/:userId/unsuspend', async (c) => {
+  const userId = c.req.param('userId');
+  const result = await c.env.DB.prepare('UPDATE users SET suspended = 0 WHERE id = ?').bind(userId).run();
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+  return c.json({ ok: true });
+});
+
 export default admin;

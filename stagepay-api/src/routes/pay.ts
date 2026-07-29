@@ -169,9 +169,18 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   // is never interrupted mid-sale by a designer running out of credits.
   const isNewReceivable = !existing || !!existing.paid;
   if (isNewReceivable) {
-    const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?').bind(userId).first<{ free_credits_remaining: number }>();
+    const user = await c.env.DB.prepare('SELECT free_credits_remaining, stagepay_access_until FROM users WHERE id = ?')
+      .bind(userId)
+      .first<{ free_credits_remaining: number; stagepay_access_until: string | null }>();
     if (!user || user.free_credits_remaining <= 0) {
       return c.json({ error: 'out_of_credits', message: "You're out of income credits — buy more to price this stage." }, 402);
+    }
+    // Same graceful treatment as running out of credits — a manually-set
+    // access window ending blocks pricing a NEW stage, but never touches an
+    // already-live payment link (see the public GET /pay/:token route below,
+    // which only checks `suspended`, not this date).
+    if (user.stagepay_access_until && user.stagepay_access_until < new Date().toISOString().slice(0, 10)) {
+      return c.json({ error: 'access_ended', message: 'Your StagePay access period has ended — contact support to renew.' }, 402);
     }
     await c.env.DB.prepare('UPDATE users SET free_credits_remaining = free_credits_remaining - 1 WHERE id = ?').bind(userId).run();
   }
@@ -246,7 +255,9 @@ async function loadPublicLink(db: D1Database, token: string) {
 
   const project = await db.prepare('SELECT name, user_id FROM projects WHERE id = ?').bind(link.project_id).first<{ name: string; user_id: string }>();
   if (!project) return null;
-  const designer = await db.prepare('SELECT name, upi_id FROM users WHERE id = ?').bind(project.user_id).first<{ name: string; upi_id: string }>();
+  const designer = await db.prepare('SELECT name, upi_id, suspended FROM users WHERE id = ?')
+    .bind(project.user_id)
+    .first<{ name: string; upi_id: string; suspended: number }>();
   const brief = await db.prepare('SELECT * FROM stage1_brief WHERE project_id = ?').bind(link.project_id).first<Stage1BriefRow>();
 
   return { projectId: link.project_id, project, designer, brief };
@@ -257,6 +268,14 @@ pay.get('/pay/:token', async (c) => {
   const loaded = await loadPublicLink(c.env.DB, token);
   if (!loaded) return c.json({ error: 'not_found' }, 404);
   const { projectId, project, designer, brief } = loaded;
+
+  // Deliberately the ONE gate on this route, and deliberately only
+  // `suspended` — never free_credits_remaining or stagepay_access_until.
+  // Those two are graceful: an already-live link keeps working past them,
+  // same reasoning as never interrupting a customer mid-sale. Suspension is
+  // the opposite case on purpose — misuse should pause a designer's public
+  // pages immediately, including ones a customer already has open/bookmarked.
+  if (designer?.suspended) return c.json({ unavailable: true });
 
   const { results } = await c.env.DB.prepare('SELECT stage, amount_paise, paid, paid_at FROM payment_link_stages WHERE token = ? ORDER BY stage')
     .bind(token)

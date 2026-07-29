@@ -68,16 +68,39 @@ auth.get('/me', async (c) => {
   if (!sessionUserId) return c.json({ user: null });
   const user = await c.env.DB.prepare(
     `SELECT id, email, name, avatar_url, upi_id, showcase_slug, contact_link,
-            status, role, instagram_url, youtube_url, ugc_description, free_credits_remaining
+            status, role, instagram_url, youtube_url, ugc_description, free_credits_remaining,
+            has_director_access, stagepay_access_until, director_access_until, suspended
      FROM users WHERE id = ?`
   )
     .bind(sessionUserId)
-    .first<{ email: string }>();
+    .first<{
+      email: string;
+      has_director_access: number;
+      stagepay_access_until: string | null;
+      director_access_until: string | null;
+      suspended: number;
+    }>();
   if (!user) return c.json({ user: null });
   // Only used to decide whether to show the Admin nav link — the admin
   // routes themselves independently re-check email against ADMIN_EMAIL,
   // so this flag is a UI convenience, not the actual access gate.
-  return c.json({ user: { ...user, isAdmin: user.email === c.env.ADMIN_EMAIL } });
+  //
+  // hasDirectorAccess folds the addon flag + its own optional expiry into
+  // one ready-to-use boolean — the extension checks exactly this field
+  // rather than re-deriving the date comparison itself. Note: index.ts's
+  // global suspension middleware already blocks this whole route before it
+  // runs if `suspended` is true — the field is still selected/returned here
+  // (it can never actually be true on a response that reaches this line)
+  // only so a future relaxation of that allowlist doesn't silently drop it.
+  const today = new Date().toISOString().slice(0, 10);
+  const hasDirectorAccess = !!user.has_director_access && (!user.director_access_until || user.director_access_until >= today);
+  return c.json({
+    user: {
+      ...user,
+      isAdmin: user.email === c.env.ADMIN_EMAIL,
+      hasDirectorAccess,
+    },
+  });
 });
 
 // Waitlist application — submitted once to move from 'pending_profile' to
