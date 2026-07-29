@@ -53,6 +53,16 @@ let folderThumbnails = []; // [{ name, file, url }] — most recent first
 // hardcoded and a differently-named folder would silently stop receiving
 // Flow's downloads.
 let folderNameMismatch = null;
+// Mandatory "which item is this file for?" prompt, one at a time — fired
+// the instant a redirected Flow download completes (see the
+// stagepay-director-download-ready listener below). Queued rather than
+// stacked so several downloads finishing close together don't pile up
+// several overlapping modals at once. No skip option, by design: an
+// unlabeled clip sitting in the folder with Flow's own generic name is
+// exactly the "which one was Scene 3 again?" confusion this whole feature
+// exists to prevent.
+const pendingRenameFiles = []; // { fileName, projectFolder } awaiting a choice
+let renamingFile = null; // the { fileName, projectFolder } currently shown in the modal, or null
 const FOLDER_GALLERY_LIMIT = 16;
 const FOLDER_GALLERY_MIME_PREFIXES = ['image/', 'video/'];
 // Must match FLOW_DOWNLOADS_SUBFOLDER in background.js — not shared code
@@ -154,6 +164,15 @@ async function init() {
 function setStatus(message, kind, title) {
   statusEl.textContent = message;
   statusEl.className = `status ${kind}`;
+  // Tells background.js's Flow-download redirect which project's subfolder
+  // new downloads should land in — plain runtime messaging, not
+  // chrome.storage, so no new "storage" permission (and no Web Store
+  // re-review) is needed; background.js just keeps it in memory. Sent as
+  // null for every non-'ok' state (logged out, multiple projects open, no
+  // project detected, load failed) so a download that happens while no
+  // project is confidently known can't get misfiled into a stale project's
+  // folder — it just falls back to the flat top-level folder instead.
+  chrome.runtime.sendMessage({ type: 'stagepay-director-set-project', name: kind === 'ok' ? currentProjectName : null, id: kind === 'ok' ? currentProjectId : null }).catch(() => {});
   const root = document.getElementById('statusModalRoot');
   if (!root) return;
   if (kind === 'ok') { root.innerHTML = ''; return; }
@@ -295,6 +314,12 @@ async function loadProject() {
 
   setStatus('Connected', 'ok'); // project + stage now live once, in the stage banner below — no need to repeat it here
   landingIntroEl.hidden = true;
+  // The gallery is scoped to the CURRENT project's own subfolder (see
+  // scanDownloadsFolder) — without this, switching to a different project
+  // would keep showing whatever the previous project's scan left behind
+  // until the next unrelated rescan trigger (a new download, the manual
+  // button) happened to fire.
+  if (downloadsDirHandle && folderPermissionState === 'granted') await scanDownloadsFolder();
 }
 
 function itemById(id) { return currentItems.find((i) => i.id === id) || null; }
@@ -302,6 +327,10 @@ function theVersion(item) { return (item && item.versions && item.versions[0]) |
 function itemConfigFor(item) {
   const sc = stageConfigCache[item.stage];
   return (sc && sc.items && sc.items[item.item_key]) || null;
+}
+function itemDisplayName(item) {
+  const ic = itemConfigFor(item);
+  return item.name || (ic && ic.label) || item.item_key;
 }
 function hasFlowPrompt(item) {
   const ic = itemConfigFor(item);
@@ -358,6 +387,40 @@ function cleanUploadFileName(item, originalFileName, existingCount) {
   const suffix = existingCount > 0 ? `-${existingCount + 1}` : '';
   return `${base}${suffix}.${ext}`;
 }
+
+// Kept in sync by hand with background.js's own copy (separate execution
+// contexts, can't share code) — MUST produce identical output in both
+// places, since background.js uses this to decide where a Flow download
+// actually lands on disk, and panel.js uses it to decide where to look for
+// it afterward. Deliberately keeps spaces in the name portion (unlike
+// cleanUploadFileName's dash-ified item names) — this becomes a real folder
+// name the customer browses by hand for backup/reference, so it should
+// still read as the project's actual name.
+//
+// Always tags on a short id fragment (the project's own first 8 UUID
+// characters) rather than relying on the name alone — confirmed live that
+// two DIFFERENT projects sharing a name (renamed to match, or an old
+// project's name reused later) would otherwise resolve to the exact same
+// physical folder: Chrome's own conflictAction: 'uniquify' only dedupes
+// individual FILE names, never folder paths, so their downloads would
+// silently land mixed together with no error at all. The id fragment makes
+// that collision structurally impossible. One side effect, accepted as a
+// reasonable tradeoff: renaming a project mid-way still creates a new
+// (differently-named-but-same-id-tagged) folder rather than reusing the old
+// one, since the human-readable portion changes — the old folder's files
+// aren't lost, just no longer the one new downloads or the gallery use.
+function sanitizeProjectFolderName(name, id) {
+  const cleanedName = (name || '')
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '')
+    .trim()
+    .replace(/[.\s]+$/, '')
+    .slice(0, 60)
+    .trim();
+  const idFragment = (id || '').slice(0, 8);
+  if (!idFragment) return cleanedName || null; // no id known yet — nothing to tag, fall back to name-only
+  return cleanedName ? `${cleanedName} (${idFragment})` : idFragment;
+}
+
 function draftFor(item) {
   if (!itemDrafts[item.id]) {
     const v = theVersion(item);
@@ -718,17 +781,39 @@ function revokeFolderThumbnails() {
   folderThumbnails = [];
 }
 
-// Enumerates the granted folder's files (one level, no subfolders), filters
-// to image/video, sorts newest-first by the file's own lastModified, keeps
-// only the most recent FOLDER_GALLERY_LIMIT — a typical Downloads folder can
-// have hundreds of unrelated entries, and nobody needs to scroll all of them
-// to find what they just generated.
+// Scans the CURRENT project's own subfolder (background.js's download
+// redirect creates one per project, named via sanitizeProjectFolderName on
+// currentProjectName) rather than the flat top-level folder — this only
+// shows files actually belonging to whatever project is open right now,
+// instead of every project's downloads mixed together. Filters to
+// image/video, sorts newest-first by the file's own lastModified, keeps
+// only the most recent FOLDER_GALLERY_LIMIT.
+//
+// A project subfolder not existing yet (getDirectoryHandle throws
+// NotFoundError) is the normal, expected state for a project with no
+// downloads yet — it just leaves the gallery empty, WITHOUT setting
+// folderPermissionState = 'missing', since that's reserved for the
+// connected folder itself actually having been moved/deleted (a real
+// problem the persistent connect-modal needs to surface). Files downloaded
+// before this per-project scoping existed still sit in the flat top-level
+// folder and won't show here anymore — they're not lost, just no longer
+// picked up by this gallery going forward.
 async function scanDownloadsFolder() {
   if (!downloadsDirHandle) return;
   revokeFolderThumbnails();
   const found = [];
   try {
-    for await (const [name, handle] of downloadsDirHandle.entries()) {
+    const projectFolder = sanitizeProjectFolderName(currentProjectName, currentProjectId);
+    let scanHandle = downloadsDirHandle;
+    if (projectFolder) {
+      try {
+        scanHandle = await downloadsDirHandle.getDirectoryHandle(projectFolder);
+      } catch (e) {
+        if (e.name === 'NotFoundError') { folderThumbnails = []; return; }
+        throw e;
+      }
+    }
+    for await (const [name, handle] of scanHandle.entries()) {
       if (handle.kind !== 'file') continue;
       const file = await handle.getFile();
       if (!FOLDER_GALLERY_MIME_PREFIXES.some((p) => file.type.startsWith(p))) continue;
@@ -744,6 +829,143 @@ async function scanDownloadsFolder() {
   folderThumbnails = found.slice(0, FOLDER_GALLERY_LIMIT).map((f) => ({
     name: f.name, file: f.file, url: URL.createObjectURL(f.file),
   }));
+}
+
+// Filters the shared project-level scan down to just the files that
+// actually belong to THIS item, by name — the mandatory rename prompt
+// already names a file after its item (e.g. "Daughter.jpeg", or
+// "Daughter (2).jpeg" for a Flow retry), so every item's own "Choose &
+// send" gallery reuses that same convention instead of showing every
+// item's files in every item's gallery. Confirmed live this matters a lot
+// with 15 characters in one project — an unfiltered shared gallery becomes
+// unusable clutter. A file that was never renamed (Flow's original name,
+// or downloaded before this feature existed) won't match anything here —
+// it's not lost, just not surfaced in any per-item gallery; it still shows
+// up if you browse the actual folder on disk. Keeps each match's index
+// into the ORIGINAL folderThumbnails array (globalIndex) — the thumbnail
+// click handler in wireItemCard looks files up by that index, so a locally
+// re-numbered index here would stage the wrong file.
+function filesForItem(item) {
+  const base = itemDisplayName(item).replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim();
+  if (!base) return [];
+  const prefix = base.toLowerCase();
+  return folderThumbnails
+    .map((t, i) => ({ ...t, globalIndex: i }))
+    .filter((t) => {
+      const stem = t.name.replace(/\.[a-zA-Z0-9]+$/, '').toLowerCase();
+      return stem === prefix || stem.startsWith(`${prefix} (`);
+    });
+}
+
+// Queues a just-completed download for the mandatory "which item is this
+// for?" rename prompt — only if it landed in the CURRENTLY open project's
+// own subfolder. If projectFolder is null (no project was known at download
+// time) or belongs to a DIFFERENT project than the one open right now, it's
+// deliberately left unprompted rather than guessed at — this panel only has
+// that other project's item list loaded when that project is actually
+// open, so there's no reliable list to offer. The file still sits safely in
+// its own correct project folder either way, just with Flow's original name
+// until renamed by hand or from within that project later.
+//
+// Also skipped entirely when the current stage has zero items to offer
+// (Stage 1/Brief has no items at all, just fields) — since this modal has
+// no skip/close button by design, showing it with nothing to click would be
+// a dead end rather than a prompt.
+function enqueueRenameIfCurrentProject(fileName, projectFolder) {
+  if (!fileName) return;
+  const myFolder = sanitizeProjectFolderName(currentProjectName, currentProjectId);
+  if (!myFolder || projectFolder !== myFolder) return;
+  if (!currentItems.some((i) => i.stage === currentStage)) return;
+  // Captures projectFolder (and, at modal-render time, the stage/items list)
+  // as of RIGHT NOW — if the user switches to a different project's tab
+  // before answering (the panel keeps reacting to tab-focus events
+  // regardless of this modal), renaming still targets the folder this file
+  // actually landed in, not wherever the panel has since navigated to.
+  pendingRenameFiles.push({ fileName, projectFolder });
+  if (!renamingFile) showNextRenameModal();
+}
+
+function showNextRenameModal() {
+  renamingFile = pendingRenameFiles.shift() || null;
+  renderRenameFileModal();
+}
+
+// Mandatory, no-dismiss modal (mirrors renderFolderConnectModal's same
+// forced pattern) — lists every item in whichever stage is CURRENTLY shown
+// in the panel, by name, so picking one is as easy as matching what you see
+// on Flow to what you see here (e.g. Stage 3 open → Character/Property/
+// Background/Sound names; Stage 4 → Scene names; Stage 5 → Movie names).
+function renderRenameFileModal() {
+  const root = document.getElementById('renameFileModalRoot');
+  if (!root) return;
+  if (!renamingFile) { root.innerHTML = ''; return; }
+  const items = currentItems.filter((i) => i.stage === currentStage);
+  root.innerHTML = `<div class="status-modal-overlay">
+    <div class="status-modal-card rename-file-modal-card">
+      <h2>📁 Which item is this file for?</h2>
+      <p>"${escapeHtml(renamingFile.fileName)}" just landed in your downloads folder — pick the item it belongs to and it'll be renamed so it's easy to find later.</p>
+      <div class="rename-file-modal-list">
+        ${items.map((it) => `<button type="button" data-rename-choice="${it.id}">${escapeHtml(itemDisplayName(it))}</button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  items.forEach((it) => {
+    const btn = root.querySelector(`[data-rename-choice="${it.id}"]`);
+    if (btn) btn.addEventListener('click', () => handleRenameChoice(it));
+  });
+}
+
+async function handleRenameChoice(item) {
+  const { fileName, projectFolder } = renamingFile;
+  try {
+    await renameDownloadedFile(fileName, item, projectFolder);
+  } catch (e) {
+    openUploadErrorModal(`Couldn't rename "${fileName}" to match "${itemDisplayName(item)}" — ${e && e.message ? e.message : 'you can rename it by hand in your downloads folder.'}`);
+  }
+  await scanDownloadsFolder();
+  render();
+  showNextRenameModal();
+}
+
+// Renames in place via the File System Access API's move() — needs a
+// one-time read-write permission upgrade on the already-connected folder
+// (a fresh prompt, not a manifest change, so no new Web Store review).
+// Collisions (e.g. a Flow retry for the same item) suffix with " (2)",
+// " (3)"... rather than overwrite, so an earlier keeper is never silently
+// lost — capped at a sane number of attempts rather than looping forever.
+// projectFolder is the one captured at enqueue time (see
+// enqueueRenameIfCurrentProject), NOT recomputed from currentProjectName —
+// that project may no longer be the one open in the panel by the time this
+// runs.
+async function renameDownloadedFile(fileName, item, projectFolder) {
+  if (!downloadsDirHandle) return;
+  const perm = await downloadsDirHandle.requestPermission({ mode: 'readwrite' });
+  if (perm !== 'granted') throw new Error('write permission for the downloads folder was not granted');
+  const dirHandle = projectFolder ? await downloadsDirHandle.getDirectoryHandle(projectFolder) : downloadsDirHandle;
+  const fileHandle = await dirHandle.getFileHandle(fileName);
+  const extMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'dat';
+  const base = itemDisplayName(item).replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim() || 'file';
+  let target = `${base}.${ext}`;
+  for (let n = 2; n <= 50 && target !== fileName && (await fileExistsIn(dirHandle, target)); n++) {
+    target = `${base} (${n}).${ext}`;
+  }
+  if (typeof fileHandle.move === 'function') {
+    await fileHandle.move(target);
+  } else {
+    // Older Chrome without FileSystemFileHandle.move() — copy the bytes to
+    // the new name, then remove the original.
+    const file = await fileHandle.getFile();
+    const newHandle = await dirHandle.getFileHandle(target, { create: true });
+    const writable = await newHandle.createWritable();
+    await writable.write(file);
+    await writable.close();
+    await dirHandle.removeEntry(fileName);
+  }
+}
+
+async function fileExistsIn(dirHandle, name) {
+  try { await dirHandle.getFileHandle(name); return true; } catch (e) { return false; }
 }
 
 // Forces the folder connection: the whole point of this extension is
@@ -882,16 +1104,19 @@ function renderItemCard(item) {
   const staged = stagingFiles[item.id] || [];
   const folderGalleryHtml = (() => {
     if (folderPermissionState === 'granted') {
-      const galleryItems = folderThumbnails.length
-        ? `<div class="folder-gallery-row">${folderThumbnails.map((t, i) => {
+      const myFiles = filesForItem(item);
+      const galleryItems = myFiles.length
+        ? `<div class="folder-gallery-row" data-folder-gallery-row="${item.id}">${myFiles.map((t) => {
             const isSelected = staged.includes(t.file);
             const isVideo = t.file.type.startsWith('video');
             const media = isVideo ? `<video src="${t.url}" muted></video>` : `<img src="${t.url}">`;
             const videoBadge = isVideo ? `<span class="video-badge">▶</span>` : '';
-            return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${i}" title="${escapeHtml(t.name)}">${media}${videoBadge}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
+            return `<div class="folder-gallery-wrap${isSelected ? ' selected' : ''}" data-folder-thumb="${item.id}" data-index="${t.globalIndex}" title="${escapeHtml(t.name)}">${media}${videoBadge}${isSelected ? `<span class="folder-gallery-tick">✓</span>` : ''}</div>`;
           }).join('')}</div>`
-        : `<p class="folder-gallery-empty">No recent images/videos found in that folder yet — click 🔄 after downloading something.</p>`;
-      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : '')}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button></div>${galleryItems}${folderThumbnails.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="folder-gallery">🔍 See all</button>` : ''}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
+        : `<p class="folder-gallery-empty">No downloads matching "${escapeHtml(itemDisplayName(item))}" yet — click 🔄 after downloading and naming one for this item.</p>`;
+      const projectFolder = sanitizeProjectFolderName(currentProjectName, currentProjectId);
+      const connectedLabel = downloadsDirHandle ? `${downloadsDirHandle.name}${projectFolder ? ` / ${projectFolder}` : ''}` : '';
+      return `<div class="folder-gallery-head"><strong>🔗 Connected: ${escapeHtml(connectedLabel)}</strong><button type="button" data-rescan-folder-btn>🔄 Rescan</button></div>${galleryItems}${myFiles.length ? `<button type="button" class="see-all-btn" data-see-all-btn data-see-all-for="${item.id}" data-see-all-kind="folder-gallery">🔍 See all</button>` : ''}<p class="folder-gallery-empty">Click a thumbnail to select/deselect it — ticked ones are what "Send" below will upload.</p>`;
     }
     if (folderPermissionState === 'needs-reconnect') {
       return `<div class="folder-gallery-head"><button type="button" data-reconnect-folder-btn>🔓 Reconnect "${escapeHtml(downloadsDirHandle ? downloadsDirHandle.name : 'downloads')}" folder</button></div>`;
@@ -1069,7 +1294,13 @@ const SEE_ALL_ROW_SELECTOR = {
   'must-attach': (id) => `[data-must-attach="${id}"]`,
   'thumbs': (id) => `[data-thumbs="${id}"]`,
   'staging': (id) => `[data-staging="${id}"]`,
-  'folder-gallery': () => '.folder-gallery-row',
+  // Scoped by item id, unlike the unscoped selector this replaced — now
+  // that each item's own gallery shows DIFFERENT files (see filesForItem),
+  // an unscoped ".folder-gallery-row" would grab whichever item's row
+  // happens to be first in the DOM if more than one item card is expanded
+  // at once, showing the wrong item's "See all" (harmless before this
+  // filtering existed, since every row showed identical content).
+  'folder-gallery': (id) => `[data-folder-gallery-row="${id}"]`,
 };
 const SEE_ALL_TITLE = {
   'must-attach': 'Reference images',
@@ -1518,10 +1749,24 @@ function escapeHtml(s) {
 
 // Real-time rescan trigger — background.js sends this the instant a
 // redirected Flow download finishes (via chrome.downloads.onChanged), so
-// the gallery updates itself with no manual "Rescan" click needed.
-chrome.runtime.onMessage.addListener((message) => {
+// the gallery updates itself with no manual "Rescan" click needed. Also
+// carries the actual saved fileName + which project's subfolder it landed
+// in, so the mandatory rename prompt (see enqueueRenameIfCurrentProject)
+// knows exactly which file to ask about.
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'stagepay-director-download-ready' && folderPermissionState === 'granted') {
     scanDownloadsFolder().then(render);
+    enqueueRenameIfCurrentProject(message.fileName, message.projectFolder || null);
+    return;
+  }
+  // background.js's own copy of the current project can be silently reset
+  // if its service worker was evicted while idle (see that file's comment
+  // on currentProjectName) — it asks here, live, at the exact moment of a
+  // download, rather than relying solely on the earlier push from
+  // setStatus(). Answered synchronously, straight from this page's own
+  // in-memory state — no fetch, no delay.
+  if (message && message.type === 'stagepay-director-query-project') {
+    sendResponse({ name: currentProjectId ? currentProjectName : null, id: currentProjectId });
   }
 });
 
