@@ -35,6 +35,12 @@ let currentBrief = null;
 let currentItems = [];
 let currentStage = null; // from GET /api/projects (list) — "the next thing to actually do", not a manually-picked tab
 let currentCompleted = false;
+// The extension is Director-exclusive — set by checkAccountAccess() before
+// any project is even detected; renderNoDirectorAccessWall() replaces the
+// whole panel instead of this reaching any item-rendering code at all when
+// false, so nothing downstream of that point needs its own separate check.
+let hasDirectorAccess = false;
+let currentUserEmail = ''; // set by checkAccountAccess() — shown on the no-Director wall so it's clear which account is being checked
 const stageConfigCache = {}; // { [stage]: parsed config JSON from GET /api/config/:stage }
 const itemDrafts = {}; // { [itemId]: { fields, prompt } } — in-memory only until "Save"
 const stagingFiles = {}; // { [itemId]: File[] } — picked/dropped but not yet sent to StagePay
@@ -193,7 +199,71 @@ function setStatus(message, kind, title) {
   if (btn) btn.addEventListener('click', () => refreshFromActiveTab(true));
 }
 
+// Extension = Director exclusively — there is no "StagePay-only" mode of
+// this panel at all. Checked FIRST, before even looking at which tab/project
+// is open, so a StagePay-only (or expired/suspended) account never triggers
+// a single /api/projects or /api/projects/:id call — there's nothing they're
+// entitled to see, so there's nothing worth fetching. Returns:
+//   'not-logged-in' — no session at all (or the request itself failed)
+//   'suspended'     — a real session, but the account is suspended (a total
+//                     kill switch everywhere else too — see stagepay-api's
+//                     index.ts global middleware — so it's treated the same
+//                     way here rather than showing the upgrade wall)
+//   'no-director'   — logged in, not suspended, but the Director addon
+//                     isn't active (never purchased, or its own expiry date
+//                     has passed)
+//   'ok'            — proceed with the normal project-detection flow below
+async function checkAccountAccess() {
+  let meRes;
+  try {
+    meRes = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+  } catch (e) {
+    return 'not-logged-in'; // network failure — never assume access when unsure
+  }
+  if (!meRes.ok) return 'not-logged-in';
+  const data = await meRes.json().catch(() => null);
+  if (!data || !data.user) return 'not-logged-in';
+  currentUserEmail = data.user.email || '';
+  if (data.user.suspended) return 'suspended';
+  hasDirectorAccess = !!data.user.hasDirectorAccess;
+  return hasDirectorAccess ? 'ok' : 'no-director';
+}
+
 async function refreshFromActiveTab(force) {
+  const access = await checkAccountAccess();
+  if (access === 'not-logged-in') {
+    setStatus('Not logged in — log into StagePay in a normal tab first, then reopen this panel.', 'error', '🔒 Not logged in');
+    landingIntroEl.hidden = false;
+    currentProjectId = null;
+    itemListEl.innerHTML = '';
+    updateStageBanner();
+    return;
+  }
+  if (access === 'suspended') {
+    setStatus('Your StagePay account has been suspended. Contact support if you believe this is a mistake.', 'error', '🚫 Account suspended');
+    landingIntroEl.hidden = true;
+    currentProjectId = null;
+    itemListEl.innerHTML = '';
+    updateStageBanner();
+    return;
+  }
+  if (access === 'no-director') {
+    // Bypasses setStatus() deliberately — that also pops its own persistent
+    // "no dismiss" modal, which would sit redundantly on top of the wall
+    // below. Directly replaces panel.html's static placeholder text
+    // ("Looking for an open StagePay tab…"), which otherwise never gets
+    // touched at all on this path — confirmed live, it was left showing
+    // above the wall until this.
+    statusEl.textContent = 'Director not active';
+    statusEl.className = 'status';
+    landingIntroEl.hidden = true;
+    currentProjectId = null;
+    currentItems = [];
+    updateStageBanner();
+    renderNoDirectorAccessWall();
+    return;
+  }
+
   const detected = await detectOpenProjectId();
   if (detected && detected.conflict) {
     await showProjectConflictWarning(detected.ids);
@@ -213,6 +283,26 @@ async function refreshFromActiveTab(force) {
   renderSkeleton(); // a real reload is about to happen (new project, or a forced refetch) — shimmer instead of a jump
   await loadProject();
   render();
+}
+
+// The only UI a StagePay-only (or Director-expired) account ever sees in
+// this panel — replaces the whole item list, no upload/staging affordance
+// left reachable, matching the "buy Director or the extension shows
+// nothing" decision. A "Check again" button covers the case where they
+// upgrade in another tab while this panel is still open, same pattern as
+// setStatus()'s persistent modal.
+function renderNoDirectorAccessWall() {
+  itemListEl.innerHTML = `
+    <div class="no-director-wall">
+      <p class="no-director-wall-icon">🔒</p>
+      <h2>Director access needed</h2>
+      <p class="no-director-wall-body">${currentUserEmail ? `<strong>${escapeHtml(currentUserEmail)}</strong> doesn't` : 'This account doesn\'t'} have Director active — either it was never purchased, or it has expired.</p>
+      <p class="no-director-wall-body">Director unlocks compiled Flow-ready prompts, auto-attached character/scene references, and structured production tools inside Google Flow.</p>
+      <a class="no-director-wall-cta" href="${API_BASE}/add-ons/director" target="_blank" rel="noopener">Learn more &amp; upgrade →</a>
+      <button type="button" id="noDirectorRecheckBtn">I've paid — check again</button>
+    </div>`;
+  const btn = document.getElementById('noDirectorRecheckBtn');
+  if (btn) btn.addEventListener('click', () => refreshFromActiveTab(true));
 }
 
 // Fires when two (or more) DIFFERENT projects are open across StagePay tabs
@@ -279,6 +369,11 @@ async function detectOpenProjectId() {
 // that stage's config (fieldsSchema/outputInstructions/universalStyle), if
 // not already cached.
 async function loadProject() {
+  // hasDirectorAccess is already known by the time this runs — checkAccountAccess()
+  // (called from refreshFromActiveTab, before project detection even starts)
+  // is the only place that fetches /auth/me now; a second fetch here would
+  // just be redundant, since this function is never reached at all unless
+  // that check already returned 'ok'.
   const [listRes, detailRes] = await Promise.all([
     fetch(`${API_BASE}/api/projects`, { credentials: 'include' }),
     fetch(`${API_BASE}/api/projects/${currentProjectId}`, { credentials: 'include' }),
