@@ -17,6 +17,7 @@ header strong { font-size: 14px; }
 .status.error { color: #b23a37; }
 .status.ok { color: #2f7a4f; }
 .status.warn { color: #a06a12; }
+.director-expiry-info { margin: 2px 0 0; font-size: 10.5px; color: #8b92a1; }
 
 .landing-intro { padding: 14px; background: #fff; border-bottom: 1px solid #dbdfe2; }
 .landing-tagline { margin: 0 0 4px; font-size: 12.5px; font-weight: 800; color: #176b5e; }
@@ -25,6 +26,9 @@ header strong { font-size: 14px; }
 .stage-banner { padding: 10px 14px; background: #14161b; color: #fff; }
 .stage-banner-project { font-size: 11px; color: #b7bcc4; text-transform: uppercase; letter-spacing: .03em; }
 .stage-banner-stage { font-size: 15px; font-weight: 800; margin-top: 2px; }
+
+.expiry-banner { padding: 8px 14px; background: #fbeedb; border-bottom: 1px solid #eccd9a; color: #a05f10; font-size: 11.5px; font-weight: 600; }
+.expiry-banner a { color: #a05f10; text-decoration: underline; font-weight: 700; }
 
 .item-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .skeleton-card { background: #fff; border: 1px solid #dbdfe2; border-radius: 8px; padding: 14px; }

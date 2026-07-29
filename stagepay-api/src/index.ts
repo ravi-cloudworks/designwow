@@ -12,6 +12,7 @@ import pay from './routes/pay';
 import showcase from './routes/showcase';
 import earnings from './routes/earnings';
 import credits from './routes/credits';
+import director from './routes/director';
 import admin from './routes/admin';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -71,6 +72,7 @@ app.route('/api', pay);
 app.route('/api', showcase);
 app.route('/api', earnings);
 app.route('/api', credits);
+app.route('/api', director);
 app.route('/api', admin);
 
 export default app;

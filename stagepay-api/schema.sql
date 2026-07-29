@@ -205,3 +205,20 @@ CREATE TABLE IF NOT EXISTS credit_purchase_requests (
 
 CREATE INDEX IF NOT EXISTS idx_credit_purchase_requests_user ON credit_purchase_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_purchase_requests_status ON credit_purchase_requests(status);
+
+-- Same manual UTR + admin-approval pattern, for buying the Director addon
+-- as a time-boxed duration (1/3/6/12 months) rather than a quantity —
+-- approving one extends director_access_until and sets has_director_access.
+CREATE TABLE IF NOT EXISTS director_purchase_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  months INTEGER NOT NULL,
+  amount_paise INTEGER NOT NULL,
+  utr TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_director_purchase_requests_user ON director_purchase_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_director_purchase_requests_status ON director_purchase_requests(status);

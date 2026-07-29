@@ -56,6 +56,8 @@
   button, input, select, textarea { font: inherit; color: inherit; }
 
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; flex-shrink: 0; }
+  .topbar-expiry-banner { flex-basis: 100%; background: #fdf3e3; border: 1px solid #eccd9a; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: #a05f10; font-weight: 600; }
+  .topbar-expiry-banner a { color: #a05f10; text-decoration: underline; font-weight: 700; }
   .topbar-title { display: flex; align-items: center; gap: 9px; }
   .topbar-title .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; }
   .beta-badge { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); border: 1px solid var(--teal-line); vertical-align: middle; margin-left: 6px; }
@@ -478,8 +480,8 @@
   .admin-row-meta a { color: var(--teal); }
 
   /* ---------- Buy Income Credits ---------- */
-  .credit-pack-row { display: flex; gap: 10px; margin: 12px 0; }
-  .credit-pack { flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; }
+  .credit-pack-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+  .credit-pack { flex: 1 1 calc(50% - 5px); min-width: 120px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; }
   .credit-pack.selected { border-color: var(--teal); background: var(--teal-soft); }
   .credit-pack .credit-pack-count { font-size: 15px; font-weight: 800; }
   .credit-pack .credit-pack-price { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
@@ -972,6 +974,29 @@ Rules:
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packSize, utr }),
       });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async getDirector() {
+      const r = await fetch(`${API_BASE}/api/director`, { credentials: 'include' });
+      if (!r.ok) return { hasDirectorAccess: false, directorAccessUntil: null, adminUpiId: '', requests: [] };
+      return r.json();
+    },
+    async requestDirectorPurchase(months, utr) {
+      const r = await fetch(`${API_BASE}/api/director/purchase-request`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ months, utr }),
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminListDirectorRequests() {
+      const r = await fetch(`${API_BASE}/api/admin/director-requests`, { credentials: 'include' });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminApproveDirectorRequest(id) {
+      const r = await fetch(`${API_BASE}/api/admin/director-requests/${id}/approve`, { method: 'POST', credentials: 'include' });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
+    async adminRejectDirectorRequest(id) {
+      const r = await fetch(`${API_BASE}/api/admin/director-requests/${id}/reject`, { method: 'POST', credentials: 'include' });
+      return r.ok;
     },
     async adminListWaitlist() {
       const r = await fetch(`${API_BASE}/api/admin/waitlist`, { credentials: 'include' });
@@ -3823,6 +3848,30 @@ ${e.rawResponse || '—'}`;
     state.screen = 'admin';
     renderApp();
   }
+  function formatPlainDate(dateStr) {
+    return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  // Always-visible (not just near-expiry) — used in the Settings modal's
+  // Account Access section, mirroring the extension's own always-on
+  // "Director access until ..." / "no expiry set" line.
+  function formatAccessUntil(dateStr, activePrefix) {
+    if (!dateStr) return activePrefix ? 'Active — no expiry set' : 'No expiry set';
+    return activePrefix ? `Active until ${formatPlainDate(dateStr)}` : `Access until ${formatPlainDate(dateStr)}`;
+  }
+  const EXPIRY_WARNING_DAYS = 7; // matches the extension's own threshold for the Director-expiry banner
+  // Proactive, non-blocking nudge — a manually-set stagepay_access_until
+  // (admin-granted, see the waitlist-approval modal) previously cut off
+  // silently with zero warning. No self-serve renewal flow exists for this
+  // yet, so this points at support email rather than a broken/nonexistent
+  // buy link (unlike the extension's Director banner, which links to the
+  // real /add-ons/director page).
+  function stagepayExpiryBannerHtml() {
+    if (!state.user || !state.user.stagepay_access_until) return '';
+    const daysLeft = Math.ceil((new Date(`${state.user.stagepay_access_until}T00:00:00`) - new Date()) / 86400000);
+    if (daysLeft > EXPIRY_WARNING_DAYS) return '';
+    const whenText = daysLeft <= 0 ? 'today' : `in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+    return `<div class="topbar-expiry-banner">⏳ Your StagePay access expires ${whenText} — <a href="mailto:stagepay.support@gmail.com">contact us to renew</a>.</div>`;
+  }
   function renderTopbar() {
     // Contextual: show "🎯 Goals" everywhere EXCEPT on the Goals screen
     // itself, where it'd be a no-op link back to the page you're already
@@ -3847,7 +3896,8 @@ ${e.rawResponse || '—'}`;
       <div style="display:flex;align-items:center;gap:10px">
         ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
         ${state.user ? `${goalsOrHomeBtn}${showcaseOrHomeBtn}${adminOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
-      </div>`;
+      </div>
+      ${stagepayExpiryBannerHtml()}`;
     const topbarHomeLink = document.getElementById('topbarHomeLink');
     if (topbarHomeLink && state.user) topbarHomeLink.addEventListener('click', goToProjectsScreen);
     const goalsNavBtn = document.getElementById('goalsNavBtn');
@@ -3984,6 +4034,12 @@ ${e.rawResponse || '—'}`;
             <p style="font-size:13px;font-weight:700;margin:2px 0 8px">💳 ${state.user.free_credits_remaining ?? 0} remaining</p>
             <button class="btn btn-sm" id="settingsBuyCreditsBtn">Buy more income credits</button>
           </div>
+          <div class="field" style="padding:0 16px 16px;border-top:1px solid var(--line-soft);padding-top:16px">
+            <label>Account Access</label>
+            <p style="font-size:12.5px;margin:4px 0 2px">StagePay: ${formatAccessUntil(state.user.stagepay_access_until)}</p>
+            <p style="font-size:12.5px;margin:0 0 8px">Director: ${state.user.has_director_access ? formatAccessUntil(state.user.director_access_until, true) : 'Not active'}</p>
+            <button class="btn btn-sm" id="settingsBuyDirectorBtn">${state.user.has_director_access ? 'Extend Director' : 'Buy Director'}</button>
+          </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px">
             <button class="btn btn-primary" id="settingsSaveBtn">Save</button>
           </div>
@@ -3994,6 +4050,10 @@ ${e.rawResponse || '—'}`;
     document.getElementById('settingsBuyCreditsBtn').addEventListener('click', () => {
       closeSettingsModal();
       openBuyCreditsModal();
+    });
+    document.getElementById('settingsBuyDirectorBtn').addEventListener('click', () => {
+      closeSettingsModal();
+      openBuyDirectorModal();
     });
     document.getElementById('settingsUpiRevealBtn').addEventListener('click', () => {
       const input = document.getElementById('settingsUpiId');
@@ -4941,9 +5001,12 @@ ${e.rawResponse || '—'}`;
               <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:14px">
                 <p style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em;margin:0 0 6px">Your requests</p>
                 ${requests.map((r) => `
-                  <div class="credit-request-row">
-                    <span>${r.pack_size} credits · ₹${(r.amount_paise / 100).toFixed(0)}</span>
-                    <span class="credit-status ${r.status}">${esc(r.status)}</span>
+                  <div class="credit-request-row" style="flex-direction:column;align-items:stretch">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span>${r.pack_size} credits · ₹${(r.amount_paise / 100).toFixed(0)}</span>
+                      <span class="credit-status ${r.status}">${esc(r.status)}</span>
+                    </div>
+                    <span style="font-size:11px;color:var(--text-faint);margin-top:2px">Submitted ${esc(formatIST(r.created_at))}${r.resolved_at ? ` · Resolved ${esc(formatIST(r.resolved_at))}` : ''}</span>
                   </div>`).join('')}
               </div>` : ''}
           </div>
@@ -4985,22 +5048,122 @@ ${e.rawResponse || '—'}`;
     });
   }
 
+  // ---------- Buy Director modal ----------
+  // Discounted duration tiers rather than flat per-month pricing, to reward
+  // a longer upfront commitment (and mean fewer manual renewal requests to
+  // process): [months, totalPaise].
+  const DIRECTOR_TIERS = [[1, 29900], [3, 83700], [6, 149400], [12, 238800]];
+  let buyDirectorDraft = null;
+  async function openBuyDirectorModal() {
+    const data = await api.getDirector();
+    buyDirectorDraft = { ...data, selectedMonths: null };
+    renderBuyDirectorModal();
+  }
+  function closeBuyDirectorModal() {
+    buyDirectorDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderBuyDirectorModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !buyDirectorDraft) { if (root) root.innerHTML = ''; return; }
+    const { hasDirectorAccess, directorAccessUntil, adminUpiId, requests, selectedMonths } = buyDirectorDraft;
+    root.innerHTML = `
+      <div class="modal-overlay" id="buyDirectorOverlay">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-head"><strong>🎬 Buy Director</strong><button class="modal-close" id="buyDirectorCloseBtn">×</button></div>
+          <div style="padding:16px">
+            <p style="font-size:13px;margin:0 0 12px">${hasDirectorAccess
+              ? `Active${directorAccessUntil ? ` until ${esc(formatPlainDate(directorAccessUntil))}` : ' — no expiry set'}. Buying more time extends from your current expiry.`
+              : "Director isn't active on your account yet."}</p>
+            <div class="credit-pack-row">
+              ${DIRECTOR_TIERS.map(([months, paise]) => `
+                <div class="credit-pack ${selectedMonths === months ? 'selected' : ''}" data-director-tier="${months}">
+                  <div class="credit-pack-count">${months} month${months === 1 ? '' : 's'}</div>
+                  <div class="credit-pack-price">₹${(paise / 100).toFixed(0)}${months > 1 ? ` <span style="font-weight:400;font-size:11px">(₹${Math.round(paise / 100 / months)}/mo)</span>` : ''}</div>
+                </div>`).join('')}
+            </div>
+            ${selectedMonths ? `
+              <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:6px">
+                <p style="font-size:13px;margin:0 0 10px">Pay ₹${(DIRECTOR_TIERS.find((t) => t[0] === selectedMonths)[1] / 100).toFixed(0)} to this UPI ID:</p>
+                <div id="buyDirectorQrWrap" style="text-align:center;margin-bottom:10px"><p>Generating QR…</p></div>
+                <p style="text-align:center;font-size:13px;font-weight:700">${esc(adminUpiId || 'UPI ID not set up yet')}</p>
+                <div class="field" style="margin-top:14px">
+                  <label for="buyDirectorUtr">UTR / reference number</label>
+                  <input id="buyDirectorUtr" type="text" placeholder="e.g. 402913887561" maxlength="100">
+                </div>
+                <button class="btn btn-primary" id="buyDirectorSubmitBtn" style="width:100%">Submit for Verification</button>
+              </div>` : ''}
+            ${requests.length ? `
+              <div style="border-top:1px solid var(--line-soft);padding-top:14px;margin-top:14px">
+                <p style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.04em;margin:0 0 6px">Your requests</p>
+                ${requests.map((r) => `
+                  <div class="credit-request-row" style="flex-direction:column;align-items:stretch">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span>${r.months} month${r.months === 1 ? '' : 's'} · ₹${(r.amount_paise / 100).toFixed(0)}</span>
+                      <span class="credit-status ${r.status}">${esc(r.status)}</span>
+                    </div>
+                    <span style="font-size:11px;color:var(--text-faint);margin-top:2px">Submitted ${esc(formatIST(r.created_at))}${r.resolved_at ? ` · Resolved ${esc(formatIST(r.resolved_at))}` : ''}</span>
+                  </div>`).join('')}
+              </div>` : ''}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('buyDirectorCloseBtn').addEventListener('click', closeBuyDirectorModal);
+    document.getElementById('buyDirectorOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyDirectorOverlay') closeBuyDirectorModal(); });
+    document.querySelectorAll('[data-director-tier]').forEach((el) => el.addEventListener('click', () => {
+      buyDirectorDraft.selectedMonths = Number(el.getAttribute('data-director-tier'));
+      renderBuyDirectorModal();
+    }));
+    if (!selectedMonths) return;
+    const amountRupees = DIRECTOR_TIERS.find((t) => t[0] === selectedMonths)[1] / 100;
+    const qrWrap = document.getElementById('buyDirectorQrWrap');
+    if (qrWrap && adminUpiId) {
+      const upiLink = buildUpiLink({ upiId: adminUpiId, payeeName: 'StagePay', amountRupees, note: `Director ${selectedMonths}mo` });
+      import('https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm')
+        .then(({ default: QRCode }) => QRCode.toDataURL(upiLink, { width: 200, margin: 1 }))
+        .then((dataUrl) => { qrWrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" alt="UPI payment QR code">`; })
+        .catch(() => { qrWrap.innerHTML = '<p>Could not generate QR code.</p>'; });
+    } else if (qrWrap) {
+      qrWrap.innerHTML = '<p>Admin UPI ID not set up yet — contact support directly.</p>';
+    }
+    document.getElementById('buyDirectorSubmitBtn').addEventListener('click', async () => {
+      const utr = document.getElementById('buyDirectorUtr').value.trim();
+      if (!utr) { toast('Enter your UTR / reference number', true); return; }
+      const btn = document.getElementById('buyDirectorSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      const { ok, body } = await api.requestDirectorPurchase(selectedMonths, utr);
+      if (!ok) {
+        toast(body.message || 'Could not submit request', true);
+        btn.disabled = false; btn.textContent = 'Submit for Verification';
+        return;
+      }
+      toast('Submitted — usually verified within a few hours');
+      const fresh = await api.getDirector();
+      buyDirectorDraft = { ...fresh, selectedMonths: null };
+      renderBuyDirectorModal();
+    });
+  }
+
   // ---------- Admin queue (?screen=admin) ----------
   let adminTab = 'waitlist';
-  let adminData = { applicants: [], creditRequests: [], users: [] };
+  let adminData = { applicants: [], creditRequests: [], directorRequests: [], users: [] };
   let adminUserSearch = '';
   async function renderAdminScreen() {
     const app = document.getElementById('app');
     app.style.cssText = '';
     app.innerHTML = `<div id="topbar" class="topbar"></div><div class="admin-page"><p>Loading…</p></div>`;
     renderTopbar();
-    const [waitlistRes, creditsRes, usersRes] = await Promise.all([api.adminListWaitlist(), api.adminListCreditRequests(), api.adminListUsers()]);
-    if (!waitlistRes.ok || !creditsRes.ok || !usersRes.ok) {
+    const [waitlistRes, creditsRes, directorRes, usersRes] = await Promise.all([
+      api.adminListWaitlist(), api.adminListCreditRequests(), api.adminListDirectorRequests(), api.adminListUsers(),
+    ]);
+    if (!waitlistRes.ok || !creditsRes.ok || !directorRes.ok || !usersRes.ok) {
       document.querySelector('.admin-page').innerHTML = `<p>You don't have access to this page.</p>`;
       return;
     }
     adminData.applicants = waitlistRes.body.applicants || [];
     adminData.creditRequests = creditsRes.body.requests || [];
+    adminData.directorRequests = directorRes.body.requests || [];
     adminData.users = usersRes.body.users || [];
     renderAdminScreenInto();
   }
@@ -5013,9 +5176,10 @@ ${e.rawResponse || '—'}`;
         <div class="admin-tabs">
           <button data-admin-tab="waitlist" class="${adminTab === 'waitlist' ? 'active' : ''}">Waitlist (${adminData.applicants.length})</button>
           <button data-admin-tab="credits" class="${adminTab === 'credits' ? 'active' : ''}">Income Credit Requests (${adminData.creditRequests.length})</button>
+          <button data-admin-tab="director" class="${adminTab === 'director' ? 'active' : ''}">Director Requests (${adminData.directorRequests.length})</button>
           <button data-admin-tab="users" class="${adminTab === 'users' ? 'active' : ''}">Users (${adminData.users.length})</button>
         </div>
-        ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : adminTab === 'credits' ? renderAdminCreditsTab() : renderAdminUsersTab()}
+        ${adminTab === 'waitlist' ? renderAdminWaitlistTab() : adminTab === 'credits' ? renderAdminCreditsTab() : adminTab === 'director' ? renderAdminDirectorTab() : renderAdminUsersTab()}
       </div>
       <div id="modalRoot"></div>`;
     renderTopbar();
@@ -5125,6 +5289,18 @@ ${e.rawResponse || '—'}`;
         </div>
       </div>`).join('');
   }
+  function renderAdminDirectorTab() {
+    if (!adminData.directorRequests.length) return '<p class="empty-note">No pending Director requests.</p>';
+    return adminData.directorRequests.map((r) => `
+      <div class="admin-row">
+        <div class="admin-row-head"><strong>${esc(r.user_name)}</strong> <span style="color:var(--text-faint);font-size:11.5px">(${esc(r.user_email)})</span></div>
+        <div class="admin-row-meta">${r.months} month${r.months === 1 ? '' : 's'} · ₹${(r.amount_paise / 100).toFixed(0)} · UTR: ${esc(r.utr)} · Submitted ${esc(formatIST(r.created_at))}</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-sm" data-admin-reject-director="${r.id}">Reject</button>
+          <button class="btn btn-sm btn-primary" data-admin-approve-director="${r.id}">Approve</button>
+        </div>
+      </div>`).join('');
+  }
   // Director is an addon, not a standalone product — the toggle + its own
   // optional end date only matter for the extension's Setup/Generate
   // features. stagepayAccessUntil is graceful (mirrors running out of
@@ -5193,6 +5369,25 @@ ${e.rawResponse || '—'}`;
       const ok = await api.adminRejectCreditRequest(id);
       if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
       adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
+      toast('Request rejected');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-approve-director]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-approve-director');
+      const req = adminData.directorRequests.find((r) => r.id === id);
+      btn.disabled = true; btn.textContent = 'Approving…';
+      const { ok, body } = await api.adminApproveDirectorRequest(id);
+      if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
+      adminData.directorRequests = adminData.directorRequests.filter((r) => r.id !== id);
+      toast(req ? `Director extended for ${req.user_name}${body.directorAccessUntil ? ` until ${formatPlainDate(body.directorAccessUntil)}` : ''}` : 'Approved');
+      renderAdminScreenInto();
+    }));
+    document.querySelectorAll('[data-admin-reject-director]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-admin-reject-director');
+      btn.disabled = true; btn.textContent = 'Rejecting…';
+      const ok = await api.adminRejectDirectorRequest(id);
+      if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
+      adminData.directorRequests = adminData.directorRequests.filter((r) => r.id !== id);
       toast('Request rejected');
       renderAdminScreenInto();
     }));

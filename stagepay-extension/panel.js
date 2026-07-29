@@ -41,6 +41,8 @@ let currentCompleted = false;
 // false, so nothing downstream of that point needs its own separate check.
 let hasDirectorAccess = false;
 let currentUserEmail = ''; // set by checkAccountAccess() — shown on the no-Director wall so it's clear which account is being checked
+let directorAccessUntilDate = null; // raw 'YYYY-MM-DD' from GET /auth/me, or null for no expiry — only meaningful once already 'ok' (an already-past date means hasDirectorAccess is false and the wall shows instead, not this)
+const EXPIRY_WARNING_DAYS = 7; // proactive nudge window — matches the same threshold used on the web app's own banner
 const stageConfigCache = {}; // { [stage]: parsed config JSON from GET /api/config/:stage }
 const itemDrafts = {}; // { [itemId]: { fields, prompt } } — in-memory only until "Save"
 const stagingFiles = {}; // { [itemId]: File[] } — picked/dropped but not yet sent to StagePay
@@ -214,6 +216,11 @@ function setStatus(message, kind, title) {
 //                     has passed)
 //   'ok'            — proceed with the normal project-detection flow below
 async function checkAccountAccess() {
+  // Reset up front, not just on the success path — a stale value from a
+  // PREVIOUS 'ok' check must never survive into a not-logged-in/suspended
+  // result just because an early return skipped reassigning it.
+  hasDirectorAccess = false;
+  directorAccessUntilDate = null;
   let meRes;
   try {
     meRes = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
@@ -226,11 +233,52 @@ async function checkAccountAccess() {
   currentUserEmail = data.user.email || '';
   if (data.user.suspended) return 'suspended';
   hasDirectorAccess = !!data.user.hasDirectorAccess;
+  directorAccessUntilDate = data.user.director_access_until || null;
   return hasDirectorAccess ? 'ok' : 'no-director';
+}
+
+// Proactive, non-blocking nudge above the item list — only shown once
+// directorAccessUntilDate is within EXPIRY_WARNING_DAYS (an already-past
+// date never reaches here at all: hasDirectorAccess would already be false,
+// landing on the full 'no-director' wall instead of this softer banner).
+// Hidden whenever there's nothing to warn about, including every non-'ok'
+// access outcome — checkAccountAccess() resets directorAccessUntilDate to
+// null on those, so this naturally clears itself without a separate check.
+function updateExpiryBanner() {
+  // Always-visible info line right under the "Connected to ..." status, but
+  // ONLY when access is actually 'ok' — this runs unconditionally from
+  // refreshFromActiveTab() for every outcome (not-logged-in, suspended,
+  // no-director too), and hasDirectorAccess is the one flag that's only
+  // ever true for 'ok'. Without this guard, a not-logged-in or suspended
+  // session would incorrectly show "no expiry set" right under a status
+  // line saying the opposite.
+  const infoEl = document.getElementById('directorExpiryInfo');
+  if (infoEl) {
+    if (!hasDirectorAccess) {
+      infoEl.hidden = true;
+    } else if (directorAccessUntilDate) {
+      const formatted = new Date(`${directorAccessUntilDate}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      infoEl.textContent = `Director access until ${formatted}`;
+      infoEl.hidden = false;
+    } else {
+      infoEl.textContent = 'Director access: no expiry set';
+      infoEl.hidden = false;
+    }
+  }
+
+  const el = document.getElementById('expiryBanner');
+  if (!el) return;
+  if (!directorAccessUntilDate) { el.hidden = true; return; }
+  const daysLeft = Math.ceil((new Date(`${directorAccessUntilDate}T00:00:00`) - new Date()) / 86400000);
+  if (daysLeft > EXPIRY_WARNING_DAYS) { el.hidden = true; return; }
+  el.hidden = false;
+  const whenText = daysLeft <= 0 ? 'today' : `in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+  el.innerHTML = `⏳ Director access expires ${whenText} — <a href="${API_BASE}/add-ons/director" target="_blank" rel="noopener">renew</a>`;
 }
 
 async function refreshFromActiveTab(force) {
   const access = await checkAccountAccess();
+  updateExpiryBanner();
   if (access === 'not-logged-in') {
     setStatus('Not logged in — log into StagePay in a normal tab first, then reopen this panel.', 'error', '🔒 Not logged in');
     landingIntroEl.hidden = false;
