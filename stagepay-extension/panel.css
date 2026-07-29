@@ -153,6 +153,17 @@ header strong { font-size: 14px; }
 .folder-connect-modal-card .folder-connect-modal-error { color: #b23a37; font-weight: 600; }
 .folder-connect-modal-card button { width: 100%; border: none; background: #176b5e; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 
+.status-modal-overlay {
+  position: fixed; inset: 0; background: rgba(20,22,27,.55); z-index: 105;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.status-modal-card { background: #fff; border-radius: 10px; padding: 16px; max-width: 100%; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.status-modal-card h2 { margin: 0 0 6px; font-size: 14px; }
+.status-modal-card p { margin: 0 0 12px; font-size: 12.5px; color: #4b5563; line-height: 1.5; }
+.status-modal-card.status-modal-error h2 { color: #b23a37; }
+.status-modal-card.status-modal-warn h2 { color: #a06a12; }
+.status-modal-card button { width: 100%; border: none; background: #176b5e; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+
 .see-all-btn { font-size: 10.5px; color: #176b5e; border: none; background: none; padding: 2px 0; cursor: pointer; margin: 2px 0 4px; display: inline-block; }
 .see-all-btn:hover { text-decoration: underline; }
 

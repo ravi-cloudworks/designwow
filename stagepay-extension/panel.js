@@ -144,6 +144,36 @@ async function init() {
   await tryRestoreDownloadsFolder();
 }
 
+// Sets the small #projectStatus line AND, for anything other than 'ok',
+// forces a persistent blocking modal too — these 4 states (no project tab
+// found, multiple conflicting projects open, not logged in, project load
+// failed) are standing conditions, not one-off events, so unlike the
+// dismissible openUploadErrorModal() this has no close button: it mirrors
+// renderFolderConnectModal()'s same forced pattern, and clears itself the
+// next time setStatus('Connected', 'ok') runs, not on user action.
+function setStatus(message, kind, title) {
+  statusEl.textContent = message;
+  statusEl.className = `status ${kind}`;
+  const root = document.getElementById('statusModalRoot');
+  if (!root) return;
+  if (kind === 'ok') { root.innerHTML = ''; return; }
+  // This overlay sits on top of the header too, covering the panel's own
+  // refresh button — without its own recheck button the only way to clear
+  // a resolved condition (e.g. closed the other project's tab) would be
+  // leaving and refocusing the window, since that's what actually re-runs
+  // refreshFromActiveTab(). Confirmed live: it doesn't auto-dismiss on its
+  // own otherwise.
+  root.innerHTML = `<div class="status-modal-overlay">
+    <div class="status-modal-card status-modal-${kind}">
+      <h2>${escapeHtml(title)}</h2>
+      <p>${escapeHtml(message)}</p>
+      <button type="button" id="statusModalRecheckBtn">🔄 Check again</button>
+    </div>
+  </div>`;
+  const btn = document.getElementById('statusModalRecheckBtn');
+  if (btn) btn.addEventListener('click', () => refreshFromActiveTab(true));
+}
+
 async function refreshFromActiveTab(force) {
   const detected = await detectOpenProjectId();
   if (detected && detected.conflict) {
@@ -152,8 +182,7 @@ async function refreshFromActiveTab(force) {
   }
   const projectId = detected;
   if (!projectId) {
-    statusEl.textContent = 'No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.';
-    statusEl.className = 'status error';
+    setStatus('No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.', 'error', '🔍 No project detected');
     landingIntroEl.hidden = false;
     currentProjectId = null;
     itemListEl.innerHTML = '';
@@ -189,31 +218,30 @@ async function showProjectConflictWarning(ids) {
       names = ids.map((id) => byId[id] || id);
     }
   } catch (e) { /* fine — falls back to raw ids below */ }
-  statusEl.textContent = `Multiple StagePay projects are open at once (${names.join(', ')}) — close all but one so Director knows which project to show.`;
-  statusEl.className = 'status warn';
+  setStatus(`Multiple StagePay projects are open at once (${names.join(', ')}) — close all but one so Director knows which project to show.`, 'warn', '⚠️ Multiple projects open');
 }
 
 // The web app already puts the open project's id in the URL as ?p=<id>
 // (added for its own refresh-persistence) — reading that is simpler and
-// more robust than trying to scrape the page for it. Prefers the tab that's
-// actually focused right now — if THIS window's active tab is itself a
-// StagePay project, that's unambiguous regardless of what other windows
-// have open, so it short-circuits below without even considering conflicts.
-// Only the fallback (this window's active tab isn't StagePay — e.g. it's on
-// Google Flow) scans across ALL windows, since a single login only ever has
-// one project open in the common case (StagePay in one window/monitor,
-// Flow in another) — restricting that scan to currentWindow would break
-// that entirely legitimate setup by finding nothing. The one real ambiguity
-// is when that scan turns up more than one DISTINCT project id — two
-// different projects open at once, anywhere — which is reported back as a
-// conflict instead of silently picking whichever tab happened to be found
-// first.
+// more robust than trying to scrape the page for it. Always scans across
+// ALL windows, not just this one — a single login only ever has one project
+// open in the common case (StagePay in one window/monitor, Flow in
+// another), so restricting to currentWindow would break that entirely
+// legitimate setup by finding nothing.
+//
+// Deliberately does NOT special-case "the active tab of this window is
+// itself a StagePay project" as automatically unambiguous — an earlier
+// version did, on the theory that looking straight at a project's own tab
+// can't be confusing. Confirmed live that it's still a real risk: the
+// conflict warning only ever appeared when the active tab wasn't StagePay
+// (e.g. on Flow), never when it WAS one of the two conflicting project
+// tabs directly — even though a second, different project sitting open in
+// another window is exactly the situation that risks an accidental
+// upload/delete landing on the wrong project's data through this
+// extension. So the one and only rule now: if more than one DISTINCT
+// project id is open anywhere, always report the conflict — regardless of
+// which tab happens to be focused when this runs.
 async function detectOpenProjectId() {
-  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (activeTab && activeTab.url && activeTab.url.startsWith(API_BASE)) {
-    const p = new URL(activeTab.url).searchParams.get('p');
-    if (p) return p;
-  }
   const tabs = await chrome.tabs.query({ url: `${API_BASE}/*` });
   const ids = [];
   for (const tab of tabs) {
@@ -237,15 +265,13 @@ async function loadProject() {
     fetch(`${API_BASE}/api/projects/${currentProjectId}`, { credentials: 'include' }),
   ]);
   if (listRes.status === 401 || detailRes.status === 401) {
-    statusEl.textContent = 'Not logged in — log into StagePay in a normal tab first, then reopen this panel.';
-    statusEl.className = 'status error';
+    setStatus('Not logged in — log into StagePay in a normal tab first, then reopen this panel.', 'error', '🔒 Not logged in');
     landingIntroEl.hidden = false;
     currentItems = [];
     return;
   }
   if (!listRes.ok || !detailRes.ok) {
-    statusEl.textContent = `Could not load project (${listRes.status}/${detailRes.status}).`;
-    statusEl.className = 'status error';
+    setStatus(`Could not load project (${listRes.status}/${detailRes.status}).`, 'error', "⚠️ Couldn't load project");
     landingIntroEl.hidden = false;
     currentItems = [];
     return;
@@ -267,8 +293,7 @@ async function loadProject() {
     } catch (e) { /* fine — falls back to upload-only rendering below */ }
   }
 
-  statusEl.textContent = 'Connected'; // project + stage now live once, in the stage banner below — no need to repeat it here
-  statusEl.className = 'status ok';
+  setStatus('Connected', 'ok'); // project + stage now live once, in the stage banner below — no need to repeat it here
   landingIntroEl.hidden = true;
 }
 
@@ -1463,6 +1488,7 @@ async function sendStagedFiles(itemId) {
       stagingFiles[itemId] = files.slice(i); // keep whatever didn't make it, so nothing's silently lost
       renderStaging(item);
       updateStagingActions(itemId);
+      openUploadErrorModal(`Upload failed on file ${i + 1} of ${files.length} ("${file.name}") — the rest weren't sent either. Try again.`);
       return;
     }
   }
