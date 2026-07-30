@@ -27,7 +27,7 @@
 // drag-drop-upload shortcut and ignores the rest.
 
 const API_BASE = 'https://stagepay.pages.dev';
-const STAGE_NAMES = { 1: 'Brief', 2: 'Story Board', 3: 'Visual & Music', 4: 'Scene Blueprint', 5: 'Final Movie' };
+const STAGE_NAMES = { 1: 'Creative Brief', 2: 'Story & Script', 3: 'Creative Direction', 4: 'Production Blueprint', 5: 'Final Ad Delivery' };
 
 let currentProjectId = null;
 let currentProjectName = '';
@@ -601,12 +601,33 @@ async function saveItemDraft(item) {
   v.prompt = promptVal;
 }
 
-// Same idea as the web app's mustAttachFiles — "every file this item needs
-// ALREADY attached as visual input before generating," not this item's own
-// (not-yet-produced) output. Kept in exact parity with index.html's version
-// so a Scene/Movie's reference list here always matches what the web app
-// itself would show.
-function mustAttachFiles(item, fields) {
+// Single source of truth for "which Character/Property/Background items are
+// featured in this scene" — a scene reads its OWN fields.refs; a movie
+// reads its PARENT scene's fields.refs (a movie has no refs of its own).
+// Always resolved live from theVersion(...).fields.refs, never from a
+// Setup-form draft — "Featured in this scene" is set immediately by a
+// separate refs-picker modal that saves to the server right away, so a
+// draft's copy of `.refs` would just be a one-time snapshot from whenever
+// that draft was first created, going stale on every later change.
+//
+// Both mustAttachFiles (which FILES to attach) and compilePrompt (which
+// NAMES/descriptions to write into the prompt text) call this SAME
+// function — confirmed live that having each resolve refs independently is
+// exactly how they drifted out of sync with each other before: fixing one
+// copy silently left the other one still reading stale data. One shared
+// resolution makes that class of bug structurally impossible now.
+function featuredRefItemsFor(item) {
+  const scene = item.item_key === 'scene' ? item : item.item_key === 'movie' ? itemById(item.parent_item_id) : null;
+  if (!scene) return [];
+  const refIds = Array.isArray(theVersion(scene).fields.refs) ? theVersion(scene).fields.refs : [];
+  return refIds.map((id) => itemById(id)).filter(Boolean);
+}
+
+// "Every file this item needs ALREADY attached as visual input before
+// generating," not this item's own (not-yet-produced) output. Kept in
+// exact parity with index.html's version so a Scene/Movie's reference list
+// here always matches what the web app itself would show.
+function mustAttachFiles(item) {
   const b = currentBrief || {};
   const logoFiles = () => (b.logo_media && b.logo_media.key ? [{ ...b.logo_media, icon: '🏷️' }] : []);
   const productFiles = () => (b.product_photos || []).map((p) => ({ ...p, icon: '📷' }));
@@ -618,15 +639,12 @@ function mustAttachFiles(item, fields) {
   if (item.item_key === 'property') return [...logoFiles(), ...productFiles()];
   if (item.item_key === 'background') return logoFiles();
   if (item.item_key === 'scene') {
-    const refIds = Array.isArray(fields.refs) ? fields.refs : [];
-    const refFiles = refIds.flatMap((id) => { const ref = itemById(id); return ref ? withIcon(itemMediaFiles(ref), '') : []; });
+    const refFiles = featuredRefItemsFor(item).flatMap((ref) => withIcon(itemMediaFiles(ref), ''));
     return [...refFiles, ...logoFiles()];
   }
   if (item.item_key === 'movie') {
     const scene = itemById(item.parent_item_id);
-    const sceneFields = scene ? (theVersion(scene).fields || {}) : {};
-    const refIds = Array.isArray(sceneFields.refs) ? sceneFields.refs : [];
-    const refFiles = refIds.flatMap((id) => { const ref = itemById(id); return ref ? withIcon(itemMediaFiles(ref), '') : []; });
+    const refFiles = featuredRefItemsFor(item).flatMap((ref) => withIcon(itemMediaFiles(ref), ''));
     const soundFiles = currentItems.filter((i) => i.stage === 3 && i.item_key === 'sound').flatMap((s) => withIcon(itemMediaFiles(s), '🔊'));
     return [...(scene ? withIcon(itemMediaFiles(scene), '🎬') : []), ...refFiles, ...soundFiles];
   }
@@ -685,7 +703,7 @@ function compilePrompt(item, fields) {
       base = f.description || '';
       break;
     case 'scene': {
-      const refItems = (f.refs || []).map((r) => itemById(r)).filter(Boolean);
+      const refItems = featuredRefItemsFor(item);
       const refLine = refItems.length
         ? ` Featuring (already approved and locked — replicate their appearance exactly as described, do not redesign or reinterpret them): ${refItems.map((it) => `${it.name} (${describeItemForRef(it)})`).join('; ')}.`
         : '';
@@ -698,7 +716,7 @@ function compilePrompt(item, fields) {
     default:
       base = '';
   }
-  const files = mustAttachFiles(item, f);
+  const files = mustAttachFiles(item);
   const refLine = files.length ? ` Reference images: ${files.map((x) => x.fileName).join(', ')}.` : '';
   return `${base}${refLine}`;
 }
@@ -729,7 +747,7 @@ function buildChatGptMetaPrompt(item, fields) {
     ? (ic.outputInstructions.find((o) => o.default) || ic.outputInstructions[0]).text
     : '';
   const contentDescription = compilePrompt(item, fields);
-  const files = mustAttachFiles(item, fields);
+  const files = mustAttachFiles(item);
   const fileNames = files.length ? files.map((f) => f.fileName).join(', ') : '(none attached yet)';
   const label = item.name || (itemConfigFor(item) || {}).label || item.item_key;
   return `I'm producing a "${label}" for a UGC-style product ad video. Use everything below — don't ask me for anything else, invent anything shown as a blank placeholder in parentheses like "(gender)" using good judgement for this brand:
@@ -768,7 +786,7 @@ function render() {
     return;
   }
   if (currentStage === 1) {
-    itemListEl.innerHTML = `<p class="stage-empty-note">Stage 1 (Brief) is filled in directly in StagePay itself — nothing to send to Flow yet. Once the brief is locked, reopen this panel.</p>`;
+    itemListEl.innerHTML = `<p class="stage-empty-note">Stage 1 (Creative Brief) is filled in directly in StagePay itself — nothing to send to Flow yet. Once the brief is locked, reopen this panel.</p>`;
     return;
   }
   const items = currentItems.filter((i) => i.stage === currentStage);
@@ -1217,6 +1235,19 @@ function renderItemCard(item) {
   // auto-overwrites it. Persisted the same way Story/Scene/Movie already
   // remember Generate-vs-Upload, in fields._uiMode.
   const promptMode = showPrompt && draft.fields._uiMode === 'custom' ? 'custom' : 'template';
+  if (showPrompt && promptMode === 'template') {
+    // Template mode is always derived and read-only — never hand-edited —
+    // so unlike draft.fields (which protects an in-progress Setup edit),
+    // draft.prompt has nothing worth preserving across renders. Recompiling
+    // it fresh on every render is what stops it going stale the same way
+    // refs used to: "Featured in this scene" can change at any time from
+    // the web app's separate refs modal, with nothing telling this panel to
+    // recompute — so the cached prompt from the last render/save just kept
+    // showing whichever references were featured as of the very first
+    // compile, even after Save (the same stale-cache bug class, just in the
+    // prompt textarea instead of mustAttachFiles/compilePrompt's own logic).
+    draft.prompt = composeFinalPrompt(item, compilePrompt(item, draft.fields));
+  }
   if (showPrompt) {
     const modeToggleHtml = `<div class="item-mode-toggle">
       <button type="button" class="${promptMode === 'template' ? 'active' : ''}" data-prompt-mode-btn="template" data-item-id="${item.id}">🧩 Template</button>
@@ -1335,17 +1366,26 @@ function renderItemRow(item, isSingleItem) {
 // already attached before generating) — distinct from loadThumbs below,
 // which shows this item's own already-uploaded OUTPUT. Same clipboard-copy
 // mechanism, different source list.
+//
+// Only the required files (mustAttachFiles — what's actually named in the
+// compiled prompt's "Featuring: ..."/"Reference images: ..." text) get a
+// copy button. Extras (optionalExtraReferenceFiles — storyboard, product
+// photos) are shown dimmed/dashed with no copy button at all: they're
+// deliberately never named in the prompt text (see that function's own
+// comment), so copying one into Flow wouldn't match anything the prompt
+// says — it'd just be an unlabeled extra image Flow has no textual cue to
+// weight correctly. Keeping copy limited to what the prompt actually
+// promises is what stops a designer from pasting the wrong set of images.
 async function loadMustAttach(item) {
   const row = document.querySelector(`[data-must-attach="${item.id}"]`);
   if (!row) return;
-  const draft = draftFor(item);
-  const required = mustAttachFiles(item, draft.fields);
+  const required = mustAttachFiles(item);
   // Extras appended after, deduped by storage key — the visual row is the
   // only place these optional references show; compilePrompt/ChatGPT text
   // generation still call mustAttachFiles directly and never see them.
   const extras = optionalExtraReferenceFiles(item).filter((f) => !required.some((r) => r.key === f.key));
-  const files = [...required, ...extras];
-  for (const f of files) {
+  const files = [...required.map((f) => ({ f, isExtra: false })), ...extras.map((f) => ({ f, isExtra: true }))];
+  for (const { f, isExtra } of files) {
     try {
       const mediaUrl = `${API_BASE}/api/media/${f.key}`;
       const r = await fetch(mediaUrl, { credentials: 'include' });
@@ -1353,27 +1393,29 @@ async function loadMustAttach(item) {
       const blob = await r.blob();
       if (!blob.type.startsWith('image/')) continue;
       const wrap = document.createElement('div');
-      wrap.className = 'must-attach-wrap';
+      wrap.className = isExtra ? 'must-attach-wrap must-attach-wrap-extra' : 'must-attach-wrap';
       const img = document.createElement('img');
       img.src = mediaUrl;
-      img.title = f.fileName;
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'must-attach-copy-btn';
-      copyBtn.textContent = '📋';
-      copyBtn.title = `Copy "${f.fileName}" — then paste (Ctrl/Cmd+V) into Flow`;
-      copyBtn.addEventListener('click', async () => {
-        try {
-          const pngBlob = blob.type === 'image/png' ? blob : await blobToPngBlob(blob);
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-          setLastCopied({ kind: 'image', label: f.fileName, preview: mediaUrl });
-          copyBtn.textContent = '✓';
-        } catch (e) {
-          copyBtn.textContent = '✗';
-        }
-        setTimeout(() => { copyBtn.textContent = '📋'; }, 1200);
-      });
+      img.title = isExtra ? `${f.fileName} (for your own reference — not named in the prompt)` : f.fileName;
       wrap.appendChild(img);
-      wrap.appendChild(copyBtn);
+      if (!isExtra) {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'must-attach-copy-btn';
+        copyBtn.textContent = '📋';
+        copyBtn.title = `Copy "${f.fileName}" — then paste (Ctrl/Cmd+V) into Flow`;
+        copyBtn.addEventListener('click', async () => {
+          try {
+            const pngBlob = blob.type === 'image/png' ? blob : await blobToPngBlob(blob);
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+            setLastCopied({ kind: 'image', label: f.fileName, preview: mediaUrl });
+            copyBtn.textContent = '✓';
+          } catch (e) {
+            copyBtn.textContent = '✗';
+          }
+          setTimeout(() => { copyBtn.textContent = '📋'; }, 1200);
+        });
+        wrap.appendChild(copyBtn);
+      }
       row.appendChild(wrap);
     } catch (e) { /* skip a file that failed to load */ }
   }

@@ -346,7 +346,7 @@ pay.get('/pay/:token/download/brief', async (c) => {
     b?.brand_color_secondary ? `- Secondary: ${b.brand_color_secondary}` : '',
   ].filter(Boolean);
 
-  const markdown = `# Client Brief — ${b?.product || '(product)'}
+  const markdown = `# Creative Brief — ${b?.product || '(product)'}
 
 **Goal:** ${b?.goal || '—'}
 **Video Style:** ${b?.video_style || '—'}
@@ -362,7 +362,7 @@ ${b?.product_description || '—'}
 ## Hook
 ${b?.hook || '—'}
 
-## Storyboard / Dialogue
+## Story & Script / Dialogue
 ${b?.storyboard || '—'}
 
 ## Call to Action

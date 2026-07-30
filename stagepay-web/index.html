@@ -1395,6 +1395,23 @@ Rules:
     }
   }
 
+  // Single source of truth for "which Character/Property/Background items are
+  // featured in this scene" — a scene resolves from its OWN fields (the
+  // `fields` passed in, so the Setup modal's live in-progress refs toggle
+  // still previews correctly before Save); a movie has no refs of its own,
+  // so it resolves its PARENT scene's already-saved fields instead. Reused
+  // by both mustAttachFiles (which FILES to attach) and compilePrompt (which
+  // NAMES/descriptions to write into the prompt text) so the two can never
+  // independently drift out of sync with each other — mirrors the identical
+  // function in the extension's panel.js.
+  function featuredRefItemsFor(item, fields) {
+    const scene = item.item_key === 'scene' ? item : (item.item_key === 'movie' ? itemById(item.parent_item_id) : null);
+    if (!scene) return [];
+    const sceneFields = scene === item ? (fields || {}) : (theVersion(scene).fields || {});
+    const refIds = Array.isArray(sceneFields.refs) ? sceneFields.refs : [];
+    return refIds.map(id => itemById(id)).filter(Boolean);
+  }
+
   // ---------- Prompt compilers (deterministic, Manual-mode default) ----------
   function compilePrompt(item, fieldsOverride) {
     const f = fieldsOverride || theVersion(item).fields || {};
@@ -1410,7 +1427,7 @@ Rules:
       // Character/Property/Background/Sound no longer generate anything via
       // Flow (upload-only now) — compilePrompt is never called for them.
       case 'scene': {
-        const refItems = (f.refs || []).map(r => itemById(r)).filter(Boolean);
+        const refItems = featuredRefItemsFor(item, f);
         const refLine = refItems.length
           ? ` Featuring (already approved and locked — replicate their appearance exactly as described, do not redesign or reinterpret them): ${refItems.map(it => `${it.name} (${describeItemForRef(it)})`).join('; ')}.`
           : '';
@@ -1611,7 +1628,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
       <div class="modal-overlay" id="sceneRefsModalOverlay">
         <div class="modal-card" style="max-width:440px">
           <div class="modal-head"><strong>Featured in this scene — ${esc(item.name || 'Scene')}</strong><button class="modal-close" id="sceneRefsModalCloseBtn">×</button></div>
-          <p class="modal-sub">You're uploading your own scene image, so there's nothing to generate here — just confirm who/what is in this scene so the Final Movie step attaches the right reference images.</p>
+          <p class="modal-sub">You're uploading your own scene image, so there's nothing to generate here — just confirm who/what is in this scene so the Final Ad Delivery step attaches the right reference images.</p>
           <div class="field"><div class="refs-picker">${sceneRefsPickerHtml(refs, 'data-scene-ref-toggle')}</div></div>
           <div class="modal-footer">
             <button class="btn" id="sceneRefsCancelBtn">Cancel</button>
@@ -2159,19 +2176,16 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     if (item.item_key === 'property') return [...logoFiles(), ...productFiles()];
     if (item.item_key === 'background') return logoFiles();
     if (item.item_key === 'scene') {
-      const refIds = Array.isArray(fields.refs) ? fields.refs : [];
-      const refFiles = refIds.flatMap(id => { const ref = itemById(id); return ref ? withIcon(itemMediaFiles(ref), ITEM_THUMBS[ref.item_key] || '') : []; });
+      const refFiles = featuredRefItemsFor(item, fields).flatMap(ref => withIcon(itemMediaFiles(ref), ITEM_THUMBS[ref.item_key] || ''));
       return [...refFiles, ...logoFiles()];
     }
     if (item.item_key === 'movie') {
       const scene = itemById(item.parent_item_id);
-      const sceneFields = scene ? (theVersion(scene).fields || {}) : {};
-      const refIds = Array.isArray(sceneFields.refs) ? sceneFields.refs : [];
       // The scene blueprint image already shows these visually, but the master
       // prompt explicitly claims to follow the Character/Prop Sheets too — this
       // makes that true, giving the video model the original clean reference
       // images as grounding, not just however well the blueprint replicated them.
-      const refFiles = refIds.flatMap(id => { const ref = itemById(id); return ref ? withIcon(itemMediaFiles(ref), ITEM_THUMBS[ref.item_key] || '') : []; });
+      const refFiles = featuredRefItemsFor(item).flatMap(ref => withIcon(itemMediaFiles(ref), ITEM_THUMBS[ref.item_key] || ''));
       const soundFiles = itemsFor(3, 'sound').flatMap(s => withIcon(itemMediaFiles(s), '🔊'));
       return [...withIcon(itemMediaFiles(scene), '🎬'), ...refFiles, ...soundFiles];
     }
@@ -2283,7 +2297,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
     // anything) was selected without reopening the modal. Show the picked
     // names right here instead.
     const sceneRefNames = item.item_key === 'scene'
-      ? (Array.isArray((version.fields || {}).refs) ? version.fields.refs : []).map(id => itemById(id)).filter(Boolean).map(it => it.name || itemLabel(it.stage, it.item_key))
+      ? featuredRefItemsFor(item, version.fields).map(it => it.name || itemLabel(it.stage, it.item_key))
       : [];
     const uploadOnlyStep = `
       <div class="story-step">
@@ -2292,7 +2306,7 @@ Write the final, ready-to-use image-generation prompt for Google Flow — concre
           <button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
           ${sceneRefNames.length
             ? `<p class="story-step-note" style="margin-top:6px">Featured: ${sceneRefNames.map(esc).join(', ')}</p>`
-            : `<p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Movie step attaches the right reference images.</p>`}
+            : `<p class="story-step-note" style="margin-top:6px">Pick who/what is in this scene so the Final Ad Delivery step attaches the right reference images.</p>`}
         </div>
       </div>
       <div class="story-step">
@@ -2547,7 +2561,7 @@ ${e.rawResponse || '—'}`;
   }
 
 
-  // ---------- Lane 1: Client Brief ----------
+  // ---------- Lane 1: Creative Brief ----------
   function textField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="text" value="${esc(value || '')}" data-brief-text="${key}" maxlength="150" ${locked ? 'disabled' : ''}></div>`; }
   function textareaField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-brief-text="${key}" style="min-height:110px" maxlength="1000" ${locked ? 'disabled' : ''}>${esc(value || '')}</textarea></div>`; }
   function pillField(label, value, options, key, locked) { return `<div class="field"><label>${esc(label)}</label><div class="pill-row">${options.map(o => `<button type="button" class="pill ${o === value ? 'selected' : ''}" data-brief-pick="${key}" data-value="${esc(o)}" ${locked ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div></div>`; }
@@ -2614,8 +2628,8 @@ ${e.rawResponse || '—'}`;
     const locked = !!b.locked;
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">1</span><span class="lane-title">Client Brief</span></div>
-        <p class="lane-desc">Given by the brand/customer. No versions — the raw input everything else builds from.</p>
+        <div class="lane-title-row"><span class="lane-badge">1</span><span class="lane-title">Creative Brief (Strategy)</span></div>
+        <p class="lane-desc">Turn vague client ideas into a clear ad strategy that wins approval before you create anything.</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">
           ${!locked ? `<span style="font-size:11.5px;color:var(--text-faint);font-weight:600">🎲 Sample data (for testing — replace before sending to a real customer):</span>
           <select id="sampleBriefSelect" class="icon-select" title="Load sample data">
@@ -2844,15 +2858,15 @@ ${e.rawResponse || '—'}`;
     })));
   }
 
-  // ---------- Lane 2: Story Board ----------
+  // ---------- Lane 2: Story & Script ----------
   // Story is always exactly one item, so unlike Stage 3-5 (which stay
   // two-tier: per-item card + one shared stage card), this collapses into a
   // single numbered card covering the whole path from draft to paid to locked.
   function renderLane2() {
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">2</span><span class="lane-title">Story Board</span>${earnedPillHtml(2)}${pendingPillHtml(2)}</div>
-        <p class="lane-desc">Pitch a few storyline directions, then approve the one that becomes the ad's spine.</p>
+        <div class="lane-title-row"><span class="lane-badge">2</span><span class="lane-title">Story & Script (Storyboard)</span>${earnedPillHtml(2)}${pendingPillHtml(2)}</div>
+        <p class="lane-desc">Sell the concept first with a scene-by-scene story — before spending time filming or generating AI videos.</p>
         </div>
       ${renderStoryCard()}`;
   }
@@ -3078,7 +3092,7 @@ ${e.rawResponse || '—'}`;
     }));
   }
 
-  // ---------- Lane 3: Visual & Music ----------
+  // ---------- Lane 3: Creative Direction ----------
   // Two-tier, unlike Stage 2: per-item cards keep steps 1-4 (Generate/
   // Download/Flow/Upload), and steps 5-7 (Amount/Paid/Lock) live once in a
   // shared card at the bottom — duplicating "set amount" per character would
@@ -3087,8 +3101,8 @@ ${e.rawResponse || '—'}`;
   function renderLane3() {
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Visual &amp; Music</span>${earnedPillHtml(3)}${pendingPillHtml(3)}</div>
-        <p class="lane-desc">Characters, properties, backgrounds, sounds — add as many as the story needs.</p>
+        <div class="lane-title-row"><span class="lane-badge">3</span><span class="lane-title">Creative Direction (Characters • Props • Backgrounds • Music &amp; Sound • Styling)</span>${earnedPillHtml(3)}${pendingPillHtml(3)}</div>
+        <p class="lane-desc">Lock in the entire visual identity so clients approve the look before production begins.</p>
         ${stageItemCapReached(3) ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(3))}</p>` : ''}
         </div>
       ${renderAutoPopulateCardHtml()}
@@ -3363,7 +3377,7 @@ ${e.rawResponse || '—'}`;
     }));
   }
 
-  // ---------- Lane 4: Scene Blueprint (content + camera/shot fields merged) ----------
+  // ---------- Lane 4: Production Blueprint (content + camera/shot fields merged) ----------
   function renderLane4() {
     const scenes = itemsFor(4, 'scene');
     const lock = stageLockFor(4);
@@ -3373,8 +3387,8 @@ ${e.rawResponse || '—'}`;
     const addTitleAttr = capReached4 ? ` title="${esc(stageItemCapMessage(4))}"` : '';
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Scene Blueprint</span>${earnedPillHtml(4)}${pendingPillHtml(4)}</div>
-        <p class="lane-desc">Add a scene for every beat in your storyboard — content and camera/shot direction together.</p>
+        <div class="lane-title-row"><span class="lane-badge">4</span><span class="lane-title">Production Blueprint</span>${earnedPillHtml(4)}${pendingPillHtml(4)}</div>
+        <p class="lane-desc">Break the ad into production-ready scenes, making revisions faster, cheaper, and easier to manage.</p>
         ${capReached4 ? `<p class="lane-desc" style="color:var(--amber);font-weight:600">⚠ ${esc(stageItemCapMessage(4))}</p>` : ''}
         </div>
       ${renderScenesSyncCardHtml()}
@@ -3411,7 +3425,7 @@ ${e.rawResponse || '—'}`;
     wireStagePaymentCard('lane4', 4);
   }
 
-  // ---------- Lane 5: Final Movie ----------
+  // ---------- Lane 5: Final Ad Delivery ----------
   function movieFor(sceneId) { return state.items.find(i => i.item_key === 'movie' && i.parent_item_id === sceneId); }
   function renderLane5() {
     const scenes = itemsFor(4, 'scene');
@@ -3425,7 +3439,7 @@ ${e.rawResponse || '—'}`;
     if (!scenes.length) {
       body = '<p class="empty-note">Add scenes in Stage 4 first.</p>';
     } else if (!movies.length && !finalVideoItem) {
-      body = '<p class="empty-note">Lock Stage 4 first — paid and approved by the customer — before Final Movie clips appear here.</p>';
+      body = '<p class="empty-note">Lock Stage 4 first — paid and approved by the customer — before Final Ad Delivery clips appear here.</p>';
     } else {
       // Final Video is the one thing the customer's public link actually
       // downloads for this stage (see pay.ts) — shown first and clearly
@@ -3441,8 +3455,8 @@ ${e.rawResponse || '—'}`;
     }
     return `
       <div class="lane-header">
-        <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Movie</span>${earnedPillHtml(5)}${pendingPillHtml(5)}</div>
-        <p class="lane-desc">Stitch the approved scene clips into one finished video — that's the only thing the customer downloads.</p>
+        <div class="lane-title-row"><span class="lane-badge">5</span><span class="lane-title">Final Ad Delivery</span>${earnedPillHtml(5)}${pendingPillHtml(5)}</div>
+        <p class="lane-desc">Produce the final polished commercial only after every creative decision has been approved and paid for.</p>
         </div>
       ${body}
       ${renderStagePaymentCardHtml(5)}`;
@@ -4151,17 +4165,17 @@ ${e.rawResponse || '—'}`;
       problemBullet1: '❌ Unpaid hours', problemBullet2: '❌ Wasted AI credits', problemBullet3: '❌ Endless revisions', problemBullet4: '❌ Scope creep', problemBullet5: '❌ Client ghosting',
       problemClosing: 'Every project becomes a gamble. StagePay changes the workflow.',
       flowTitle: 'Instead of creating an entire video first...', flowSub: '...you build it one paid stage at a time — approved and paid in days, not months.',
-      flowClientBrief: 'Client Brief', flowStoryboard: 'Storyboard', flowCustomerApproves: '↓ Customer approves ↓', flowYouGetPaid: 'You get paid',
-      flowCharactersMusic: 'Characters &amp; Music', flowSceneBlueprint: 'Scene Blueprint', flowFinalMovie: 'Final Movie', flowYouGetPaidFinal: 'You get paid — project complete',
+      flowClientBrief: 'Creative Brief', flowStoryboard: 'Story &amp; Script', flowCustomerApproves: '↓ Customer approves ↓', flowYouGetPaid: 'You get paid',
+      flowCharactersMusic: 'Creative Direction', flowSceneBlueprint: 'Production Blueprint', flowFinalMovie: 'Final Ad Delivery', flowYouGetPaidFinal: 'You get paid — project complete',
       flowNote: 'No approval. No payment. No generation.',
       poorTitle: 'Why This Keeps You From Staying Poor',
       poorLead: "Most creators build hours of work — AI generations or full shoots — before the client even approves the idea. StagePay flips that: every next stage only starts once the last one is approved and paid. Generating with AI? Your prompts stay aligned from start to finish — no rebuilding, no burned credits. Filming it yourself? No reshoots for a version nobody signed off on. Either way, you're never working past what's already been approved and paid for.",
       howTitle: 'How it Works',
-      step1Title: 'Client Brief', step1Desc: 'Collect everything once. Brand. Product. Campaign. Goals.',
-      step2Title: 'Storyboard', step2Desc: 'Write it, generate it, or upload one you built elsewhere. Customer approves it. Lock it.', step2Tag: 'Get paid',
-      step3Title: 'Visual &amp; Music', step3Desc: 'Upload your reference characters, props, backgrounds and sounds — locked to the approved storyboard. No guessing. Everything stays consistent.', step3Tag: 'Get paid',
-      step4Title: 'Scene Blueprint', step4Desc: 'Convert the approved story into production-ready scenes. Every prompt already knows the approved assets.', step4Tag: 'Get paid',
-      step5Title: 'Final Movie', step5Desc: 'Only now generate — or upload — the final videos. No surprises. No wasted work. Deliver.', step5Tag: 'Get paid — project complete',
+      step1Title: 'Creative Brief', step1Desc: 'Collect everything once. Brand. Product. Campaign. Goals.',
+      step2Title: 'Story &amp; Script', step2Desc: 'Write it, generate it, or upload one you built elsewhere. Customer approves it. Lock it.', step2Tag: 'Get paid',
+      step3Title: 'Creative Direction', step3Desc: 'Upload your reference characters, props, backgrounds and sounds — locked to the approved storyboard. No guessing. Everything stays consistent.', step3Tag: 'Get paid',
+      step4Title: 'Production Blueprint', step4Desc: 'Convert the approved story into production-ready scenes. Every prompt already knows the approved assets.', step4Tag: 'Get paid',
+      step5Title: 'Final Ad Delivery', step5Desc: 'Only now generate — or upload — the final videos. No surprises. No wasted work. Deliver.', step5Tag: 'Get paid — project complete',
       howeverTitle: 'Built for However You Create',
       aiLead: 'Generating with AI? Whether you use', aiClosing: '...StagePay makes sure you never generate expensive AI content before the client says "Yes."',
       filmLead: 'Shooting it yourself instead? Whether you create', filmClosing: '...same protection: nothing gets filmed, or paid for, until the client says yes.',
@@ -4212,17 +4226,17 @@ ${e.rawResponse || '—'}`;
       problemBullet1: '❌ बिना पैसे के घंटों काम', problemBullet2: '❌ बर्बाद हुए AI क्रेडिट', problemBullet3: '❌ खत्म न होने वाले रिवीज़न', problemBullet4: '❌ बढ़ता हुआ स्कोप', problemBullet5: '❌ क्लाइंट का गायब हो जाना',
       problemClosing: 'हर प्रोजेक्ट एक जुआ बन जाता है। StagePay यह तरीका बदल देता है।',
       flowTitle: 'पूरा वीडियो पहले बनाने की बजाय...', flowSub: '...आप इसे एक-एक पेड स्टेज करके बनाते हैं।',
-      flowClientBrief: 'क्लाइंट ब्रीफ़', flowStoryboard: 'स्टोरीबोर्ड', flowCustomerApproves: '↓ ग्राहक अप्रूव करता है ↓', flowYouGetPaid: 'आपको पेमेंट मिलती है',
-      flowCharactersMusic: 'किरदार और संगीत', flowSceneBlueprint: 'सीन ब्लूप्रिंट', flowFinalMovie: 'फाइनल मूवी', flowYouGetPaidFinal: 'आपको पेमेंट मिलती है — प्रोजेक्ट पूरा',
+      flowClientBrief: 'क्रिएटिव ब्रीफ़', flowStoryboard: 'स्टोरी और स्क्रिप्ट', flowCustomerApproves: '↓ ग्राहक अप्रूव करता है ↓', flowYouGetPaid: 'आपको पेमेंट मिलती है',
+      flowCharactersMusic: 'क्रिएटिव डायरेक्शन', flowSceneBlueprint: 'प्रोडक्शन ब्लूप्रिंट', flowFinalMovie: 'फाइनल एड डिलीवरी', flowYouGetPaidFinal: 'आपको पेमेंट मिलती है — प्रोजेक्ट पूरा',
       flowNote: 'न अप्रूवल, न पेमेंट, न जनरेशन।',
       poorTitle: 'यह आपको गरीब होने से कैसे बचाता है',
       poorLead: 'ज़्यादातर क्रिएटर्स क्लाइंट के आइडिया अप्रूव करने से पहले ही घंटों की मेहनत लगा देते हैं — चाहे AI जनरेशन हो या पूरी शूटिंग। StagePay इसे उल्टा कर देता है: अगली स्टेज तभी शुरू होती है जब पिछली स्टेज अप्रूव और पेड हो चुकी हो। AI से बना रहे हैं? आपके प्रॉम्प्ट शुरू से आखिर तक एक जैसे रहते हैं — न दोबारा बनाना, न क्रेडिट बर्बाद करना। खुद शूट कर रहे हैं? किसी ऐसे वर्ज़न के लिए दोबारा शूट नहीं करना जिसे किसी ने अप्रूव ही नहीं किया। दोनों ही तरह से, आप कभी उससे आगे काम नहीं करते जो पहले से अप्रूव और पेड है।',
       howTitle: 'यह कैसे काम करता है',
-      step1Title: 'क्लाइंट ब्रीफ़', step1Desc: 'एक बार में सब कुछ इकट्ठा करें। ब्रांड। प्रोडक्ट। कैंपेन। लक्ष्य।',
-      step2Title: 'स्टोरीबोर्ड', step2Desc: 'खुद लिखें, जनरेट करें, या कहीं और बनाया हुआ अपलोड करें। ग्राहक इसे अप्रूव करता है। लॉक करें।', step2Tag: 'पेमेंट पाएं',
-      step3Title: 'विज़ुअल और संगीत', step3Desc: 'अपने रेफरेंस किरदार, प्रॉप्स, बैकग्राउंड और साउंड अपलोड करें — अप्रूव्ड स्टोरीबोर्ड से जुड़े हुए। कोई अंदाज़ा नहीं। सब कुछ एक जैसा रहता है।', step3Tag: 'पेमेंट पाएं',
-      step4Title: 'सीन ब्लूप्रिंट', step4Desc: 'अप्रूव्ड कहानी को प्रोडक्शन-रेडी सीन में बदलें। हर प्रॉम्प्ट को अप्रूव्ड एसेट्स पहले से पता होते हैं।', step4Tag: 'पेमेंट पाएं',
-      step5Title: 'फाइनल मूवी', step5Desc: 'अब ही फाइनल वीडियो जनरेट करें — या अपलोड करें। कोई सरप्राइज़ नहीं। कोई बर्बाद मेहनत नहीं। डिलीवर करें।', step5Tag: 'पेमेंट पाएं — प्रोजेक्ट पूरा',
+      step1Title: 'क्रिएटिव ब्रीफ़', step1Desc: 'एक बार में सब कुछ इकट्ठा करें। ब्रांड। प्रोडक्ट। कैंपेन। लक्ष्य।',
+      step2Title: 'स्टोरी और स्क्रिप्ट', step2Desc: 'खुद लिखें, जनरेट करें, या कहीं और बनाया हुआ अपलोड करें। ग्राहक इसे अप्रूव करता है। लॉक करें।', step2Tag: 'पेमेंट पाएं',
+      step3Title: 'क्रिएटिव डायरेक्शन', step3Desc: 'अपने रेफरेंस किरदार, प्रॉप्स, बैकग्राउंड और साउंड अपलोड करें — अप्रूव्ड स्टोरीबोर्ड से जुड़े हुए। कोई अंदाज़ा नहीं। सब कुछ एक जैसा रहता है।', step3Tag: 'पेमेंट पाएं',
+      step4Title: 'प्रोडक्शन ब्लूप्रिंट', step4Desc: 'अप्रूव्ड कहानी को प्रोडक्शन-रेडी सीन में बदलें। हर प्रॉम्प्ट को अप्रूव्ड एसेट्स पहले से पता होते हैं।', step4Tag: 'पेमेंट पाएं',
+      step5Title: 'फाइनल एड डिलीवरी', step5Desc: 'अब ही फाइनल वीडियो जनरेट करें — या अपलोड करें। कोई सरप्राइज़ नहीं। कोई बर्बाद मेहनत नहीं। डिलीवर करें।', step5Tag: 'पेमेंट पाएं — प्रोजेक्ट पूरा',
       howeverTitle: 'आप जैसे भी बनाएं, इसके लिए बना है',
       aiLead: 'AI से बना रहे हैं? चाहे आप इस्तेमाल करें', aiClosing: '...StagePay तय करता है कि क्लाइंट के "हां" कहने से पहले आप महंगा AI कंटेंट कभी न बनाएं।',
       filmLead: 'खुद शूट कर रहे हैं? चाहे आप बनाएं', filmClosing: '...वही सुरक्षा: जब तक क्लाइंट "हां" नहीं कहता, न कुछ शूट होता है, न पेमेंट।',
@@ -4270,17 +4284,17 @@ ${e.rawResponse || '—'}`;
       problemBullet1: '❌ சம்பளமில்லா மணிநேரங்கள்', problemBullet2: '❌ வீணான AI கிரெடிட்கள்', problemBullet3: '❌ முடிவில்லா திருத்தங்கள்', problemBullet4: '❌ வேலை எல்லை மீறல்', problemBullet5: '❌ வாடிக்கையாளர் மறைதல்',
       problemClosing: 'ஒவ்வொரு திட்டமும் ஒரு சூதாட்டமாக மாறுகிறது. StagePay இந்த பணிமுறையை மாற்றுகிறது.',
       flowTitle: 'முழு வீடியோவையும் முதலில் உருவாக்குவதற்குப் பதிலாக...', flowSub: '...ஒரு நேரத்தில் ஒரு பணம் பெறும் நிலையாக அதை உருவாக்குகிறீர்கள்.',
-      flowClientBrief: 'வாடிக்கையாளர் விவரம்', flowStoryboard: 'கதைப்பலகை', flowCustomerApproves: '↓ வாடிக்கையாளர் ஒப்புதல் ↓', flowYouGetPaid: 'உங்களுக்கு பணம் கிடைக்கும்',
-      flowCharactersMusic: 'கதாபாத்திரங்கள் &amp; இசை', flowSceneBlueprint: 'காட்சி வடிவமைப்பு', flowFinalMovie: 'இறுதி திரைப்படம்', flowYouGetPaidFinal: 'உங்களுக்கு பணம் கிடைக்கும் — திட்டம் முடிந்தது',
+      flowClientBrief: 'படைப்பு சுருக்கம்', flowStoryboard: 'கதை &amp; ஸ்கிரிப்ட்', flowCustomerApproves: '↓ வாடிக்கையாளர் ஒப்புதல் ↓', flowYouGetPaid: 'உங்களுக்கு பணம் கிடைக்கும்',
+      flowCharactersMusic: 'படைப்பு இயக்கம்', flowSceneBlueprint: 'தயாரிப்பு வடிவமைப்பு', flowFinalMovie: 'இறுதி விளம்பர வழங்கல்', flowYouGetPaidFinal: 'உங்களுக்கு பணம் கிடைக்கும் — திட்டம் முடிந்தது',
       flowNote: 'ஒப்புதல் இல்லை. பணம் இல்லை. உருவாக்கமும் இல்லை.',
       poorTitle: 'இது உங்களை ஏழையாக இருந்து காப்பாற்றுவது எப்படி',
       poorLead: 'பெரும்பாலான உருவாக்குநர்கள் வாடிக்கையாளர் யோசனையை ஒப்புக்கொள்வதற்கு முன்பே மணிநேரக் கணக்கில் வேலையை உருவாக்குகிறார்கள் — AI உருவாக்கங்களோ முழு படப்பிடிப்போ. StagePay அதை தலைகீழாக்குகிறது: முந்தைய நிலை ஒப்புதல் பெற்று பணம் பெற்ற பின்னரே அடுத்த நிலை தொடங்கும். AI மூலம் உருவாக்குகிறீர்களா? உங்கள் ப்ராம்ப்ட்கள் தொடக்கத்திலிருந்து முடிவு வரை ஒத்திசைவாக இருக்கும் — மீண்டும் கட்டமைக்க வேண்டாம், கிரெடிட் வீணாக்க வேண்டாம். நீங்களே படமெடுக்கிறீர்களா? யாரும் ஒப்புக்கொள்ளாத பதிப்புக்காக மீண்டும் படமெடுக்க வேண்டாம். எப்படியிருந்தாலும், ஏற்கனவே ஒப்புதல் பெற்று பணம் பெற்றதற்கு மேல் நீங்கள் ஒருபோதும் வேலை செய்வதில்லை.',
       howTitle: 'இது எப்படி செயல்படுகிறது',
-      step1Title: 'வாடிக்கையாளர் விவரம்', step1Desc: 'எல்லாவற்றையும் ஒரே முறை சேகரிக்கவும். பிராண்ட். தயாரிப்பு. பிரச்சாரம். இலக்குகள்.',
-      step2Title: 'கதைப்பலகை', step2Desc: 'நீங்களே எழுதுங்கள், உருவாக்குங்கள், அல்லது வேறு இடத்தில் உருவாக்கியதை பதிவேற்றுங்கள். வாடிக்கையாளர் ஒப்புக்கொள்கிறார். பூட்டவும்.', step2Tag: 'பணம் பெறுங்கள்',
-      step3Title: 'காட்சி &amp; இசை', step3Desc: 'உங்கள் குறிப்பு கதாபாத்திரங்கள், பொருட்கள், பின்னணிகள் மற்றும் ஒலிகளை பதிவேற்றுங்கள் — ஒப்புதல் பெற்ற கதைப்பலகையுடன் இணைக்கப்பட்டுள்ளது. யூகிக்க வேண்டாம். எல்லாமே சீராக இருக்கும்.', step3Tag: 'பணம் பெறுங்கள்',
-      step4Title: 'காட்சி வடிவமைப்பு', step4Desc: 'ஒப்புதல் பெற்ற கதையை தயாரிப்புக்கு தயாரான காட்சிகளாக மாற்றுங்கள். ஒவ்வொரு ப்ராம்ப்ட்டுக்கும் ஒப்புதல் பெற்ற உள்ளடக்கங்கள் ஏற்கனவே தெரியும்.', step4Tag: 'பணம் பெறுங்கள்',
-      step5Title: 'இறுதி திரைப்படம்', step5Desc: 'இப்போது மட்டுமே இறுதி வீடியோக்களை உருவாக்குங்கள் — அல்லது பதிவேற்றுங்கள். எந்த ஆச்சரியமும் இல்லை. வீணான வேலையும் இல்லை. வழங்குங்கள்.', step5Tag: 'பணம் பெறுங்கள் — திட்டம் முடிந்தது',
+      step1Title: 'படைப்பு சுருக்கம்', step1Desc: 'எல்லாவற்றையும் ஒரே முறை சேகரிக்கவும். பிராண்ட். தயாரிப்பு. பிரச்சாரம். இலக்குகள்.',
+      step2Title: 'கதை &amp; ஸ்கிரிப்ட்', step2Desc: 'நீங்களே எழுதுங்கள், உருவாக்குங்கள், அல்லது வேறு இடத்தில் உருவாக்கியதை பதிவேற்றுங்கள். வாடிக்கையாளர் ஒப்புக்கொள்கிறார். பூட்டவும்.', step2Tag: 'பணம் பெறுங்கள்',
+      step3Title: 'படைப்பு இயக்கம்', step3Desc: 'உங்கள் குறிப்பு கதாபாத்திரங்கள், பொருட்கள், பின்னணிகள் மற்றும் ஒலிகளை பதிவேற்றுங்கள் — ஒப்புதல் பெற்ற கதைப்பலகையுடன் இணைக்கப்பட்டுள்ளது. யூகிக்க வேண்டாம். எல்லாமே சீராக இருக்கும்.', step3Tag: 'பணம் பெறுங்கள்',
+      step4Title: 'தயாரிப்பு வடிவமைப்பு', step4Desc: 'ஒப்புதல் பெற்ற கதையை தயாரிப்புக்கு தயாரான காட்சிகளாக மாற்றுங்கள். ஒவ்வொரு ப்ராம்ப்ட்டுக்கும் ஒப்புதல் பெற்ற உள்ளடக்கங்கள் ஏற்கனவே தெரியும்.', step4Tag: 'பணம் பெறுங்கள்',
+      step5Title: 'இறுதி விளம்பர வழங்கல்', step5Desc: 'இப்போது மட்டுமே இறுதி வீடியோக்களை உருவாக்குங்கள் — அல்லது பதிவேற்றுங்கள். எந்த ஆச்சரியமும் இல்லை. வீணான வேலையும் இல்லை. வழங்குங்கள்.', step5Tag: 'பணம் பெறுங்கள் — திட்டம் முடிந்தது',
       howeverTitle: 'நீங்கள் எப்படி உருவாக்கினாலும் அதற்காக கட்டமைக்கப்பட்டது',
       aiLead: 'AI மூலம் உருவாக்குகிறீர்களா? நீங்கள் பயன்படுத்தினாலும்', aiClosing: '...வாடிக்கையாளர் "சரி" என்று சொல்வதற்கு முன் விலையுயர்ந்த AI உள்ளடக்கத்தை நீங்கள் ஒருபோதும் உருவாக்காதபடி StagePay உறுதி செய்கிறது.',
       filmLead: 'நீங்களே படமெடுக்கிறீர்களா? நீங்கள் உருவாக்கினாலும்', filmClosing: '...அதே பாதுகாப்பு: வாடிக்கையாளர் சரி என்று சொல்லும் வரை எதுவும் படமெடுக்கப்படாது, பணமும் செலுத்தப்படாது.',
@@ -6237,7 +6251,7 @@ ${e.rawResponse || '—'}`;
   const STAGE_COLORS = { 1: '#9aa0ab', 2: '#176b5e', 3: '#a05f10', 4: '#8b5fbf', 5: '#2464b4' };
   // Same names as each lane's own header in the swimlane (renderLane1-5) —
   // "Stage 2" alone doesn't mean anything to the designer day-to-day.
-  const STAGE_NAMES = { 1: 'Client Brief', 2: 'Story Board', 3: 'Visual & Music', 4: 'Scene Blueprint', 5: 'Final Movie' };
+  const STAGE_NAMES = { 1: 'Creative Brief', 2: 'Story & Script', 3: 'Creative Direction', 4: 'Production Blueprint', 5: 'Final Ad Delivery' };
   const GOAL_STEP_PAISE = 500000; // ₹5,000 — the goal slider only ever lands on this grid
   const WORK_HISTORY_MONTHS = 6; // Work History tab's fixed window — used to be a 3/6-month toggle, now just always 6
   // Positions each label where a native range thumb would actually sit for
@@ -7450,7 +7464,7 @@ ${e.rawResponse || '—'}`;
 
           <div class="pay-stage-row" style="margin-bottom:14px">
             <div class="pay-stage-head" style="cursor:default">
-              <span class="pay-stage-title">📄 Your Brief</span>
+              <span class="pay-stage-title">📄 Your Creative Brief</span>
               <a class="btn btn-sm" href="${API_BASE}/api/pay/${token}/download/brief">⬇ Download</a>
             </div>
           </div>

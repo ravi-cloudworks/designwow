@@ -86,6 +86,10 @@ header strong { font-size: 14px; }
   border-radius: 50%; border: 1px solid #dbdfe2; background: #fff; font-size: 9px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
+/* Not named in the compiled prompt (see optionalExtraReferenceFiles) — no
+   copy button, and dimmed/dashed so it visually reads as "for your own
+   reference," not something to paste into Flow alongside the prompt. */
+.must-attach-wrap-extra img { opacity: 0.55; border-style: dashed; }
 .no-prompt-note { font-size: 11px; color: #8b92a1; margin: 0 0 6px; }
 .stage-empty-note { padding: 24px 16px; text-align: center; color: #8b92a1; font-size: 12px; }
 

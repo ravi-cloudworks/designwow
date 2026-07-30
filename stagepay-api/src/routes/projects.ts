@@ -34,7 +34,7 @@ const REQUIRED_BRIEF_FIELDS = [
   ['platform', 'Platform'],
   ['language', 'Language'],
   ['hook', 'Hook'],
-  ['storyboard', 'Storyboard / dialogue'],
+  ['storyboard', 'Story & Script / dialogue'],
   ['cta', 'Call to action'],
   ['brand_color_primary', 'Primary color'],
   ['brand_color_secondary', 'Secondary color'],
