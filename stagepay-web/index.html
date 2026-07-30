@@ -658,14 +658,17 @@
 
   const MAX_RECOMMENDED_SCENES = 8;
   // Builds a fully self-contained meta-prompt: every Stage 1 brief field the
-  // designer already filled in is baked straight into the text, so ChatGPT
-  // never needs anything pasted in separately — it invents/expands the
-  // storyline itself and hands back a dialogue-bearing, scene-capped script
-  // the designer pastes into the Storyboard/dialogue field below. Keeps
-  // Stage 1 data quality high without any AI call of our own.
+  // designer already filled in is baked straight into the text. This seeds
+  // EVERY downstream stage (Stage 3/4 sync off of it) — getting the story
+  // wrong here is expensive to unwind later, so unlike the per-item
+  // Enhance-with-ChatGPT prompt (a single targeted improvement), this one
+  // deliberately asks deeper clarifying questions about plot/dialogue/tone
+  // first, then hands back a COUPLE of distinct script options rather than
+  // one forced answer — the designer picks whichever fits best and pastes
+  // just that one option into the Storyboard/dialogue field below.
   function buildStoryboardChatGptPrompt(b) {
     const colors = [b.brand_color_primary, b.brand_color_secondary, b.brand_color_accent].filter(Boolean).join(', ') || '(not given)';
-    return `I'm writing the storyline for a ${b.duration || 30}-second UGC-style product ad video for ${b.platform || 'social media'}. Here is everything known about the brand/product/campaign — use ALL of it, don't ask me for anything else, invent anything below marked "(not given)":
+    return `I'm writing the storyline for a ${b.duration || 30}-second UGC-style product ad video for ${b.platform || 'social media'}. Here is everything known about the brand/product/campaign:
 
 Brand/product: ${b.product || '(not given)'}
 Product description: ${b.product_description || '(not given)'}
@@ -679,10 +682,15 @@ Language: ${b.language || 'English'}
 Hook (opening line/idea): ${b.hook || '(not given — invent one)'}
 Call to action: ${b.cta || '(not given)'}
 Brand colors: ${colors}
-${b.storyboard ? `My rough storyline so far — expand/polish this, keep its core idea:\n${b.storyboard}` : 'I don\'t have a storyline yet — invent one from everything above.'}
+${b.storyboard ? `My rough storyline so far — expand/polish this, keep its core idea:\n${b.storyboard}` : 'I don\'t have a storyline yet — help me invent one from everything above.'}
 
-Turn this into a storyboard script, formatted EXACTLY like this:
+This is the most important creative decision in the whole project — every later stage (cast, props, backgrounds, scene-by-scene shots) gets built from whatever story we lock in here, so it's worth getting right before I commit to one.
 
+Before writing anything, ask me a handful of short, specific questions about whatever is still genuinely unclear for a good script — things like: the exact moment/trigger where the product gets used, the emotional arc you want (what changes from beginning to end), any specific line of dialogue or catchphrase I already want included, what makes this brand's voice distinct, and whether there's a real testimonial/proof point to work in. Skip any question that's already answered by what I gave you above — only ask what's actually missing or ambiguous.
+
+Once I answer (or if nothing needs asking), give me 2-3 DIFFERENT script options — distinct creative directions, not minor rewordings of each other — so I can pick whichever fits best. Format EACH option like this, clearly labeled "OPTION A", "OPTION B", etc.:
+
+OPTION A
 SCENE 1
 Location: <short, concrete location>
 Time of Day: <Morning / Afternoon / Evening / Night>
@@ -693,14 +701,14 @@ Emotion: <exactly one of: Frustrated, Curious, Relieved, Happy, Excited, Confide
 SCENE 2
 ...
 
-Rules:
+Rules for every option:
 - Use AT MOST 8 scenes total — fewer is fine, do not pad to reach 8.
 - Every scene should be visually distinct (a real beat), not a rephrasing of the previous one.
 - Include actual dialogue or on-screen text in at least the scenes where it naturally belongs (e.g. a punchline, a CTA, a key stat) — don't leave every scene silent.
 - Objective and Emotion must each be exactly one of the listed options — do not invent your own wording for them.
 - Location and Time of Day should stay consistent across scenes unless the story actually moves somewhere else or a real time skip happens.
 - Keep it concrete and specific to this exact brand/product — no generic placeholder actions.
-- Output ONLY the scenes in that exact format, nothing else before or after.`;
+- I'll paste only ONE chosen option's scenes back into my form, so keep each option's SCENE block self-contained and don't mix numbering between options.`;
   }
 
   function countStoryboardScenes(text) {
@@ -1447,35 +1455,36 @@ Rules:
     return `${base}${refLine}`;
   }
   // Manual mode's real on-ramp to ChatGPT — every item type, not just Story
-  // (which already had its own dedicated template). Reuses compilePrompt's
-  // per-type Setup-field description as the raw material, so it's always in
-  // sync with whatever schema that item type actually has, and bundles in
-  // the Stage 1 brief + attached reference file names + this item's own
-  // output template, so ChatGPT gets the same context Gemini's own
-  // "Generate with AI" call would — the whole point being that Manual mode
-  // (no Gemini cost) can still produce AI-agent-quality prompts by routing
-  // through a designer's own ChatGPT instead.
+  // (which already had its own dedicated template). Mirrors the extension's
+  // buildChatGptMetaPrompt exactly (kept in sync) — enhances the EXACT
+  // prompt already compiled/shown in Generate (master template + universal
+  // style already baked in via composeFinalPrompt, nothing left to
+  // separately re-explain). Deliberately invites clarifying questions
+  // instead of forcing a single forced answer: a one-shot "don't ask me
+  // anything, output only the result" instruction just made ChatGPT guess
+  // at blanks like "(camera angle)" instead of asking what was actually
+  // meant — asking a few targeted questions first, in the same chat,
+  // produces a genuinely better final prompt to copy back.
   function buildItemChatGptPrompt(item, fields) {
-    const ic = itemConfigFor(item);
-    const master = ic && ic.outputInstructions && ic.outputInstructions.length
-      ? (ic.outputInstructions.find(o => o.default) || ic.outputInstructions[0]).text
-      : '';
-    const contentDescription = compilePrompt(item, fields);
+    const label = itemLabel(item.stage, item.item_key);
+    // Sound isn't a Flow image prompt at all — it's a brief for a sound
+    // designer or AI audio tool, so the framing/destination wording below
+    // has to say that instead of falsely claiming "Google Flow."
+    const isSound = item.item_key === 'sound';
+    const artifact = isSound ? 'sound brief' : 'prompt';
+    const currentPrompt = composeFinalPrompt(item, compilePrompt(item, fields));
     const files = mustAttachFiles(item, fields);
     const fileNames = files.length ? files.map(f => f.fileName).join(', ') : '(none attached yet)';
-    return `I'm producing a "${itemLabel(item.stage, item.item_key)}" reference image for a UGC-style product ad video. Use everything below — don't ask me for anything else, invent anything shown as a blank placeholder in parentheses like "(gender)" using good judgement for this brand:
+    return `I'm producing ${isSound ? `the sound brief for "${label}"` : `a "${label}" reference image`} for a UGC-style product ad video${isSound ? '' : ' in Google Flow'}.
 
 Campaign brief: ${briefSummaryPrompt()}
 
-This item's own details (from my Setup form):
-${contentDescription || '(nothing filled in yet)'}
+Here's the current compiled ${artifact} for this "${label}":
+${currentPrompt || '(nothing compiled yet)'}
 
-Reference files I already have attached, that Flow will see: ${fileNames}
+Reference files I already have attached: ${fileNames}
 
-Base creative direction to follow:
-${master || '(no template for this item type — just write a clean, concrete visual description)'}
-
-Write the final, ready-to-use image-generation prompt for Google Flow — concrete and specific, no placeholders left unfilled, following the structure/overlays implied above if any are shown. Output ONLY the prompt text, nothing else before or after.`;
+If anything above is genuinely ambiguous or missing (e.g. a blank placeholder like "(camera angle)", or a vague description), ask me up to 3-4 short questions about just those specific things — skip straight to the answer if nothing needs asking. Once I answer (or if you have no questions), reply with ONE improved version of this ${artifact}, ready to ${isSound ? 'hand to a sound designer or AI audio tool' : 'paste into Google Flow'}, in a single code block and nothing else outside it.`;
   }
   function briefSummaryPrompt() {
     const b = state.brief;

@@ -1,7 +1,7 @@
 {
   "stage": 3,
   "laneTitle": "Visual & Music",
-  "note": "Character/Property/Background regained a Flow prompt (031_stage3_flow_prompts) — not Gemini-drafted, just a fixed reference-sheet template (from the user's own tested RTF prompts) wrapped around one designer-typed one-line description, same masterSheetPrompt+yourDescription pattern as Story/Scene/Movie. This lives in the StagePay Bridge extension only, never in the swimlane itself — the swimlane stays upload-only for these types (see STAGEPAY_SWIMLANE_EXTENSION_PLAN.md). Sound has no Flow prompt — it's real audio, nothing to generate — and stays upload-only everywhere.",
+  "note": "Character/Property/Background regained a Flow prompt (031_stage3_flow_prompts) — not Gemini-drafted, just a fixed reference-sheet template (from the user's own tested RTF prompts) wrapped around one designer-typed one-line description, same masterSheetPrompt+yourDescription pattern as Story/Scene/Movie. This lives in the StagePay Director extension only, never in the swimlane itself — the swimlane stays upload-only for these types (see STAGEPAY_SWIMLANE_EXTENSION_PLAN.md). Sound got the same treatment in 038_sound_flow_prompt — a master sound-brief template (not a Flow image prompt) wrapped around its own one-line description, same pattern, for the extension's Enhance-with-ChatGPT flow.",
   "items": {
     "character": {
       "label": "Character",
@@ -51,6 +51,21 @@
         }
       ]
     },
-    "sound": { "label": "Sound" }
+    "sound": {
+      "label": "Sound",
+      "content": {
+        "fieldsSchema": [
+          { "key": "description", "label": "One-line sound description", "type": "textarea" }
+        ]
+      },
+      "outputInstructions": [
+        {
+          "key": "master_sound_reference_prompt",
+          "label": "Master Sound Reference Prompt",
+          "default": true,
+          "text": "Create a MASTER SOUND BRIEF for this audio element in a UGC-style product ad video.\n\nTYPE\n- Exactly what kind of sound this is (background music, jingle, sound effect, voiceover, or ambient noise)\n\nMOOD & STYLE\n- Genre, energy, and emotional tone that matches the brand and this ad's tone\n- A comparable reference if it helps (e.g. \"upbeat acoustic pop, similar to a coffee-shop morning ad\")\n\nTECHNICAL DETAILS\n- Tempo/BPM and key, if this is music\n- Duration this cue needs to cover\n- Specific instruments, textures, or sound sources to include, and anything to avoid\n\nDELIVERY\n- Format expected (loopable background bed, one-shot sound effect, spoken voiceover line, etc.)\n- Where in the video this plays and what it needs to sync with\n\nKeep it concrete and specific to this brand/product - no generic \"upbeat music\" placeholders. This brief is what a sound designer or AI audio tool will use to actually produce the track or clip."
+        }
+      ]
+    }
   }
 }

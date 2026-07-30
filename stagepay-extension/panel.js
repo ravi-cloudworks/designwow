@@ -700,6 +700,7 @@ function compilePrompt(item, fields) {
     case 'character':
     case 'property':
     case 'background':
+    case 'sound':
       base = f.description || '';
       break;
     case 'scene': {
@@ -737,32 +738,36 @@ function briefSummary() {
   return `A ${b.duration}-second ${b.platform || '(platform)'} UGC ad for ${b.product || '(product)'}, targeting ${b.audience || '(audience)'}. Goal: ${b.goal || '(goal)'}. Format: ${b.video_style || '(style)'}. Opens with "${b.hook || '(hook)'}" and closes on "${b.cta || '(CTA)'}". Dialogue in ${b.language || '(language)'}.`;
 }
 
-// Same meta-prompt shape as index.html's buildItemChatGptPrompt — this is
-// the non-Flow production path: a filmed creator (or an AI creator without
-// Flow open) gets a written, ChatGPT-composed shot list/direction instead of
-// an image-generation prompt.
+// Same meta-prompt shape as index.html's buildItemChatGptPrompt — enhances
+// the EXACT prompt already compiled/shown in this item's Template box
+// (master template + universal style already baked in via
+// composeFinalPrompt, so there's nothing left to separately re-explain).
+// Deliberately invites clarifying questions instead of forcing a single
+// forced answer: a one-shot "don't ask me anything, output only the
+// result" instruction just made ChatGPT guess at blanks like
+// "(camera angle)" instead of asking what was actually meant — asking a
+// few targeted questions first, in the same chat, produces a genuinely
+// better final prompt to copy back into Custom mode.
 function buildChatGptMetaPrompt(item, fields) {
-  const ic = itemConfigFor(item);
-  const master = ic && ic.outputInstructions && ic.outputInstructions.length
-    ? (ic.outputInstructions.find((o) => o.default) || ic.outputInstructions[0]).text
-    : '';
-  const contentDescription = compilePrompt(item, fields);
+  const label = item.name || (itemConfigFor(item) || {}).label || item.item_key;
+  // Sound isn't a Flow image prompt at all — it's a brief for a sound
+  // designer or AI audio tool, so the framing/destination wording below
+  // has to say that instead of falsely claiming "Google Flow."
+  const isSound = item.item_key === 'sound';
+  const artifact = isSound ? 'sound brief' : 'prompt';
+  const currentPrompt = composeFinalPrompt(item, compilePrompt(item, fields));
   const files = mustAttachFiles(item);
   const fileNames = files.length ? files.map((f) => f.fileName).join(', ') : '(none attached yet)';
-  const label = item.name || (itemConfigFor(item) || {}).label || item.item_key;
-  return `I'm producing a "${label}" for a UGC-style product ad video. Use everything below — don't ask me for anything else, invent anything shown as a blank placeholder in parentheses like "(gender)" using good judgement for this brand:
+  return `I'm producing ${isSound ? `the sound brief for "${label}"` : `a "${label}" reference image`} for a UGC-style product ad video${isSound ? '' : ' in Google Flow'}.
 
 Campaign brief: ${briefSummary()}
 
-This item's own details:
-${contentDescription || '(nothing filled in yet)'}
+Here's the current compiled ${artifact} for this "${label}":
+${currentPrompt || '(nothing compiled yet)'}
 
-Reference files I already have: ${fileNames}
+Reference files I already have attached: ${fileNames}
 
-Base creative direction to follow:
-${master || '(no template for this item type — just write a clean, concrete visual description)'}
-
-Write me a clear, concrete shot list / shooting direction I can actually film from — no placeholders left unfilled. Output ONLY the direction text, nothing else before or after.`;
+If anything above is genuinely ambiguous or missing (e.g. a blank placeholder like "(camera angle)", or a vague description), ask me up to 3-4 short questions about just those specific things — skip straight to the answer if nothing needs asking. Once I answer (or if you have no questions), reply with ONE improved version of this ${artifact}, ready to ${isSound ? 'hand to a sound designer or AI audio tool' : 'paste into Google Flow'}, in a single code block and nothing else outside it.`;
 }
 
 // ---------- rendering ----------
@@ -1273,7 +1278,7 @@ function renderItemCard(item) {
         <textarea data-prompt-area="${item.id}" ${promptMode === 'template' ? 'readonly' : ''} placeholder="${promptMode === 'custom' ? 'Paste your custom prompt here...' : 'Edit Setup above to fill this in...'}">${escapeHtml((promptMode === 'custom' ? draft.fields._customPrompt : draft.prompt) || '')}</textarea>
         <div class="row">
           <button type="button" data-copy-prompt-btn="${item.id}">📋 Copy prompt</button>
-          <button type="button" data-chatgpt-btn="${item.id}">🤖 Enhance this prompt with ChatGPT</button>
+          <button type="button" data-chatgpt-btn="${item.id}">🤖 Enhance Prompt With ChatGPT</button>
           <button type="button" class="primary" data-save-draft-btn="${item.id}">💾 Save</button>
         </div>`,
     });
