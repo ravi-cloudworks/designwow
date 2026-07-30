@@ -32,6 +32,13 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   in the compiled prompt; optional extras (storyboard, product photos) are
   shown dimmed/dashed with no copy button, since pasting them into Flow
   wouldn't match anything the prompt text says (537a5b9).
+- "Enhance with ChatGPT" (Story/Scene/Movie) no longer forces a single
+  guessed answer — it now sends the actual compiled prompt and invites a
+  few clarifying questions before giving one improved version in a
+  copyable code block. Added the same Flow/ChatGPT-enhance support to
+  Sound (framed as a sound brief, not a Flow image prompt), matching
+  Character/Property/Background. Renamed the button to "Enhance Prompt
+  With ChatGPT" (ca9d1d6).
 
 ## 0.3.0 — 2026-07-29
 
