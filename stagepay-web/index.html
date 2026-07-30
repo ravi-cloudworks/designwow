@@ -1170,6 +1170,12 @@ Rules for every option:
     entry.paidAt = paidAt;
     entry.totalPaidPaise = (entry.totalPaidPaise || 0) + entry.amountPaise;
     entry.payments = [...(entry.payments || []), { amountPaise: entry.amountPaise, paidAt }];
+    // The project-level "total earned" pill reads a SEPARATE field
+    // (state.paymentLink.totalEarnedPaise, singular) than the per-stage
+    // entry above — without this, it stayed stale until the next full
+    // refetch (page reload or the Refresh button), even though this
+    // stage's own pill updated instantly.
+    if (state.paymentLink) state.paymentLink.totalEarnedPaise = (state.paymentLink.totalEarnedPaise || 0) + entry.amountPaise;
   }
   function stageLockFor(stage) { return state.stageLocks.find(l => l.stage === stage) || null; }
   // Same "highest stage_locks row, +1 if it's locked" logic the project list
