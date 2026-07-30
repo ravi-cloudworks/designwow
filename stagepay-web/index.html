@@ -2186,7 +2186,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     if (item.item_key === 'background') return logoFiles();
     if (item.item_key === 'scene') {
       const refFiles = featuredRefItemsFor(item, fields).flatMap(ref => withIcon(itemMediaFiles(ref), ITEM_THUMBS[ref.item_key] || ''));
-      return [...refFiles, ...logoFiles()];
+      return [...refFiles, ...logoFiles(), ...productFiles()];
     }
     if (item.item_key === 'movie') {
       const scene = itemById(item.parent_item_id);

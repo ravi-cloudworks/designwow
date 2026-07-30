@@ -640,7 +640,7 @@ function mustAttachFiles(item) {
   if (item.item_key === 'background') return logoFiles();
   if (item.item_key === 'scene') {
     const refFiles = featuredRefItemsFor(item).flatMap((ref) => withIcon(itemMediaFiles(ref), ''));
-    return [...refFiles, ...logoFiles()];
+    return [...refFiles, ...logoFiles(), ...productFiles()];
   }
   if (item.item_key === 'movie') {
     const scene = itemById(item.parent_item_id);
