@@ -27,7 +27,8 @@ credits.get('/credits', async (c) => {
     .first<{ upi_id: string }>();
 
   const { results: requests } = await c.env.DB.prepare(
-    'SELECT id, pack_size, amount_paise, status, created_at, resolved_at FROM credit_purchase_requests WHERE user_id = ? ORDER BY created_at DESC'
+    `SELECT id, pack_size, amount_paise, status, created_at, resolved_at, reject_reason, previous_credits, new_credits
+     FROM credit_purchase_requests WHERE user_id = ? ORDER BY created_at DESC`
   )
     .bind(userId)
     .all();
@@ -54,6 +55,29 @@ credits.post('/credits/purchase-request', async (c) => {
     .run();
 
   return c.json({ id }, 201);
+});
+
+// Fixes a wrong/typo'd UTR on an already-paid request WITHOUT a new
+// payment — a rejection doesn't necessarily mean the money never arrived,
+// just that the admin couldn't match it against this reference number. Puts
+// the SAME row back to 'pending' (same id, same pack/amount) rather than
+// creating a new request, so there's exactly one record per real payment,
+// and clears the old rejection reason since it no longer applies.
+credits.post('/credits/purchase-request/:id/resubmit-utr', async (c) => {
+  const userId = await currentUserId(c);
+  if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+  const id = c.req.param('id');
+  const body = await c.req.json<{ utr?: string }>().catch(() => ({}) as { utr?: string });
+  const utr = (body.utr || '').trim();
+  if (!utr) return c.json({ error: 'utr_required', message: 'Enter the UTR / reference number from your payment.' }, 400);
+
+  const result = await c.env.DB.prepare(
+    "UPDATE credit_purchase_requests SET utr = ?, status = 'pending', resolved_at = NULL, reject_reason = NULL WHERE id = ? AND user_id = ? AND status = 'rejected'"
+  )
+    .bind(utr.slice(0, 100), id, userId)
+    .run();
+  if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
+  return c.json({ ok: true });
 });
 
 export default credits;

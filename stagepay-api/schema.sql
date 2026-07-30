@@ -200,7 +200,10 @@ CREATE TABLE IF NOT EXISTS credit_purchase_requests (
   utr TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  resolved_at TEXT
+  resolved_at TEXT,
+  reject_reason TEXT, -- shown to the designer alongside a 'rejected' status, e.g. a wrong/unmatched UTR
+  previous_credits INTEGER, -- permanent before/after snapshot, captured once at approval — the account's own balance drifts afterward, so this stays accurate regardless
+  new_credits INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_credit_purchase_requests_user ON credit_purchase_requests(user_id);
@@ -217,7 +220,10 @@ CREATE TABLE IF NOT EXISTS director_purchase_requests (
   utr TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  resolved_at TEXT
+  resolved_at TEXT,
+  reject_reason TEXT, -- shown to the designer alongside a 'rejected' status, e.g. a wrong/unmatched UTR
+  previous_access_until TEXT, -- permanent before/after snapshot, captured once at approval — the account's own expiry drifts with later renewals, so this stays accurate regardless
+  new_access_until TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_director_purchase_requests_user ON director_purchase_requests(user_id);

@@ -51,13 +51,18 @@ admin.post('/admin/waitlist/:userId/approve', async (c) => {
 
 admin.get('/admin/credit-requests', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT cpr.id, cpr.pack_size, cpr.amount_paise, cpr.utr, cpr.created_at, u.name AS user_name, u.email AS user_email
+    `SELECT cpr.id, cpr.pack_size, cpr.amount_paise, cpr.utr, cpr.created_at, u.name AS user_name, u.email AS user_email,
+            u.free_credits_remaining AS user_free_credits_remaining
      FROM credit_purchase_requests cpr JOIN users u ON u.id = cpr.user_id
      WHERE cpr.status = 'pending' ORDER BY cpr.created_at ASC`
   ).all();
   return c.json({ requests: results });
 });
 
+// previous_credits/new_credits are captured here, once, permanently — the
+// account's own free_credits_remaining keeps changing as they spend, so
+// showing "your current balance" next to an old approved request would
+// drift from what was actually true the moment it was approved.
 admin.post('/admin/credit-requests/:id/approve', async (c) => {
   const id = c.req.param('id');
   const request = await c.env.DB.prepare("SELECT user_id, pack_size FROM credit_purchase_requests WHERE id = ? AND status = 'pending'")
@@ -65,20 +70,29 @@ admin.post('/admin/credit-requests/:id/approve', async (c) => {
     .first<{ user_id: string; pack_size: number }>();
   if (!request) return c.json({ error: 'not_found' }, 404);
 
-  await c.env.DB.prepare('UPDATE users SET free_credits_remaining = free_credits_remaining + ? WHERE id = ?')
-    .bind(request.pack_size, request.user_id)
+  const user = await c.env.DB.prepare('SELECT free_credits_remaining FROM users WHERE id = ?')
+    .bind(request.user_id)
+    .first<{ free_credits_remaining: number }>();
+  const previousCredits = user?.free_credits_remaining ?? 0;
+  const newCredits = previousCredits + request.pack_size;
+
+  await c.env.DB.prepare('UPDATE users SET free_credits_remaining = ? WHERE id = ?')
+    .bind(newCredits, request.user_id)
     .run();
-  await c.env.DB.prepare("UPDATE credit_purchase_requests SET status = 'approved', resolved_at = datetime('now') WHERE id = ?")
-    .bind(id)
+  await c.env.DB.prepare(
+    "UPDATE credit_purchase_requests SET status = 'approved', resolved_at = datetime('now'), previous_credits = ?, new_credits = ? WHERE id = ?"
+  )
+    .bind(previousCredits, newCredits, id)
     .run();
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, previousCredits, newCredits });
 });
 
 admin.post('/admin/credit-requests/:id/reject', async (c) => {
   const id = c.req.param('id');
-  const result = await c.env.DB.prepare("UPDATE credit_purchase_requests SET status = 'rejected', resolved_at = datetime('now') WHERE id = ? AND status = 'pending'")
-    .bind(id)
+  const body = await c.req.json<{ reason?: string }>().catch(() => ({}) as { reason?: string });
+  const result = await c.env.DB.prepare("UPDATE credit_purchase_requests SET status = 'rejected', resolved_at = datetime('now'), reject_reason = ? WHERE id = ? AND status = 'pending'")
+    .bind((body.reason || '').trim().slice(0, 300) || null, id)
     .run();
   if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });
@@ -86,7 +100,8 @@ admin.post('/admin/credit-requests/:id/reject', async (c) => {
 
 admin.get('/admin/director-requests', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT dpr.id, dpr.months, dpr.amount_paise, dpr.utr, dpr.created_at, u.name AS user_name, u.email AS user_email
+    `SELECT dpr.id, dpr.months, dpr.amount_paise, dpr.utr, dpr.created_at, u.name AS user_name, u.email AS user_email,
+            u.director_access_until AS user_director_access_until
      FROM director_purchase_requests dpr JOIN users u ON u.id = dpr.user_id
      WHERE dpr.status = 'pending' ORDER BY dpr.created_at ASC`
   ).all();
@@ -97,6 +112,11 @@ admin.get('/admin/director-requests', async (c) => {
 // future (an early renewal — no already-paid time is lost), otherwise from
 // today (lapsed or never had it). Always sets has_director_access = 1,
 // even for a renewal on an account that had temporarily let it lapse.
+// previous_access_until/new_access_until are captured here, once,
+// permanently — the account's own director_access_until keeps changing
+// with later renewals, so an old request's own history needs its own fixed
+// record of what it actually did, not a live-drifting reference to "the
+// account's current expiry."
 admin.post('/admin/director-requests/:id/approve', async (c) => {
   const id = c.req.param('id');
   const request = await c.env.DB.prepare("SELECT user_id, months FROM director_purchase_requests WHERE id = ? AND status = 'pending'")
@@ -108,24 +128,28 @@ admin.post('/admin/director-requests/:id/approve', async (c) => {
     .bind(request.user_id)
     .first<{ director_access_until: string | null }>();
   const today = new Date().toISOString().slice(0, 10);
-  const base = user?.director_access_until && user.director_access_until > today ? new Date(`${user.director_access_until}T00:00:00`) : new Date();
+  const previousUntil = user?.director_access_until && user.director_access_until > today ? user.director_access_until : null;
+  const base = previousUntil ? new Date(`${previousUntil}T00:00:00`) : new Date();
   base.setMonth(base.getMonth() + request.months);
   const newUntil = base.toISOString().slice(0, 10);
 
   await c.env.DB.prepare('UPDATE users SET has_director_access = 1, director_access_until = ? WHERE id = ?')
     .bind(newUntil, request.user_id)
     .run();
-  await c.env.DB.prepare("UPDATE director_purchase_requests SET status = 'approved', resolved_at = datetime('now') WHERE id = ?")
-    .bind(id)
+  await c.env.DB.prepare(
+    "UPDATE director_purchase_requests SET status = 'approved', resolved_at = datetime('now'), previous_access_until = ?, new_access_until = ? WHERE id = ?"
+  )
+    .bind(previousUntil, newUntil, id)
     .run();
 
-  return c.json({ ok: true, directorAccessUntil: newUntil });
+  return c.json({ ok: true, previousAccessUntil: previousUntil, newAccessUntil: newUntil });
 });
 
 admin.post('/admin/director-requests/:id/reject', async (c) => {
   const id = c.req.param('id');
-  const result = await c.env.DB.prepare("UPDATE director_purchase_requests SET status = 'rejected', resolved_at = datetime('now') WHERE id = ? AND status = 'pending'")
-    .bind(id)
+  const body = await c.req.json<{ reason?: string }>().catch(() => ({}) as { reason?: string });
+  const result = await c.env.DB.prepare("UPDATE director_purchase_requests SET status = 'rejected', resolved_at = datetime('now'), reject_reason = ? WHERE id = ? AND status = 'pending'")
+    .bind((body.reason || '').trim().slice(0, 300) || null, id)
     .run();
   if (!result.meta.changes) return c.json({ error: 'not_found' }, 404);
   return c.json({ ok: true });

@@ -58,6 +58,7 @@
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; flex-shrink: 0; }
   .topbar-expiry-banner { flex-basis: 100%; background: #fdf3e3; border: 1px solid #eccd9a; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: #a05f10; font-weight: 600; }
   .topbar-expiry-banner a { color: #a05f10; text-decoration: underline; font-weight: 700; }
+  .topbar-expiry-banner button { border: none; background: none; color: #a05f10; cursor: pointer; font-size: 12px; padding: 0 0 0 2px; vertical-align: middle; }
   .topbar-title { display: flex; align-items: center; gap: 9px; }
   .topbar-title .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; }
   .beta-badge { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); border: 1px solid var(--teal-line); vertical-align: middle; margin-left: 6px; }
@@ -975,6 +976,12 @@ Rules:
       });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
     },
+    async resubmitCreditUtr(id, utr) {
+      const r = await fetch(`${API_BASE}/api/credits/purchase-request/${id}/resubmit-utr`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ utr }),
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
     async getDirector() {
       const r = await fetch(`${API_BASE}/api/director`, { credentials: 'include' });
       if (!r.ok) return { hasDirectorAccess: false, directorAccessUntil: null, adminUpiId: '', requests: [] };
@@ -986,6 +993,12 @@ Rules:
       });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
     },
+    async resubmitDirectorUtr(id, utr) {
+      const r = await fetch(`${API_BASE}/api/director/purchase-request/${id}/resubmit-utr`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ utr }),
+      });
+      return { ok: r.ok, body: await r.json().catch(() => ({})) };
+    },
     async adminListDirectorRequests() {
       const r = await fetch(`${API_BASE}/api/admin/director-requests`, { credentials: 'include' });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
@@ -994,8 +1007,10 @@ Rules:
       const r = await fetch(`${API_BASE}/api/admin/director-requests/${id}/approve`, { method: 'POST', credentials: 'include' });
       return { ok: r.ok, body: await r.json().catch(() => ({})) };
     },
-    async adminRejectDirectorRequest(id) {
-      const r = await fetch(`${API_BASE}/api/admin/director-requests/${id}/reject`, { method: 'POST', credentials: 'include' });
+    async adminRejectDirectorRequest(id, reason) {
+      const r = await fetch(`${API_BASE}/api/admin/director-requests/${id}/reject`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
+      });
       return r.ok;
     },
     async adminListWaitlist() {
@@ -1016,8 +1031,10 @@ Rules:
       const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/approve`, { method: 'POST', credentials: 'include' });
       return r.ok;
     },
-    async adminRejectCreditRequest(id) {
-      const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/reject`, { method: 'POST', credentials: 'include' });
+    async adminRejectCreditRequest(id, reason) {
+      const r = await fetch(`${API_BASE}/api/admin/credit-requests/${id}/reject`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
+      });
       return r.ok;
     },
     async adminListUsers() {
@@ -3858,6 +3875,19 @@ ${e.rawResponse || '—'}`;
     if (!dateStr) return activePrefix ? 'Active — no expiry set' : 'No expiry set';
     return activePrefix ? `Active until ${formatPlainDate(dateStr)}` : `Access until ${formatPlainDate(dateStr)}`;
   }
+  // Mirrors admin.ts's own director-approval date math EXACTLY — kept in
+  // sync by hand (separate execution contexts). Used only to show an
+  // accurate preview before the admin confirms; the server independently
+  // recomputes and commits the real result when the approve request lands,
+  // so a client/server mismatch here would only ever affect what the
+  // preview SAYS, never what actually gets saved.
+  function previewDirectorNewUntil(currentUntil, months) {
+    const today = new Date().toISOString().slice(0, 10);
+    const previousUntil = currentUntil && currentUntil > today ? currentUntil : null;
+    const base = previousUntil ? new Date(`${previousUntil}T00:00:00`) : new Date();
+    base.setMonth(base.getMonth() + months);
+    return { previousUntil, newUntil: base.toISOString().slice(0, 10) };
+  }
   const EXPIRY_WARNING_DAYS = 7; // matches the extension's own threshold for the Director-expiry banner
   // Proactive, non-blocking nudge — a manually-set stagepay_access_until
   // (admin-granted, see the waitlist-approval modal) previously cut off
@@ -3865,12 +3895,18 @@ ${e.rawResponse || '—'}`;
   // yet, so this points at support email rather than a broken/nonexistent
   // buy link (unlike the extension's Director banner, which links to the
   // real /add-ons/director page).
+  const SUPPORT_EMAIL = 'stagepay.support@gmail.com';
   function stagepayExpiryBannerHtml() {
     if (!state.user || !state.user.stagepay_access_until) return '';
     const daysLeft = Math.ceil((new Date(`${state.user.stagepay_access_until}T00:00:00`) - new Date()) / 86400000);
     if (daysLeft > EXPIRY_WARNING_DAYS) return '';
     const whenText = daysLeft <= 0 ? 'today' : `in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
-    return `<div class="topbar-expiry-banner">⏳ Your StagePay access expires ${whenText} — <a href="mailto:stagepay.support@gmail.com">contact us to renew</a>.</div>`;
+    // mailto: links silently do nothing on a machine with no default mail
+    // app configured (common with webmail-only setups, confirmed as the
+    // likely cause live) — the address itself is shown as plain, always-
+    // usable text alongside it, with its own copy button, rather than
+    // relying on mailto: being the only way to get it.
+    return `<div class="topbar-expiry-banner">⏳ Your StagePay access expires ${whenText} — email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a> to renew <button type="button" id="topbarExpiryCopyEmailBtn" title="Copy email address">📋</button></div>`;
   }
   function renderTopbar() {
     // Contextual: show "🎯 Goals" everywhere EXCEPT on the Goals screen
@@ -3898,6 +3934,10 @@ ${e.rawResponse || '—'}`;
         ${state.user ? `${goalsOrHomeBtn}${showcaseOrHomeBtn}${adminOrHomeBtn}<button class="btn btn-sm" id="settingsBtn">⚙ Settings</button><div class="user-chip">${state.user.avatar_url ? `<img src="${esc(state.user.avatar_url)}">` : ''}<span>${esc(state.user.name)}</span></div><button class="btn btn-sm" id="logoutBtn">Log out</button>` : ''}
       </div>
       ${stagepayExpiryBannerHtml()}`;
+    const topbarExpiryCopyEmailBtn = document.getElementById('topbarExpiryCopyEmailBtn');
+    if (topbarExpiryCopyEmailBtn) topbarExpiryCopyEmailBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(SUPPORT_EMAIL).then(() => toast('Email copied'));
+    });
     const topbarHomeLink = document.getElementById('topbarHomeLink');
     if (topbarHomeLink && state.user) topbarHomeLink.addEventListener('click', goToProjectsScreen);
     const goalsNavBtn = document.getElementById('goalsNavBtn');
@@ -5007,6 +5047,11 @@ ${e.rawResponse || '—'}`;
                       <span class="credit-status ${r.status}">${esc(r.status)}</span>
                     </div>
                     <span style="font-size:11px;color:var(--text-faint);margin-top:2px">Submitted ${esc(formatIST(r.created_at))}${r.resolved_at ? ` · Resolved ${esc(formatIST(r.resolved_at))}` : ''}</span>
+                    ${r.status === 'approved' && r.new_credits != null ? `<span style="font-size:11px;color:var(--teal);margin-top:2px">Approved — ${r.previous_credits} → ${r.new_credits} credits</span>` : ''}
+                    ${r.status === 'rejected' ? `
+                      ${r.reject_reason ? `<span style="font-size:11px;color:var(--crimson);margin-top:2px">Reason: ${esc(r.reject_reason)}</span>` : ''}
+                      <button type="button" class="btn btn-sm" data-resubmit-credit-utr="${r.id}" style="margin-top:6px;align-self:flex-start">Resubmit corrected UTR</button>
+                    ` : ''}
                   </div>`).join('')}
               </div>` : ''}
           </div>
@@ -5016,6 +5061,18 @@ ${e.rawResponse || '—'}`;
     document.getElementById('buyCreditsOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyCreditsOverlay') closeBuyCreditsModal(); });
     document.querySelectorAll('[data-credit-pack]').forEach((el) => el.addEventListener('click', () => {
       buyCreditsDraft.selectedPack = Number(el.getAttribute('data-credit-pack'));
+      renderBuyCreditsModal();
+    }));
+    document.querySelectorAll('[data-resubmit-credit-utr]').forEach((el) => el.addEventListener('click', async () => {
+      const reqId = el.getAttribute('data-resubmit-credit-utr');
+      const utr = prompt('Enter the corrected UTR / reference number for this same payment:');
+      if (!utr || !utr.trim()) return;
+      el.disabled = true; el.textContent = 'Resubmitting…';
+      const { ok, body } = await api.resubmitCreditUtr(reqId, utr.trim());
+      if (!ok) { toast(body.message || 'Could not resubmit', true); el.disabled = false; el.textContent = 'Resubmit corrected UTR'; return; }
+      toast('Resubmitted — usually verified within a few hours');
+      const fresh = await api.getCredits();
+      buyCreditsDraft = { ...fresh, selectedPack: buyCreditsDraft.selectedPack };
       renderBuyCreditsModal();
     }));
     if (!selectedPack) return;
@@ -5104,6 +5161,11 @@ ${e.rawResponse || '—'}`;
                       <span class="credit-status ${r.status}">${esc(r.status)}</span>
                     </div>
                     <span style="font-size:11px;color:var(--text-faint);margin-top:2px">Submitted ${esc(formatIST(r.created_at))}${r.resolved_at ? ` · Resolved ${esc(formatIST(r.resolved_at))}` : ''}</span>
+                    ${r.status === 'approved' && r.new_access_until ? `<span style="font-size:11px;color:var(--teal);margin-top:2px">Approved — ${r.previous_access_until ? formatPlainDate(r.previous_access_until) : 'not active'} → ${formatPlainDate(r.new_access_until)}</span>` : ''}
+                    ${r.status === 'rejected' ? `
+                      ${r.reject_reason ? `<span style="font-size:11px;color:var(--crimson);margin-top:2px">Reason: ${esc(r.reject_reason)}</span>` : ''}
+                      <button type="button" class="btn btn-sm" data-resubmit-director-utr="${r.id}" style="margin-top:6px;align-self:flex-start">Resubmit corrected UTR</button>
+                    ` : ''}
                   </div>`).join('')}
               </div>` : ''}
           </div>
@@ -5113,6 +5175,18 @@ ${e.rawResponse || '—'}`;
     document.getElementById('buyDirectorOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyDirectorOverlay') closeBuyDirectorModal(); });
     document.querySelectorAll('[data-director-tier]').forEach((el) => el.addEventListener('click', () => {
       buyDirectorDraft.selectedMonths = Number(el.getAttribute('data-director-tier'));
+      renderBuyDirectorModal();
+    }));
+    document.querySelectorAll('[data-resubmit-director-utr]').forEach((el) => el.addEventListener('click', async () => {
+      const reqId = el.getAttribute('data-resubmit-director-utr');
+      const utr = prompt('Enter the corrected UTR / reference number for this same payment:');
+      if (!utr || !utr.trim()) return;
+      el.disabled = true; el.textContent = 'Resubmitting…';
+      const { ok, body } = await api.resubmitDirectorUtr(reqId, utr.trim());
+      if (!ok) { toast(body.message || 'Could not resubmit', true); el.disabled = false; el.textContent = 'Resubmit corrected UTR'; return; }
+      toast('Resubmitted — usually verified within a few hours');
+      const fresh = await api.getDirector();
+      buyDirectorDraft = { ...fresh, selectedMonths: buyDirectorDraft.selectedMonths };
       renderBuyDirectorModal();
     }));
     if (!selectedMonths) return;
@@ -5142,6 +5216,56 @@ ${e.rawResponse || '—'}`;
       const fresh = await api.getDirector();
       buyDirectorDraft = { ...fresh, selectedMonths: null };
       renderBuyDirectorModal();
+    });
+  }
+
+  // ---------- Reject-reason modal (shared by credit & Director requests) ----------
+  // Quick-pick presets speed up the common cases; the free-text box always
+  // stays editable (picking a preset just fills it, doesn't lock it) since
+  // "Other" often needs a specific note. onSubmit fires with whatever text
+  // ends up in the box, even '' — an empty reason is allowed (rejected with
+  // no explanation), only Cancel/× aborts the reject entirely.
+  const REJECT_REASON_PRESETS = ['Amount not received', 'UTR incorrect — please resend the correct UTR'];
+  let rejectReasonDraft = null; // { onSubmit }
+  function openRejectReasonModal(onSubmit) {
+    rejectReasonDraft = { onSubmit };
+    renderRejectReasonModal();
+  }
+  function closeRejectReasonModal() {
+    rejectReasonDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderRejectReasonModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !rejectReasonDraft) { if (root) root.innerHTML = ''; return; }
+    root.innerHTML = `
+      <div class="modal-overlay" id="rejectReasonOverlay">
+        <div class="modal-card" style="max-width:380px">
+          <div class="modal-head"><strong>Reject request</strong><button class="modal-close" id="rejectReasonCloseBtn">×</button></div>
+          <div style="padding:16px">
+            <p style="font-size:12.5px;margin:0 0 10px;color:var(--text-faint)">Pick a reason, or write your own — shown to the designer.</p>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+              ${REJECT_REASON_PRESETS.map((r) => `<button type="button" class="btn btn-sm" data-reject-preset="${esc(r)}" style="text-align:left">${esc(r)}</button>`).join('')}
+            </div>
+            <div class="field">
+              <label for="rejectReasonCustom">Reason (optional, shown to the designer)</label>
+              <textarea id="rejectReasonCustom" rows="2" maxlength="300" placeholder="Pick a reason above, or write your own..."></textarea>
+            </div>
+            <button class="btn btn-primary" id="rejectReasonSubmitBtn" style="width:100%;margin-top:10px">Reject with this reason</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('rejectReasonCloseBtn').addEventListener('click', closeRejectReasonModal);
+    document.getElementById('rejectReasonOverlay').addEventListener('click', (e) => { if (e.target.id === 'rejectReasonOverlay') closeRejectReasonModal(); });
+    document.querySelectorAll('[data-reject-preset]').forEach((btn) => btn.addEventListener('click', () => {
+      document.getElementById('rejectReasonCustom').value = btn.getAttribute('data-reject-preset');
+    }));
+    document.getElementById('rejectReasonSubmitBtn').addEventListener('click', () => {
+      const reason = document.getElementById('rejectReasonCustom').value.trim();
+      const onSubmit = rejectReasonDraft.onSubmit;
+      closeRejectReasonModal();
+      onSubmit(reason);
     });
   }
 
@@ -5356,40 +5480,51 @@ ${e.rawResponse || '—'}`;
     document.querySelectorAll('[data-admin-approve-credit]').forEach((btn) => btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-admin-approve-credit');
       const req = adminData.creditRequests.find((r) => r.id === id);
+      const previous = req ? (req.user_free_credits_remaining ?? 0) : 0;
+      const newTotal = previous + (req ? req.pack_size : 0);
+      if (!confirm(`Approve ${req ? req.pack_size : ''} credits for ${req ? req.user_name : 'this user'}?\n\nCurrent balance: ${previous}\nNew balance: ${newTotal}`)) return;
       btn.disabled = true; btn.textContent = 'Approving…';
-      const ok = await api.adminApproveCreditRequest(id);
+      const { ok, body } = await api.adminApproveCreditRequest(id);
       if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
       adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
-      toast(req ? `${req.pack_size} income credits added to ${req.user_name}` : 'Approved');
+      toast(req ? `${req.pack_size} income credits added to ${req.user_name} (${body.previousCredits} → ${body.newCredits})` : 'Approved');
       renderAdminScreenInto();
     }));
-    document.querySelectorAll('[data-admin-reject-credit]').forEach((btn) => btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-admin-reject-credit]').forEach((btn) => btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-admin-reject-credit');
-      btn.disabled = true; btn.textContent = 'Rejecting…';
-      const ok = await api.adminRejectCreditRequest(id);
-      if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
-      adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
-      toast('Request rejected');
-      renderAdminScreenInto();
+      openRejectReasonModal(async (reason) => {
+        btn.disabled = true; btn.textContent = 'Rejecting…';
+        const ok = await api.adminRejectCreditRequest(id, reason);
+        if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
+        adminData.creditRequests = adminData.creditRequests.filter((r) => r.id !== id);
+        toast('Request rejected');
+        renderAdminScreenInto();
+      });
     }));
     document.querySelectorAll('[data-admin-approve-director]').forEach((btn) => btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-admin-approve-director');
       const req = adminData.directorRequests.find((r) => r.id === id);
+      if (req) {
+        const { previousUntil, newUntil } = previewDirectorNewUntil(req.user_director_access_until, req.months);
+        if (!confirm(`Extend Director for ${req.user_name} by ${req.months} month${req.months === 1 ? '' : 's'}?\n\nCurrent expiry: ${previousUntil ? formatPlainDate(previousUntil) : 'Not active'}\nNew expiry: ${formatPlainDate(newUntil)}`)) return;
+      }
       btn.disabled = true; btn.textContent = 'Approving…';
       const { ok, body } = await api.adminApproveDirectorRequest(id);
       if (!ok) { toast('Could not approve', true); btn.disabled = false; btn.textContent = 'Approve'; return; }
       adminData.directorRequests = adminData.directorRequests.filter((r) => r.id !== id);
-      toast(req ? `Director extended for ${req.user_name}${body.directorAccessUntil ? ` until ${formatPlainDate(body.directorAccessUntil)}` : ''}` : 'Approved');
+      toast(req ? `Director extended for ${req.user_name} — ${body.previousAccessUntil ? formatPlainDate(body.previousAccessUntil) : 'not active'} → ${formatPlainDate(body.newAccessUntil)}` : 'Approved');
       renderAdminScreenInto();
     }));
-    document.querySelectorAll('[data-admin-reject-director]').forEach((btn) => btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-admin-reject-director]').forEach((btn) => btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-admin-reject-director');
-      btn.disabled = true; btn.textContent = 'Rejecting…';
-      const ok = await api.adminRejectDirectorRequest(id);
-      if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
-      adminData.directorRequests = adminData.directorRequests.filter((r) => r.id !== id);
-      toast('Request rejected');
-      renderAdminScreenInto();
+      openRejectReasonModal(async (reason) => {
+        btn.disabled = true; btn.textContent = 'Rejecting…';
+        const ok = await api.adminRejectDirectorRequest(id, reason);
+        if (!ok) { toast('Could not reject', true); btn.disabled = false; btn.textContent = 'Reject'; return; }
+        adminData.directorRequests = adminData.directorRequests.filter((r) => r.id !== id);
+        toast('Request rejected');
+        renderAdminScreenInto();
+      });
     }));
     wireAdminUsersRows();
     const searchInput = document.getElementById('adminUserSearchInput');
