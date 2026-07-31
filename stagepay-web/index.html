@@ -2266,9 +2266,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     // Director extension, see STAGEPAY_SWIMLANE_EXTENSION_PLAN.md) — its old
     // "Movie Details" button/modal route had nothing left to offer once
     // Generate moved out, so it's grouped in here too. Scene is the one
-    // remaining exception (uploadOnlyStep, below) since "Featured in this
-    // scene" is a structural/continuity feature, not part of Generate, and
-    // stays in the swimlane permanently.
+    // remaining exception (see numberedStepsHtml, below) since "Featured in
+    // this scene" is a structural/continuity feature, not part of Generate,
+    // and stays in the swimlane permanently.
     const isUploadOnlyType = ['character', 'property', 'background', 'sound', 'final_video', 'movie'].includes(item.item_key);
     // Exactly one file per item (every label in MEDIA_LABELS is singular —
     // "Character Reference", "Scene Video", never plural) — so no `multiple`,
@@ -2348,7 +2348,20 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const sceneRefNames = item.item_key === 'scene'
       ? featuredRefItemsFor(item, version.fields).map(it => it.name || itemLabel(it.stage, it.item_key))
       : [];
-    const uploadOnlyStep = `
+    // Only one of these two branches is ever actually rendered (see
+    // isUploadOnlyType below) — computed inside an if/else, not as two
+    // unconditional consts, specifically so the DISCARDED branch never
+    // gets to consume/increment the shared stepNum counter. (It used to:
+    // both templates were built every render regardless of which one was
+    // used, so the unused one silently ate 2 step numbers before the real
+    // one got its turn — e.g. a Character showed "1" then "4" instead of
+    // "1" then "2".)
+    const numberedStepsHtml = isUploadOnlyType ? `
+      ${fieldsStepHtml}
+      <div class="story-step">
+        <span class="story-step-num">${stepNum++}</span>
+        <div class="story-step-body">${buildUploadWidget(false)}</div>
+      </div>` : `
       ${fieldsStepHtml}
       <div class="story-step">
         <span class="story-step-num">${stepNum++}</span>
@@ -2366,14 +2379,6 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
           ${buildUploadWidget(false)}
         </div>
       </div>`;
-    // Character/Property/Background/Sound: description (if any) + the
-    // upload widget, nothing else — no name-your-mode toggle, no Generate step.
-    const assetOnlyStep = `
-      ${fieldsStepHtml}
-      <div class="story-step">
-        <span class="story-step-num">${stepNum++}</span>
-        <div class="story-step-body">${buildUploadWidget(false)}</div>
-      </div>`;
     return `
       <div class="item-row ${isExpanded ? 'expanded' : ''}" data-item-row="${item.id}">
         <div class="item-row-head" data-toggle-item="${item.id}">
@@ -2386,7 +2391,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
         <div class="item-body">
           ${hasPrompt ? `<button type="button" class="btn btn-sm" data-view-prompt-btn="${item.id}" style="margin-bottom:8px">📄 View prompt</button>` : ''}
-          ${isUploadOnlyType ? assetOnlyStep : uploadOnlyStep}
+          ${numberedStepsHtml}
         </div>
       </div>`;
   }
