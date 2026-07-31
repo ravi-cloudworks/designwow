@@ -340,6 +340,11 @@ projects.post('/:id/unlock-brief', async (c) => {
   await c.env.DB.prepare('UPDATE stage1_brief SET locked = 0 WHERE project_id = ?').bind(id).run();
   await c.env.DB.prepare('DELETE FROM items WHERE project_id = ? AND stage >= 2').bind(id).run();
   await c.env.DB.prepare('DELETE FROM stage_locks WHERE project_id = ? AND stage >= 2').bind(id).run();
+  // Story's storyboard text is only editable again once unlocked, so this
+  // is the one moment the auto-populate cache (044_auto_populate_cache) can
+  // ever actually go stale — clear it here so the next Stage 3/4 Sync click
+  // calls Gemini fresh instead of replaying a response built from the old text.
+  await c.env.DB.prepare('DELETE FROM auto_populate_cache WHERE project_id = ?').bind(id).run();
   const briefUnlockLink = await c.env.DB.prepare('SELECT token FROM payment_links WHERE project_id = ?').bind(id).first<{ token: string }>();
   if (briefUnlockLink) {
     await c.env.DB.prepare('DELETE FROM payment_link_stages WHERE token = ? AND stage >= 2').bind(briefUnlockLink.token).run();

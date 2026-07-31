@@ -239,6 +239,18 @@ suggest.post('/auto-populate', async (c) => {
   }
   if (!autoPopulateFields.length) return c.json({ error: 'no_autopopulate_configured' }, 400);
 
+  // Repeated clicks of the same Sync button (Stage 3 or Stage 4) shouldn't
+  // pay for another Gemini call each time — Stage 1's storyboard is
+  // immutable once locked, so the same purpose+project can only ever need
+  // a fresh call again after unlock-brief's delete cascade clears this
+  // cache (see migration 044). "Purpose" is just which fields were asked
+  // for, sorted so request-order never matters.
+  const purpose = (body.fields && body.fields.length ? [...body.fields].sort() : [itemKey]).join(',');
+  const cached = await c.env.DB.prepare('SELECT response_json FROM auto_populate_cache WHERE project_id = ? AND purpose = ?')
+    .bind(body.projectId, purpose)
+    .first<{ response_json: string }>();
+  if (cached) return c.json({ autoPopulate: JSON.parse(cached.response_json) });
+
   // Every field requested in one call targets the same stage (Stage 3's
   // sync always requests characters/properties/backgrounds/sounds together,
   // Stage 4's sync always requests scenes alone) — so one stage-level cap
@@ -377,6 +389,13 @@ Respond with ONLY the JSON object. No markdown, no code fences, no explanation. 
   for (const f of autoPopulateFields) {
     autoPopulate[f.key] = sanitizeAutoPopulateEntries(parsed[f.key], extractSecondaryKeys(f.shape));
   }
+  // Only a genuinely successful extraction gets cached — every early
+  // return above (timeout, invalid JSON, etc.) skips this, so a failed
+  // call never gets "stuck" being replayed on the next click.
+  await c.env.DB.prepare(
+    `INSERT INTO auto_populate_cache (project_id, purpose, response_json) VALUES (?, ?, ?)
+     ON CONFLICT(project_id, purpose) DO UPDATE SET response_json = excluded.response_json, created_at = datetime('now')`
+  ).bind(body.projectId, purpose, JSON.stringify(autoPopulate)).run();
 
   return c.json({
     autoPopulate,
