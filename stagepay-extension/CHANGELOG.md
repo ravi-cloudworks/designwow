@@ -10,7 +10,7 @@ changed since the previous submission — move the "Unreleased" bullets under
 it and clear "Unreleased" back out. Ask Claude to do this as part of the
 release commit; it can reconstruct the list from `git log` if it falls behind.
 
-## Unreleased (queued for 0.4.0 — do not submit until 0.3.0 is approved/published)
+## 0.4.0 — 2026-07-31
 
 - Gated the extension behind Director access — removed the old "StagePay-only"
   fallback mode entirely (56d797d).
@@ -39,6 +39,8 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   Sound (framed as a sound brief, not a Flow image prompt), matching
   Character/Property/Background. Renamed the button to "Enhance Prompt
   With ChatGPT" (ca9d1d6).
+- Product photos now get a copy button on Scene reference thumbnails too
+  (previously only the brand logo did) (32f4249).
 
 ## 0.3.0 — 2026-07-29
 
