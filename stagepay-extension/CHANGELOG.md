@@ -48,6 +48,11 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
 - Scene now allows up to 2 uploaded images (previously capped at 1, same as
   Story) — a second keyframe gives Stage 5's clip generation a real
   start/end visual anchor for the motion (58bc7f6).
+- Movie's compiled prompt now explicitly names a scene's Start/End frame
+  images by role ("Start frame reference: X. End frame reference: Y.
+  Animate the transition from the Start frame to the End frame...") instead
+  of just listing filenames, so Flow has an explicit label to go by even
+  after it renames the attached files (c76ca8f).
 
 ## 0.3.0 — 2026-07-29
 
