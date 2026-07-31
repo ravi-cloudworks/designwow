@@ -575,21 +575,6 @@
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 
-  .debug-fab { position: fixed; right: 18px; bottom: 18px; z-index: 1500; border: 1px solid var(--line); background: var(--ink); color: var(--paper); border-radius: 999px; padding: 9px 15px; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-card); }
-  .debug-drawer { position: fixed; right: 18px; bottom: 66px; z-index: 1500; width: 420px; max-width: calc(100vw - 36px); max-height: 70vh; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); overflow: hidden; }
-  .debug-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .debug-entries { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-  .debug-entry { border: 1px solid var(--line-soft); border-radius: 7px; background: var(--surface-2); }
-  .debug-entry-head { display: flex; align-items: center; gap: 7px; padding: 8px 9px; cursor: pointer; font-size: 11.5px; font-weight: 600; }
-  .debug-model { font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
-  .debug-badge-ok { color: var(--moss); font-weight: 700; }
-  .debug-badge-error { color: var(--crimson); font-weight: 700; }
-  .debug-entry-body { display: none; padding: 0 10px 10px; }
-  .debug-entry.expanded .debug-entry-body { display: block; }
-  .debug-time { font-size: 10px; color: var(--text-faint); margin-bottom: 6px; font-family: var(--mono); }
-  .debug-error-line { font-size: 11.5px; color: var(--crimson); margin-bottom: 6px; }
-  .debug-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-faint); margin: 8px 0 4px; }
-  .debug-pre { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 10.5px; line-height: 1.5; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 8px; max-height: 220px; overflow-y: auto; margin: 0; }
 
   .pay-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; background: var(--paper); gap: 18px; }
   .pay-brand-bar { display: flex; align-items: center; gap: 8px; color: var(--text); }
@@ -1080,7 +1065,6 @@ Rules for every option:
     stageLocks: [], // [{stage, locked, lockedAt}] for the open project
     paymentLinks: [], // [{stage, amountPaise, paid, paidAt}] for the open project
     expandedItems: {},
-    debugLog: [], debugPanelOpen: false, debugExpanded: {},
     briefOpenSection: 'brand', // Stage 1 accordion — one section open at a time
     briefSampleKey: '', // which SAMPLE_BRIEFS entry was last loaded (so the selector keeps showing it, not resetting to the placeholder) — resets on project switch, not persisted server-side (it's just a UI convenience, not real brief data)
     renamingProject: false,
@@ -2580,103 +2564,6 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     }));
   }
 
-  // ---------- Debug console (Gemini request/response log, in-memory only) ----------
-  function logDebugEntry(item, result) {
-    const d = result.debug || {};
-    state.debugLog.unshift({
-      id: 'dbg' + Math.random().toString(36).slice(2, 9),
-      itemLabel: `${itemLabel(item.stage, item.item_key)} — ${item.name || ''}`,
-      time: d.requestedAt || new Date().toISOString(),
-      model: d.model || '—',
-      finishReason: d.finishReason || '',
-      retried: !!d.retried,
-      requestPrompt: d.requestPrompt || '',
-      rawResponse: d.rawResponse || '',
-      error: result.error || null,
-      errorMessage: result.message || d.parseError || '',
-      warning: result.warning || '',
-    });
-    if (state.debugLog.length > 20) state.debugLog.length = 20;
-    renderDebugPanel();
-  }
-  function debugEntryFullText(e) {
-    return `${e.itemLabel} — ${e.time}
-Model: ${e.model}${e.finishReason ? ` (finishReason: ${e.finishReason})` : ''}${e.retried ? ' [retried]' : ''}
-${e.error ? `Error: ${e.error}${e.errorMessage ? ` — ${e.errorMessage}` : ''}\n` : ''}${e.warning ? `Warning: ${e.warning}\n` : ''}
---- Request sent to Gemini ---
-${e.requestPrompt || '—'}
-
---- Raw response ---
-${e.rawResponse || '—'}`;
-  }
-  function debugEntryHtml(e) {
-    const expanded = !!state.debugExpanded[e.id];
-    return `<div class="debug-entry ${expanded ? 'expanded' : ''}" data-debug-key="${e.id}">
-      <div class="debug-entry-head">
-        <span class="${e.error ? 'debug-badge-error' : e.warning ? 'debug-badge-error' : 'debug-badge-ok'}">${e.error ? '✗' : e.warning ? '⚠' : '✓'}</span>
-        <span style="flex:1">${esc(e.itemLabel)}</span>
-        <span class="debug-model">${esc(e.model)}${e.finishReason ? ` · ${esc(e.finishReason)}` : ''}${e.retried ? ' · retried' : ''}</span>
-        <button type="button" class="icon-btn" data-debug-copy="${e.id}" title="Copy full request + response">📋</button>
-      </div>
-      <div class="debug-entry-body">
-        <div class="debug-time">${esc(e.time)}</div>
-        ${e.error ? `<div class="debug-error-line">Error: ${esc(e.error)}${e.errorMessage ? ` — ${esc(e.errorMessage)}` : ''}</div>` : ''}
-        ${e.warning ? `<div class="debug-error-line">⚠ ${esc(e.warning)}</div>` : ''}
-        <div class="debug-label">Request sent to Gemini</div>
-        <pre class="debug-pre">${esc(e.requestPrompt || '—')}</pre>
-        <div class="debug-label">Raw response</div>
-        <pre class="debug-pre">${esc(e.rawResponse || '—')}</pre>
-      </div>
-    </div>`;
-  }
-  function renderDebugPanel() {
-    const root = document.getElementById('debugPanelRoot');
-    if (!root) return;
-    const count = state.debugLog.length;
-    root.innerHTML = `
-      <button class="debug-fab" id="debugToggleBtn">🐞 Debug${count ? ` (${count})` : ''}</button>
-      ${state.debugPanelOpen ? `
-        <div class="debug-drawer">
-          <div class="debug-drawer-head"><strong>Gemini call log — this session only</strong>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-sm" id="debugClearBtn">Clear</button>
-              <button class="modal-close" id="debugCloseBtn">×</button>
-            </div>
-          </div>
-          <div class="debug-entries">
-            ${count ? state.debugLog.map(debugEntryHtml).join('') : '<p class="empty-note">No AI calls yet this session.</p>'}
-          </div>
-        </div>` : ''}`;
-    const toggleBtn = document.getElementById('debugToggleBtn');
-    if (toggleBtn) toggleBtn.addEventListener('click', () => { state.debugPanelOpen = !state.debugPanelOpen; renderDebugPanel(); });
-    const closeBtn = document.getElementById('debugCloseBtn');
-    if (closeBtn) closeBtn.addEventListener('click', () => { state.debugPanelOpen = false; renderDebugPanel(); });
-    const clearBtn = document.getElementById('debugClearBtn');
-    if (clearBtn) clearBtn.addEventListener('click', () => { state.debugLog = []; state.debugExpanded = {}; renderDebugPanel(); });
-    document.querySelectorAll('[data-debug-key]').forEach(el => el.querySelector('.debug-entry-head').addEventListener('click', (ev) => {
-      if (ev.target.closest('[data-debug-copy]')) return;
-      const key = el.getAttribute('data-debug-key');
-      state.debugExpanded[key] = !state.debugExpanded[key];
-      renderDebugPanel();
-    }));
-    document.querySelectorAll('[data-debug-copy]').forEach(btn => btn.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      const key = btn.getAttribute('data-debug-copy');
-      const entry = state.debugLog.find(e => e.id === key);
-      if (!entry) return;
-      const original = btn.textContent;
-      try {
-        await navigator.clipboard.writeText(debugEntryFullText(entry));
-        btn.textContent = '✓';
-        toast('Copied full request + response');
-      } catch {
-        toast('Could not copy — clipboard access denied');
-      }
-      setTimeout(() => { btn.textContent = original; }, 1600);
-    }));
-  }
-
-
   // ---------- Lane 1: Creative Brief ----------
   function textField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="text" value="${esc(value || '')}" data-brief-text="${key}" maxlength="150" ${locked ? 'disabled' : ''}></div>`; }
   function textareaField(label, value, key, locked) { const id = 'b' + key; return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-brief-text="${key}" style="min-height:110px" maxlength="1000" ${locked ? 'disabled' : ''}>${esc(value || '')}</textarea></div>`; }
@@ -3279,7 +3166,6 @@ ${e.rawResponse || '—'}`;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
         const result = await api.autoPopulateFromText(2, 'story', sourceText, ['characters', 'properties', 'backgrounds', 'sounds'], state.project.id);
-        logDebugEntry(story, result);
         if (result.error) { toast(result.message || `Sync failed: ${result.error}`); return; }
         const hasAny = result.autoPopulate && Object.values(result.autoPopulate).some(arr => Array.isArray(arr) && arr.length);
         if (!hasAny) { toast('No characters/props/backgrounds/sounds found in the current story'); return; }
@@ -3326,7 +3212,6 @@ ${e.rawResponse || '—'}`;
       const stopWaitTimer = startWaitTimer(btn, SYNC_WAIT_MESSAGES);
       try {
         const result = await api.autoPopulateFromText(2, 'story', sourceText, ['scenes'], state.project.id);
-        logDebugEntry(story, result);
         if (result.error) { toast(result.message || `Sync failed: ${result.error}`); return; }
         const hasAny = result.autoPopulate && Object.values(result.autoPopulate).some(arr => Array.isArray(arr) && arr.length);
         if (!hasAny) { toast('No scenes found in the current story'); return; }
@@ -7477,12 +7362,10 @@ ${e.rawResponse || '—'}`;
         <span>🎨 = persistent Stage 1 asset</span>
       </div>
       <div id="swimlaneWrap" class="swimlane-wrap"></div>
-      <div id="modalRoot"></div>
-      <div id="debugPanelRoot"></div>`;
+      <div id="modalRoot"></div>`;
     renderTopbar();
     renderProjectInfoBar();
     await renderTool();
-    renderDebugPanel();
   }
 
   // ---------- Moodboard (fullscreen, internal-only, one-page project snapshot) ----------
