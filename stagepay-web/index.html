@@ -2311,6 +2311,29 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
           ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
         </div>`;
     };
+    // Setup-field content (Character/Property/Background/Sound's one-line
+    // description, Scene's location/action/dialogue/emotion, Movie's scene
+    // description/direction/duration/broll/transition) previously only
+    // existed in the extension — a designer working from the swimlane alone
+    // had no idea what they were about to upload a match for. Reuses the
+    // exact same fieldsSchema + renderFieldControl the extension's own Setup
+    // form already uses, so it's the SAME live theVersion(item).fields on
+    // both sides — an edit here shows up in the extension next refresh, and
+    // vice versa, with no separate sync needed. A native <fieldset disabled>
+    // (not a per-control disabled attribute) locks the whole block at once
+    // once the stage is paid/locked.
+    const ic = itemConfigFor(item);
+    const fieldsSchema = (ic && ic.content && ic.content.fieldsSchema) || [];
+    let stepNum = 1;
+    const fieldsStepHtml = fieldsSchema.length ? `
+      <div class="story-step">
+        <span class="story-step-num">${stepNum++}</span>
+        <div class="story-step-body">
+          <fieldset data-item-fields="${item.id}" style="border:none;padding:0;margin:0" ${dis}>
+            ${fieldsSchema.map(def => renderFieldControl(def, (version.fields || {})[def.key], def.key)).join('')}
+          </fieldset>
+        </div>
+      </div>` : '';
     // Scene is the one type that still needs something above the plain
     // upload widget: "Featured in this scene" is a structural/continuity
     // decision (which approved character/prop/background belong to this
@@ -2326,8 +2349,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       ? featuredRefItemsFor(item, version.fields).map(it => it.name || itemLabel(it.stage, it.item_key))
       : [];
     const uploadOnlyStep = `
+      ${fieldsStepHtml}
       <div class="story-step">
-        <span class="story-step-num">1</span>
+        <span class="story-step-num">${stepNum++}</span>
         <div class="story-step-body">
           <button class="btn btn-sm" data-open-scene-refs="${item.id}" ${dis}>📋 Featured in this scene</button>
           ${sceneRefNames.length
@@ -2336,17 +2360,18 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>
       <div class="story-step">
-        <span class="story-step-num">2</span>
+        <span class="story-step-num">${stepNum++}</span>
         <div class="story-step-body">
           <p class="story-step-note">Upload your own ${esc(mediaLabel.toLowerCase())} — no Flow generation needed.</p>
           ${buildUploadWidget(false)}
         </div>
       </div>`;
-    // Character/Property/Background/Sound: just the upload widget, nothing
-    // else — no name-your-mode toggle, no Setup modal, no Generate step.
+    // Character/Property/Background/Sound: description (if any) + the
+    // upload widget, nothing else — no name-your-mode toggle, no Generate step.
     const assetOnlyStep = `
+      ${fieldsStepHtml}
       <div class="story-step">
-        <span class="story-step-num">1</span>
+        <span class="story-step-num">${stepNum++}</span>
         <div class="story-step-body">${buildUploadWidget(false)}</div>
       </div>`;
     return `
@@ -2397,6 +2422,34 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       renderTool();
     }));
     wireItemRename(item);
+    // Same live theVersion(item).fields the extension's own Setup form
+    // reads/writes — auto-saves on change/click, same as Stage 1's own
+    // brief fields, so there's no separate "Save" step to forget.
+    document.querySelectorAll(`[data-item-fields="${item.id}"] [data-field-pick]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
+      const key = el.getAttribute('data-field-pick');
+      const v = theVersion(item);
+      v.fields = { ...(v.fields || {}), [key]: el.getAttribute('data-value') };
+      await api.updateVersion(item.id, { fields: v.fields });
+      renderTool();
+      toast('Saved');
+    })));
+    document.querySelectorAll(`[data-item-fields="${item.id}"] [data-field-preset]`).forEach(el => el.addEventListener('click', withMutationGuard(async () => {
+      const key = el.getAttribute('data-field-preset');
+      const v = theVersion(item);
+      v.fields = { ...(v.fields || {}), [key]: el.getAttribute('data-value') };
+      await api.updateVersion(item.id, { fields: v.fields });
+      renderTool();
+      toast('Saved');
+    })));
+    document.querySelectorAll(`[data-item-fields="${item.id}"] [data-field-text]`).forEach(el => el.addEventListener('change', withMutationGuard(async () => {
+      const key = el.getAttribute('data-field-text');
+      const val = trimBlankLines(el.value);
+      el.value = val;
+      const v = theVersion(item);
+      v.fields = { ...(v.fields || {}), [key]: val };
+      await api.updateVersion(item.id, { fields: v.fields });
+      toast('Saved');
+    })));
     const openGenBtn = document.querySelector(`[data-open-generate="${item.id}"]`);
     if (openGenBtn) openGenBtn.addEventListener('click', () => openGenerateModal(item));
     const viewPromptBtn = document.querySelector(`[data-view-prompt-btn="${item.id}"]`);
