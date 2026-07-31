@@ -755,6 +755,13 @@ Rules for every option:
   const DEFAULT_MEDIA_MAX_MB = 20;
   const MEDIA_MAX_MB = { movie: 100 };
   const STORY_MAX_FILES = 2; // Storyboard is the one item type allowed more than 1 file — capped at 2, not unlimited
+  // Scene gets the same 2-file allowance as Story — a second keyframe (e.g. a
+  // start pose + an end pose, or an alternate angle) gives Stage 5's clip
+  // generation real visual anchors for the motion, instead of animating the
+  // whole 8 seconds from a single static image. Every other item type still
+  // stays at exactly 1 (see buildUploadWidget below).
+  const NUMBERED_ITEM_MAX_FILES = { scene: 2 };
+  function maxFilesForNumberedItem(itemKey) { return NUMBERED_ITEM_MAX_FILES[itemKey] || 1; }
   function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
   function checkFileSize(file, maxMb) {
     if (file.size > maxMb * 1024 * 1024) {
@@ -2288,16 +2295,18 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const buildUploadWidget = (requirePrompt) => {
       const blocked = requirePrompt && !hasPrompt && !hasFile;
       const maxMb = maxUploadMb(item.item_key);
+      const maxFiles = maxFilesForNumberedItem(item.item_key);
+      const atCap = mediaFiles.length >= maxFiles;
       const uploadPhrase = UPLOAD_LABEL_PHRASE[item.item_key];
       const itemDisplayName = item.name || itemLabel(item.stage, item.item_key);
       const uploadLabel = uploadPhrase ? `+ Upload ${uploadPhrase} for "${esc(itemDisplayName)}"` : '+ Upload file';
       const dimensionHint = item.item_key === 'sound'
         ? `<p class="story-step-note" style="margin-top:4px">Max file size: ${maxMb}MB.</p>`
-        : `<p class="story-step-note" style="margin-top:4px">Use a clean reference image for better results in the scene and final movie creation. Max file size: ${maxMb}MB.</p>`;
+        : `<p class="story-step-note" style="margin-top:4px">Use a clean reference image for better results in the scene and final movie creation.${maxFiles > 1 ? ` Up to ${maxFiles} images allowed.` : ''} Max file size: ${maxMb}MB.</p>`;
       return `
         <input type="file" accept="${mediaAccept}" style="display:none" data-media-upload-input="${item.id}" ${dis}>
-        ${hasFile ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>${uploadLabel}</button>`}
-        ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : (hasFile ? '' : dimensionHint)}
+        ${atCap ? '' : `<button type="button" class="btn btn-sm${blocked ? ' btn-guard-disabled' : ''}" data-media-upload-btn="${item.id}" data-requires-prompt="${requirePrompt}" ${dis}>${uploadLabel}</button>`}
+        ${blocked ? `<p class="story-step-note" style="margin-top:4px">Generate a prompt first (step 1) — there's nothing to upload a result for yet.</p>` : (atCap ? '' : dimensionHint)}
         <div class="attach-chip-row" style="margin-top:7px">
           ${mediaFiles.map((f, i) => `<span class="attach-chip" title="${esc(f.fileName)}"><a href="${esc(api.mediaUrl(f.key))}" data-media-preview data-media-name="${esc(f.fileName)}" data-media-kind="${esc(f.kind || 'image')}" rel="noopener" style="color:inherit;text-decoration:underline">${esc(f.fileName)}</a> ${isLocked ? '' : `<button type="button" data-remove-media="${item.id}" data-index="${i}" style="border:none;background:none;cursor:pointer;color:inherit;font-weight:700;padding:0 0 0 3px">×</button>`}</span>`).join('')}
         </div>`;
@@ -2424,10 +2433,14 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         const files = Array.from(uploadInput.files);
         if (!files.length) return;
         const version = theVersion(item);
-        // The button itself already hides once a file exists, but guard
-        // here too — one file per item, no silent second upload.
-        if ((version.media_files || []).length > 0) {
-          toast(`This item already has a file — remove "${version.media_files[0].fileName}" first before uploading another.`);
+        const existingFiles = version.media_files || [];
+        const maxFiles = maxFilesForNumberedItem(item.item_key);
+        // The button itself already hides once the cap is reached, but
+        // guard here too — never a silent upload past the per-type limit.
+        if (existingFiles.length >= maxFiles) {
+          toast(maxFiles > 1
+            ? `This item already has ${maxFiles} files — remove one first before uploading another.`
+            : `This item already has a file — remove "${existingFiles[0].fileName}" first before uploading another.`);
           uploadInput.value = '';
           return;
         }
@@ -2436,9 +2449,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
         mutationsInFlight++;
         try {
-          const mediaFiles = [];
+          const mediaFiles = [...existingFiles];
           const kind = file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'image';
-          const cleanName = cleanUploadFileName(item, file.name, 0);
+          const cleanName = cleanUploadFileName(item, file.name, existingFiles.length);
           const uploaded = await api.uploadMedia(state.project.id, file, cleanName);
           mediaFiles.push({ key: uploaded.key, fileName: uploaded.fileName, kind });
           version.media_files = mediaFiles;

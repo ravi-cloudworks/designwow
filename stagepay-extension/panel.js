@@ -484,10 +484,12 @@ function hasFlowPrompt(item) {
   return !!(ic && ic.outputInstructions && ic.outputInstructions.length);
 }
 // Mirrors index.html's own per-type caps exactly — every item type is
-// capped at exactly 1 file except Story (STORY_MAX_FILES = 2 there). The
-// web app enforces this by hiding its upload button once at capacity; the
-// extension has no such button to hide, so it has to check explicitly.
-function maxFilesFor(item) { return item.item_key === 'story' ? 2 : 1; }
+// capped at exactly 1 file except Story and Scene (2 each — Scene's second
+// keyframe gives Stage 5's clip generation a real start/end visual anchor
+// instead of animating from a single static image). The web app enforces
+// this by hiding its upload button once at capacity; the extension has no
+// such button to hide, so it has to check explicitly.
+function maxFilesFor(item) { return (item.item_key === 'story' || item.item_key === 'scene') ? 2 : 1; }
 
 // Mirrors index.html's DEFAULT_MEDIA_MAX_MB/MEDIA_MAX_MB/maxUploadMb/
 // checkFileSize exactly — the backend's own 100MB cap (media.ts) is a
