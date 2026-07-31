@@ -2340,9 +2340,15 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     // are Flow-prompt/AI-workflow concerns that only make sense alongside
     // the extension's own Setup+Generate+ChatGPT flow — the swimlane only
     // needs to show enough story content (location/action/dialogue) to know
-    // what's being uploaded a match for. Extension-only fields stay fully
-    // editable in panel.js, which renders the complete schema, unfiltered.
-    const SWIMLANE_FIELD_ALLOWLIST = { scene: ['location', 'action', 'dialogue'] };
+    // what's being uploaded a match for. Same reasoning for Movie: direction/
+    // duration/broll/transition are camera/edit concerns for the extension's
+    // Generate flow, so only its own scene_description shows here. Extension-
+    // only fields stay fully editable in panel.js, which renders the
+    // complete schema, unfiltered.
+    const SWIMLANE_FIELD_ALLOWLIST = {
+      scene: ['location', 'action', 'dialogue'],
+      movie: ['scene_description'],
+    };
     const fieldsSchema = SWIMLANE_FIELD_ALLOWLIST[item.item_key]
       ? fullFieldsSchema.filter(def => SWIMLANE_FIELD_ALLOWLIST[item.item_key].includes(def.key))
       : fullFieldsSchema;
