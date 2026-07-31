@@ -1457,7 +1457,19 @@ Rules for every option:
       }
       case 'movie': {
         const sceneLine = f.scene_description ? `${f.scene_description} ` : '';
-        base = `${sceneLine}Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
+        // Scene now allows a Start-frame + End-frame pair (see 043_scene_start_end_frames).
+        // Naming each by role — not just listing filenames — is what tells Flow
+        // (and whoever's pasting these in) which attached image anchors the
+        // beginning vs the end, since Flow renames files on attach and the
+        // prompt text is the only place that role survives. Relies on upload
+        // order: first scene upload = Start, second = End. Falls back to the
+        // old single-shot phrasing when there's only one (or no) scene image.
+        const scene = itemById(item.parent_item_id);
+        const sceneFiles = scene ? (theVersion(scene).media_files || []) : [];
+        const frameInstruction = sceneFiles.length >= 2
+          ? `Start frame reference: ${sceneFiles[0].fileName}. End frame reference: ${sceneFiles[1].fileName}. Animate the transition from the Start frame to the End frame `
+          : 'Animate the approved shot ';
+        base = `${sceneLine}${frameInstruction}into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
         break;
       }
       default:
