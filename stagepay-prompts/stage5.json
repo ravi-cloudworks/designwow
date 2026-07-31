@@ -11,9 +11,10 @@
   "items": {
     "movie": {
       "label": "Final Movie Clip",
-      "note": "content.geminiInstruction removed — animation direction is now a plain designer-set field, no Gemini drafting. Transition/B-roll moved here from Stage 4 — they're video-editing concepts (how this clip cuts into the next one, what supplementary footage to cut in) that a still keyframe image can't represent, so they belong to the actual clip, not the Scene Blueprint.",
+      "note": "content.geminiInstruction removed — animation direction is now a plain designer-set field, no Gemini drafting. Transition/B-roll moved here from Stage 4 — they're video-editing concepts (how this clip cuts into the next one, what supplementary footage to cut in) that a still keyframe image can't represent, so they belong to the actual clip, not the Scene Blueprint. scene_description added (042_movie_scene_description) — pre-filled once, at Movie-creation time, from the scene's own location/action/dialogue/emotion, then freely editable; without it the compiled prompt only ever described camera movement, never what's actually supposed to happen or be said in the clip.",
       "content": {
         "fieldsSchema": [
+          { "key": "scene_description", "label": "Scene description (from Stage 1 — edit if needed)", "type": "textarea" },
           { "key": "direction", "label": "Animation direction", "type": "textarea", "presets": [
             "Slow push-in on the subject, hold at the end.",
             "Static shot with a gentle handheld sway.",

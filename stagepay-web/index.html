@@ -1448,9 +1448,11 @@ Rules for every option:
         base = `${f.location || '(location)'}. ${f.action || '(action)'} Emotion: ${f.emotion || '(emotion)'}. Dialogue: "${f.dialogue || '(no dialogue)'}".${refLine} Shot: ${f.type || '(shot type)'} on ${f.camera || '(camera)'}, ${f.lens || '(lens)'} lens, ${f.camera_angle || '(camera angle)'}.`;
         break;
       }
-      case 'movie':
-        base = `Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
+      case 'movie': {
+        const sceneLine = f.scene_description ? `${f.scene_description} ` : '';
+        base = `${sceneLine}Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
         break;
+      }
       default:
         base = '';
     }
@@ -3348,7 +3350,20 @@ ${e.rawResponse || '—'}`;
           const scenes = state.items.filter(i => i.stage === 4 && i.item_key === 'scene');
           for (const scene of scenes) {
             if (!movieFor(scene.id)) {
-              await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Video Clip`, parentItemId: scene.id });
+              const created = await api.createItem(state.project.id, { stage: 5, itemKey: 'movie', name: `${scene.name || 'Scene'} — Video Clip`, parentItemId: scene.id });
+              // Pre-fills the Movie's own editable "Scene description" field
+              // (same pattern as Character/Property/Background's one-liner)
+              // from exactly what this scene's own compiled prompt already
+              // says — without this, the compiled Movie prompt only ever
+              // described camera movement, never what's actually supposed to
+              // happen or be said in the clip. One-time copy, never
+              // auto-resynced afterward — the designer can freely edit it if
+              // the scene changes later.
+              if (created && created.id) {
+                const sf = theVersion(scene).fields || {};
+                const sceneDescription = `${sf.location || '(location)'}. ${sf.action || '(action)'} Emotion: ${sf.emotion || '(emotion)'}. Dialogue: "${sf.dialogue || '(no dialogue)'}".`;
+                await api.updateVersion(created.id, { fields: { scene_description: sceneDescription } });
+              }
             }
           }
           // One per project, not per scene — the designer stitches every

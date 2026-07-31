@@ -711,9 +711,11 @@ function compilePrompt(item, fields) {
       base = `${f.location || '(location)'}. ${f.action || '(action)'} Emotion: ${f.emotion || '(emotion)'}. Dialogue: "${f.dialogue || '(no dialogue)'}".${refLine} Shot: ${f.type || '(shot type)'} on ${f.camera || '(camera)'}, ${f.lens || '(lens)'} lens, ${f.camera_angle || '(camera angle)'}.`;
       break;
     }
-    case 'movie':
-      base = `Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
+    case 'movie': {
+      const sceneLine = f.scene_description ? `${f.scene_description} ` : '';
+      base = `${sceneLine}Animate the approved shot into a ${f.duration || 8}-second clip: ${f.direction || '(direction)'}.${f.broll && f.broll !== 'None' ? ` B-roll: ${f.broll}.` : ''} Transition: ${f.transition || 'Hard Cut'}.`;
       break;
+    }
     default:
       base = '';
   }
