@@ -45,6 +45,9 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   from the scene's own content and fed into the compiled prompt — previously
   the prompt only ever described camera movement, never what's actually
   supposed to happen or be said in the clip (ed602af).
+- Scene now allows up to 2 uploaded images (previously capped at 1, same as
+  Story) — a second keyframe gives Stage 5's clip generation a real
+  start/end visual anchor for the motion (58bc7f6).
 
 ## 0.3.0 — 2026-07-29
 
