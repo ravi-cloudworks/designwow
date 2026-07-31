@@ -41,6 +41,10 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   With ChatGPT" (ca9d1d6).
 - Product photos now get a copy button on Scene reference thumbnails too
   (previously only the brand logo did) (32f4249).
+- Movie items now have an editable "Scene description" field, pre-filled
+  from the scene's own content and fed into the compiled prompt — previously
+  the prompt only ever described camera movement, never what's actually
+  supposed to happen or be said in the clip (ed602af).
 
 ## 0.3.0 — 2026-07-29
 
