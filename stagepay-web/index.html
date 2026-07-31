@@ -2312,7 +2312,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>`;
     };
     // Setup-field content (Character/Property/Background/Sound's one-line
-    // description, Scene's location/action/dialogue/emotion, Movie's scene
+    // description, Scene's location/action/dialogue, Movie's scene
     // description/direction/duration/broll/transition) previously only
     // existed in the extension — a designer working from the swimlane alone
     // had no idea what they were about to upload a match for. Reuses the
@@ -2323,7 +2323,17 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     // (not a per-control disabled attribute) locks the whole block at once
     // once the stage is paid/locked.
     const ic = itemConfigFor(item);
-    const fieldsSchema = (ic && ic.content && ic.content.fieldsSchema) || [];
+    const fullFieldsSchema = (ic && ic.content && ic.content.fieldsSchema) || [];
+    // Scene's emotion + shot/camera fields (type/camera_angle/camera/lens)
+    // are Flow-prompt/AI-workflow concerns that only make sense alongside
+    // the extension's own Setup+Generate+ChatGPT flow — the swimlane only
+    // needs to show enough story content (location/action/dialogue) to know
+    // what's being uploaded a match for. Extension-only fields stay fully
+    // editable in panel.js, which renders the complete schema, unfiltered.
+    const SWIMLANE_FIELD_ALLOWLIST = { scene: ['location', 'action', 'dialogue'] };
+    const fieldsSchema = SWIMLANE_FIELD_ALLOWLIST[item.item_key]
+      ? fullFieldsSchema.filter(def => SWIMLANE_FIELD_ALLOWLIST[item.item_key].includes(def.key))
+      : fullFieldsSchema;
     let stepNum = 1;
     const fieldsStepHtml = fieldsSchema.length ? `
       <div class="story-step">
