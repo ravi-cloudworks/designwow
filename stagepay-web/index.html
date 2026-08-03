@@ -1084,7 +1084,7 @@ Rules for every option:
     showcaseCandidates: [], // eligible-but-not-yet-showcased items from locked stages
     showcaseCandidateSearch: '', // client-side project-name filter for "Add from your delivered work" — persisted across re-renders so it survives an add/remove refresh
     showcaseMax: 25, // server-driven cap (see GET /api/showcase's max field) — default here is just a pre-fetch placeholder
-    projectsMax: 50, // server-driven cap (see GET /api/projects's max field) — default here is just a pre-fetch placeholder
+    projectsMax: 20, // server-driven cap (see GET /api/projects's max field) — default here is just a pre-fetch placeholder
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -4660,7 +4660,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
 
         <h2>8. Project Limits &amp; Deletion</h2>
         <ul>
-          <li>Your account may have a <strong>maximum of 50 active projects</strong> at any time. Once you reach this limit, you must delete an existing project before creating a new one.</li>
+          <li>Your account may have a <strong>maximum of 20 active projects</strong> at any time. Once you reach this limit, you must delete an existing project before creating a new one.</li>
           <li><strong>Deleting a project is immediate and permanent.</strong> It removes: all files and uploaded content associated with that project; any of that project's work currently shown on your public Showcase page; and that project's income/payment records shown in your Income Tracker.</li>
           <li><strong>This cannot be undone.</strong> StagePay cannot recover a deleted project or its associated data once removed. You are solely responsible for keeping your own copies of anything you wish to retain before deleting a project.</li>
           <li>Similarly, <strong>unlocking a stage</strong> to make changes permanently deletes all content built on stages after it. This is intentional platform behavior, not a defect, and StagePay bears no liability for data loss resulting from your own decision to unlock a stage or delete a project.</li>

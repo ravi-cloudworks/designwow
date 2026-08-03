@@ -44,7 +44,7 @@ const REQUIRED_BRIEF_FIELDS = [
 // cap for now (same pattern as SHOWCASE_MAX_ITEMS). Deleting a project frees
 // up the slot — see the DELETE route below, which now actually cleans up
 // everything a deleted project owned rather than just its DB rows.
-const MAX_PROJECTS = 50;
+const MAX_PROJECTS = 20;
 
 projects.post('/', async (c) => {
   const userId = await currentUserId(c);
