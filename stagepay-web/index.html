@@ -2879,8 +2879,13 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   // Placeholder shown before Stage 1 is locked — the Story item doesn't
   // exist yet at that point (it's auto-created the instant the brief locks),
   // but showing a bare one-line note here read as "broken", not "gated".
-  // Same 7-step shell as the real card, fully inert, so Stage 2 looks
-  // consistent with the disabled-state treatment every other stage gets.
+  // Mirrors renderStoryCard's own real 4-step structure exactly (upload,
+  // Set Income, Confirm Payment, Lock stage), just disabled/guarded —
+  // previously this had its own separate, stale 7-step mockup (Generate/
+  // Download/Paste-into-Flow) left over from before Story's Setup+Generate
+  // moved to the extension, so a designer saw one set of steps before
+  // locking and a completely different one after, reading as a button
+  // vanishing rather than the same card simply switching on.
   function renderStoryPlaceholderCard() {
     return `<div class="item-row expanded story-card">
       <div class="item-row-head" style="cursor:default">
@@ -2888,13 +2893,17 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         <span class="item-name" style="color:var(--text-faint)">Story</span>
       </div>
       <div class="item-body">
-        <div class="story-step"><span class="story-step-num">1</span><div class="story-step-body"><button class="btn btn-sm btn-primary btn-guard-disabled" data-story-placeholder-guard>✨ Generate Story</button></div></div>
-        <div class="story-step"><span class="story-step-num">2</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>⬇ Download artifacts</button></div></div>
-        <div class="story-step"><span class="story-step-num">3</span><div class="story-step-body"><p class="story-step-note">Paste the prompt and attach the downloaded files into Google Flow to generate the storyboard image.</p></div></div>
-        <div class="story-step"><span class="story-step-num">4</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>+ Upload storyboard image</button></div></div>
-        <div class="story-step"><span class="story-step-num">5</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>💰 Set Income</button></div></div>
-        <div class="story-step"><span class="story-step-num">6</span><div class="story-step-body"><p class="story-step-note">Set an amount first.</p></div></div>
-        <div class="story-step"><span class="story-step-num">7</span><div class="story-step-body"><button class="btn btn-primary btn-guard-disabled" style="width:100%" data-story-placeholder-guard>✅ Lock this stage</button></div></div>
+        <div class="story-step">
+          <span class="story-step-num">1</span>
+          <div class="story-step-body">
+            <p class="story-step-note">Upload your own storyboard image — no Flow generation needed.</p>
+            <button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>+ Upload storyboard image</button>
+            <p class="story-step-note" style="margin-top:4px">Max ${STORY_MAX_FILES} storyboard images allowed. Max file size: ${DEFAULT_MEDIA_MAX_MB}MB each.</p>
+          </div>
+        </div>
+        <div class="story-step"><span class="story-step-num">2</span><div class="story-step-body"><button type="button" class="btn btn-sm btn-guard-disabled" data-story-placeholder-guard>💰 Set Income</button></div></div>
+        <div class="story-step"><span class="story-step-num">3</span><div class="story-step-body"><p class="story-step-note">Set an amount first.</p></div></div>
+        <div class="story-step"><span class="story-step-num">4</span><div class="story-step-body"><button class="btn btn-primary btn-guard-disabled" style="width:100%" data-story-placeholder-guard>✅ Lock this stage</button></div></div>
         ${previousStageGuardNote(2)}
       </div>
     </div>`;
