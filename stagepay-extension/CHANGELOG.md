@@ -10,6 +10,10 @@ changed since the previous submission — move the "Unreleased" bullets under
 it and clear "Unreleased" back out. Ask Claude to do this as part of the
 release commit; it can reconstruct the list from `git log` if it falls behind.
 
+## Unreleased
+
+_Nothing yet — 0.4.0 was approved 2026-08-03._
+
 ## 0.4.0 — 2026-07-31
 
 - Gated the extension behind Director access — removed the old "StagePay-only"
