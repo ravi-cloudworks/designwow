@@ -347,7 +347,11 @@ projects.post('/:id/unlock-brief', async (c) => {
   await c.env.DB.prepare('DELETE FROM auto_populate_cache WHERE project_id = ?').bind(id).run();
   const briefUnlockLink = await c.env.DB.prepare('SELECT token FROM payment_links WHERE project_id = ?').bind(id).first<{ token: string }>();
   if (briefUnlockLink) {
-    await c.env.DB.prepare('DELETE FROM payment_link_stages WHERE token = ? AND stage >= 2').bind(briefUnlockLink.token).run();
+    // Only unpaid pricing is stale here — an already-paid stage's row stays
+    // so that money doesn't disappear from the swimlane/payment-link view;
+    // earnings_log already made it permanent, this just keeps the per-stage
+    // display in sync with that.
+    await c.env.DB.prepare('DELETE FROM payment_link_stages WHERE token = ? AND stage >= 2 AND paid = 0').bind(briefUnlockLink.token).run();
   }
   return c.json({ ok: true });
 });
@@ -414,9 +418,11 @@ projects.post('/:id/stages/:stage/lock', async (c) => {
 
 // Deliberately destructive, same as unlock-brief: this stage's content is
 // about to change, so everything built AFTER it (which assumed this stage
-// was final) is wiped — items and their payment records both — rather than
+// was final) is wiped — items and their unpaid pricing both — rather than
 // left silently stale. Stages before this one are untouched; they don't
-// depend on it.
+// depend on it. A later stage's payment_link_stages row only gets deleted
+// if it was never paid — a paid one is a real, permanent receipt (also in
+// earnings_log) and survives so the swimlane keeps showing it.
 projects.post('/:id/stages/:stage/unlock', async (c) => {
   const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
@@ -467,7 +473,11 @@ projects.post('/:id/stages/:stage/unlock', async (c) => {
   await c.env.DB.prepare('DELETE FROM items WHERE project_id = ? AND stage > ?').bind(id, stage).run();
   const link = await c.env.DB.prepare('SELECT token FROM payment_links WHERE project_id = ?').bind(id).first<{ token: string }>();
   if (link) {
-    await c.env.DB.prepare('DELETE FROM payment_link_stages WHERE token = ? AND stage > ?').bind(link.token, stage).run();
+    // Only unpaid pricing is stale here — an already-paid later stage's row
+    // stays so that money doesn't disappear from the swimlane/payment-link
+    // view; earnings_log already made it permanent, this just keeps the
+    // per-stage display in sync with that.
+    await c.env.DB.prepare('DELETE FROM payment_link_stages WHERE token = ? AND stage > ? AND paid = 0').bind(link.token, stage).run();
   }
   return c.json({ ok: true });
 });

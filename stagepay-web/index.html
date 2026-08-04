@@ -2821,8 +2821,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking…';
       await api.unlockBrief(state.project.id);
       state.brief.locked = false;
-      const full = await api.getProject(state.project.id);
+      const [full, paymentLinkRes] = await Promise.all([api.getProject(state.project.id), api.getProjectPaymentLink(state.project.id)]);
       state.items = full.items;
+      state.paymentLinks = paymentLinkRes.stages || [];
       renderTool();
       toast('Unlocked — Stage 2-5 cleared');
     }));
@@ -3092,9 +3093,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       const res = await api.unlockStage(state.project.id, 2);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < 2);
-        state.paymentLinks = state.paymentLinks.filter(l => l.stage <= 2);
-        const full = await api.getProject(state.project.id);
+        const [full, paymentLinkRes] = await Promise.all([api.getProject(state.project.id), api.getProjectPaymentLink(state.project.id)]);
         state.items = full.items;
+        state.paymentLinks = paymentLinkRes.stages || [];
         renderTool();
         renderProjectInfoBar();
         toast('Stage 2 unlocked — Stage 3-5 cleared');
@@ -3388,9 +3389,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       const res = await api.unlockStage(state.project.id, stage);
       if (res.ok) {
         state.stageLocks = state.stageLocks.filter(l => l.stage < stage);
-        state.paymentLinks = state.paymentLinks.filter(l => l.stage <= stage);
-        const full = await api.getProject(state.project.id);
+        const [full, paymentLinkRes] = await Promise.all([api.getProject(state.project.id), api.getProjectPaymentLink(state.project.id)]);
         state.items = full.items;
+        state.paymentLinks = paymentLinkRes.stages || [];
         renderTool();
         renderProjectInfoBar();
         toast(stagesToDelete.length ? `Stage ${stage} unlocked — Stage ${stagesToDelete[0]}-${stagesToDelete[stagesToDelete.length - 1]} cleared` : `Stage ${stage} unlocked`);
