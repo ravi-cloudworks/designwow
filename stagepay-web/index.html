@@ -743,9 +743,12 @@ Rules for every option:
   // Scene gets the same 2-file allowance as Story — a second keyframe (e.g. a
   // start pose + an end pose, or an alternate angle) gives Stage 5's clip
   // generation real visual anchors for the motion, instead of animating the
-  // whole 8 seconds from a single static image. Every other item type still
-  // stays at exactly 1 (see buildUploadWidget below).
-  const NUMBERED_ITEM_MAX_FILES = { scene: 2 };
+  // whole 8 seconds from a single static image. Character also gets 2 — its
+  // master prompt now asks Flow for a full-body turnaround plus a separate
+  // close-up face/expression sheet from one paste, so both need somewhere to
+  // land. Every other item type still stays at exactly 1 (see
+  // buildUploadWidget below).
+  const NUMBERED_ITEM_MAX_FILES = { scene: 2, character: 2 };
   function maxFilesForNumberedItem(itemKey) { return NUMBERED_ITEM_MAX_FILES[itemKey] || 1; }
   function maxUploadMb(itemKey) { return MEDIA_MAX_MB[itemKey] || DEFAULT_MEDIA_MAX_MB; }
   function checkFileSize(file, maxMb) {

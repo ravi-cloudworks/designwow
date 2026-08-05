@@ -486,10 +486,13 @@ function hasFlowPrompt(item) {
 // Mirrors index.html's own per-type caps exactly — every item type is
 // capped at exactly 1 file except Story and Scene (2 each — Scene's second
 // keyframe gives Stage 5's clip generation a real start/end visual anchor
-// instead of animating from a single static image). The web app enforces
-// this by hiding its upload button once at capacity; the extension has no
-// such button to hide, so it has to check explicitly.
-function maxFilesFor(item) { return (item.item_key === 'story' || item.item_key === 'scene') ? 2 : 1; }
+// instead of animating from a single static image) and Character (2 — the
+// master prompt now asks Flow for a full-body turnaround plus a separate
+// close-up face/expression sheet from one paste, so both need somewhere to
+// land). The web app enforces this by hiding its upload button once at
+// capacity; the extension has no such button to hide, so it has to check
+// explicitly.
+function maxFilesFor(item) { return (item.item_key === 'story' || item.item_key === 'scene' || item.item_key === 'character') ? 2 : 1; }
 
 // Mirrors index.html's DEFAULT_MEDIA_MAX_MB/MEDIA_MAX_MB/maxUploadMb/
 // checkFileSize exactly — the backend's own 100MB cap (media.ts) is a
