@@ -939,6 +939,15 @@ Rules for every option:
       });
       return r.json();
     },
+    // Same upload endpoint as uploadShowcasePromo, just tagged with the real
+    // deliverable it was compressed from — see compressImageForShowcase and
+    // wireShowcaseCandidateButtons for the client-side compression step.
+    async uploadShowcaseFromCandidate(sourceItemId, filename, blob) {
+      const r = await fetch(`${API_BASE}/api/showcase/upload/${encodeURIComponent(filename)}?sourceItemId=${encodeURIComponent(sourceItemId)}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+      });
+      return r.json();
+    },
     async removeShowcase(itemId) { return fetch(`${API_BASE}/api/showcase/${itemId}`, { method: 'DELETE', credentials: 'include' }); },
     showcaseFileUrl(itemId) { return `${API_BASE}/api/showcase-items/${itemId}/file`; },
     showcaseThumbnailUrl(itemId) { return `${API_BASE}/api/showcase-items/${itemId}/thumbnail`; },
@@ -6804,6 +6813,62 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       img.src = url;
     });
   }
+  // Same canvas pattern as captureImageThumbnail, but this is what actually
+  // gets SERVED on the public showcase page, not just a management-view list
+  // thumbnail — production deliverables were being showcased at their
+  // original resolution (often 2K+), loaded into a swipe card rendered a
+  // few hundred px wide on a phone. 1600px covers even a fullscreen phone
+  // view with headroom; quality 0.85 keeps visible detail while cutting
+  // file size drastically versus an untouched original.
+  //
+  // Deliberately NO img.crossOrigin here — unlike captureImageThumbnail/
+  // captureVideoThumbnail (which read from the PUBLIC, unauthenticated
+  // /showcase-items/:id/file route), this reads from /api/media/:key, which
+  // requires the auth cookie. crossOrigin='anonymous' risked the browser
+  // treating this as a credential-less CORS fetch — confirmed live: it hung
+  // forever on "Adding…" with no console error, most likely a SecurityError
+  // thrown synchronously inside canvas.toBlob() on a tainted canvas, which
+  // happens outside this Promise's try/catch and so never resolves OR
+  // rejects. Omitting it matches the plain <img src=...> candidateMediaHtml
+  // already uses successfully for this exact same authenticated URL.
+  //
+  // The timeout is a second, independent safety net — if this ever hangs
+  // again for any other reason, it fails LOUDLY (rejects, caller falls back
+  // and toasts) instead of leaving the button stuck on "Adding…" forever
+  // with no signal at all.
+  function compressImageForShowcase(url, maxDim = 1600, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('compress_timeout'));
+      }, 15000);
+      const finish = (fn, arg) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(arg);
+      };
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { finish(reject, new Error('no_canvas_context')); return; }
+        try {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => finish(blob ? resolve : reject, blob || new Error('compress_failed')), 'image/jpeg', quality);
+        } catch (e) {
+          finish(reject, e);
+        }
+      };
+      img.onerror = () => finish(reject, new Error('image_load_failed'));
+      img.src = url;
+    });
+  }
   // Shared by both the "add from delivered work" and "upload a promo file"
   // handlers below — captures + stores a thumbnail for whichever media kind
   // was just added, best-effort (a failure just leaves the existing
@@ -6842,7 +6907,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     return `<div class="showcase-tile">
       ${candidateMediaHtml(c)}
       <p class="showcase-tile-name" title="${esc(c.fileName)}">${esc(MEDIA_LABELS[c.itemKey] || c.itemKey)}${c.itemName ? ' · ' + esc(c.itemName) : ''}</p>
-      <button class="btn btn-sm showcase-candidate-add" data-add-showcase="${esc(c.itemId)}" data-key="${esc(c.key)}" data-filename="${esc(c.fileName)}">+ Add</button>
+      ${c.isShowcased
+        ? `<button class="btn btn-sm showcase-candidate-add" disabled>✓ Added</button>`
+        : `<button class="btn btn-sm showcase-candidate-add" data-add-showcase="${esc(c.itemId)}" data-key="${esc(c.key)}" data-filename="${esc(c.fileName)}">+ Add</button>`}
     </div>`;
   }
   // Project → Stage (2-5) — same stage grouping as everywhere else in the
@@ -6895,7 +6962,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   function renderShowcaseCard() {
     const publicUrl = `${location.origin}/showcase/${state.user.showcase_slug || state.user.id}`;
     const items = state.showcaseItems;
-    const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
+    const candidates = state.showcaseCandidates;
     return `
       <div class="section-head-row" style="justify-content:space-between">
         <span class="section-title">🖼 Public Showcase</span>
@@ -7001,15 +7068,30 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       const sourceItemId = btn.getAttribute('data-add-showcase');
       const key = btn.getAttribute('data-key');
       const fileName = btn.getAttribute('data-filename');
+      const candidate = state.showcaseCandidates.find((c) => c.itemId === sourceItemId && c.key === key);
       btn.disabled = true; btn.textContent = 'Adding…';
-      const result = await api.addShowcase(sourceItemId, key, fileName);
+      // Images get compressed client-side into a real, smaller derivative
+      // before upload — the original was a straight reference to the
+      // production deliverable's own full-resolution file. Video isn't
+      // touched yet (no client-side transcoder in place) — still just
+      // references the original file's key, exactly as before.
+      let result;
+      if (candidate && candidate.kind === 'image') {
+        try {
+          const blob = await compressImageForShowcase(api.mediaUrl(key));
+          result = await api.uploadShowcaseFromCandidate(sourceItemId, fileName, blob);
+        } catch {
+          result = await api.addShowcase(sourceItemId, key, fileName); // compression failed — fall back rather than blocking the add entirely
+        }
+      } else {
+        result = await api.addShowcase(sourceItemId, key, fileName);
+      }
       if (result.error) {
         toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Failed to add to showcase', true);
         btn.disabled = false; btn.textContent = '+ Add';
         return;
       }
       toast('Added to your showcase');
-      const candidate = state.showcaseCandidates.find((c) => c.itemId === sourceItemId && c.key === key);
       if (candidate) await captureAndStoreShowcaseThumbnail(result.id, candidate.kind);
       await refreshShowcaseScreen();
     }));
@@ -7028,7 +7110,17 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       if (file.size > 5 * 1024 * 1024) { toast('Cover image must be under 5MB', true); return; }
       const btn = document.getElementById('showcaseCoverBtn');
       btn.disabled = true; btn.textContent = 'Uploading…';
-      const { ok, body } = await api.uploadShowcaseCover(file);
+      // The cover is the very first thing that loads on the showcase page —
+      // same compression as candidate-add/promo upload, so it's not serving
+      // an uncompressed original either.
+      let uploadFile = file;
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const blob = await compressImageForShowcase(objectUrl);
+        uploadFile = new File([blob], file.name, { type: 'image/jpeg' });
+      } catch { /* fall back to the original file below */ }
+      finally { URL.revokeObjectURL(objectUrl); }
+      const { ok, body } = await api.uploadShowcaseCover(uploadFile);
       if (!ok) {
         toast(body.message || 'Failed to upload cover image', true);
         btn.disabled = false; btn.textContent = state.showcaseHasCover ? 'Replace cover image' : 'Upload cover image';
@@ -7139,8 +7231,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         state.showcaseCandidateSearch = searchInput.value;
-        const candidates = state.showcaseCandidates.filter((c) => !c.isShowcased);
-        document.getElementById('showcaseCandidateList').innerHTML = renderShowcaseCandidateList(candidates);
+        document.getElementById('showcaseCandidateList').innerHTML = renderShowcaseCandidateList(state.showcaseCandidates);
         wireShowcaseCandidateButtons();
       });
     }
@@ -7166,7 +7257,18 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       }
       if (!checkFileSize(file, 50)) return;
       promoBtn.disabled = true; promoBtn.textContent = 'Uploading…';
-      const result = await api.uploadShowcasePromo(file);
+      // Compress a promo image the same way candidate-add does — this file
+      // is going straight to R2 uncompressed otherwise. Video is untouched.
+      let uploadFile = file;
+      if (file.type.startsWith('image/')) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          const blob = await compressImageForShowcase(objectUrl);
+          uploadFile = new File([blob], file.name, { type: 'image/jpeg' });
+        } catch { /* fall back to the original file below */ }
+        finally { URL.revokeObjectURL(objectUrl); }
+      }
+      const result = await api.uploadShowcasePromo(uploadFile);
       if (result.error) {
         toast(result.error === 'showcase_limit_reached' ? `Showcase is full (max ${result.max})` : 'Upload failed', true);
         promoBtn.disabled = false; promoBtn.textContent = 'Upload your Creative Portfolio';
@@ -8039,6 +8141,13 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         direction: 'vertical',
         grabCursor: true,
         loop: slides.length > 1,
+        // Default loop clone count is too small for the cards effect (which
+        // peeks a couple of slides ahead of the active one) once the real
+        // slide count is small — one scroll direction would run out of
+        // clones and stall while the other still had enough to wrap
+        // smoothly. A generous, fixed buffer keeps both directions symmetric
+        // regardless of how few items are showcased.
+        loopAdditionalSlides: 4,
         mousewheel: { forceToAxis: true },
         cardsEffect: { perSlideOffset: 8, perSlideRotate: 3, slideShadows: false },
         on: { slideChange(sw) { updateForSlide(sw.realIndex, sw.activeIndex); } },

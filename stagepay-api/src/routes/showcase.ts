@@ -34,10 +34,17 @@ showcase.get('/showcase/candidates', async (c) => {
     .bind(userId)
     .all<{ item_id: string; item_name: string; stage: number; item_key: string; media_files: string; project_name: string }>();
 
-  const { results: showcased } = await c.env.DB.prepare('SELECT r2_key FROM showcase_items WHERE user_id = ?')
+  // Matched on (source_item_id, file_name) rather than r2_key — an image add
+  // now uploads a client-compressed derivative to its own new R2 key (see
+  // /showcase/upload/:filename below), so the stored r2_key no longer equals
+  // the source candidate's key. source_item_id + file_name still uniquely
+  // identifies which candidate file was added, whichever path it went through.
+  const { results: showcased } = await c.env.DB.prepare(
+    'SELECT source_item_id, file_name FROM showcase_items WHERE user_id = ? AND source_item_id IS NOT NULL'
+  )
     .bind(userId)
-    .all<{ r2_key: string }>();
-  const showcasedKeys = new Set(showcased.map((s) => s.r2_key));
+    .all<{ source_item_id: string; file_name: string }>();
+  const showcasedSet = new Set(showcased.map((s) => `${s.source_item_id}::${s.file_name}`));
 
   const candidates: {
     itemId: string; itemName: string; stage: number; itemKey: string; projectName: string;
@@ -48,7 +55,7 @@ showcase.get('/showcase/candidates', async (c) => {
     for (const f of files) {
       candidates.push({
         itemId: row.item_id, itemName: row.item_name, stage: row.stage, itemKey: row.item_key, projectName: row.project_name,
-        key: f.key, fileName: f.fileName, kind: f.kind, isShowcased: showcasedKeys.has(f.key),
+        key: f.key, fileName: f.fileName, kind: f.kind, isShowcased: showcasedSet.has(`${row.item_id}::${f.fileName}`),
       });
     }
   }
@@ -114,8 +121,15 @@ const SHOWCASE_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 const SHOWCASE_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'video/mp4', 'video/quicktime'];
 
 showcase.put('/showcase/upload/:filename', async (c) => {
-  // Standalone promo upload — a demo reel, a personal intro — never tied to
-  // an actual StagePay item, so there's no source item to verify against.
+  // Standalone promo upload by default — a demo reel, a personal intro,
+  // nothing to verify against. But also reused for the "add an existing
+  // deliverable's IMAGE to showcase" path: the candidate-add flow used to
+  // just point at the production item's own R2 key directly, serving full
+  // production-resolution originals to a swipe card rendered a few hundred
+  // px wide. The client now compresses that image first and uploads the
+  // compressed result as its own new file — ?sourceItemId attributes it
+  // back to the real deliverable (still checked for real ownership +
+  // stage-locked eligibility below) without reusing its original key.
   const userId = await currentUserId(c);
   if (!userId) return c.json({ error: 'unauthenticated' }, 401);
 
@@ -127,6 +141,19 @@ showcase.put('/showcase/upload/:filename', async (c) => {
   const contentLength = Number(c.req.header('Content-Length') ?? 0);
   if (!contentLength || contentLength > SHOWCASE_UPLOAD_MAX_BYTES) return c.json({ error: 'file_too_large', maxBytes: SHOWCASE_UPLOAD_MAX_BYTES }, 413);
 
+  const sourceItemId = c.req.query('sourceItemId') || null;
+  if (sourceItemId) {
+    const eligible = await c.env.DB.prepare(
+      `SELECT 1 FROM items i
+       JOIN projects p ON p.id = i.project_id
+       JOIN stage_locks sl ON sl.project_id = i.project_id AND sl.stage = i.stage
+       WHERE i.id = ? AND p.user_id = ? AND sl.locked = 1`
+    )
+      .bind(sourceItemId, userId)
+      .first();
+    if (!eligible) return c.json({ error: 'not_eligible' }, 400);
+  }
+
   const filename = c.req.param('filename');
   const id = crypto.randomUUID();
   const key = `showcase/${userId}/${id}-${filename}`;
@@ -134,9 +161,9 @@ showcase.put('/showcase/upload/:filename', async (c) => {
 
   await c.env.DB.prepare(
     `INSERT INTO showcase_items (id, user_id, r2_key, file_name, mime_type, size_bytes, source_item_id, caption)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
   )
-    .bind(id, userId, key, filename, contentType, contentLength)
+    .bind(id, userId, key, filename, contentType, contentLength, sourceItemId)
     .run();
 
   return c.json({ id }, 201);
