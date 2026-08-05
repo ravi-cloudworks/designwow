@@ -26,6 +26,8 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   whether stagepay.pages.dev needs opening under a different account.
 - Header (StagePay account, project, stage) is now sticky — stays visible
   while scrolling a long item list instead of scrolling away.
+- Increased font sizes throughout (~15% across the board) — the panel's
+  text was hard to read at its previous small, dense sizing.
 
 ## 0.4.0 — 2026-07-31
 
