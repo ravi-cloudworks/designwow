@@ -28,6 +28,10 @@
 
 const API_BASE = 'https://stagepay.pages.dev';
 const STAGE_NAMES = { 1: 'Creative Brief', 2: 'Story & Script', 3: 'Creative Direction', 4: 'Production Blueprint', 5: 'Final Ad Delivery' };
+// Plural group-header text for render()'s per-item_key sections — a naive
+// label + 's' gets Property/Properties wrong, so spelled out explicitly
+// rather than pluralizing the singular config label at render time.
+const GROUP_LABELS = { character: 'Characters', property: 'Properties', background: 'Backgrounds', sound: 'Sounds', scene: 'Scenes', movie: 'Movie Clips', final_video: 'Final Video' };
 
 let currentProjectId = null;
 let currentProjectName = '';
@@ -89,6 +93,17 @@ const FLOW_DOWNLOADS_SUBFOLDER_HINT = 'StagePayDirector';
 
 const statusEl = document.getElementById('projectStatus');
 const itemListEl = document.getElementById('itemList');
+// Lives inside .sticky-top (panel.html), not itemListEl — the jump nav is
+// only useful if it stays put while the item list below it scrolls, same
+// reasoning as the header itself. render() is the only place that ever
+// writes non-empty content here; every other exit path clears it via
+// clearItemList() below so a stale toolbar from a previous stage/state
+// never lingers once that stage no longer has one.
+const itemListToolbarEl = document.getElementById('itemListToolbar');
+function clearItemList(html) {
+  itemListToolbarEl.innerHTML = '';
+  itemListEl.innerHTML = html || '';
+}
 const lastCopiedSectionEl = document.getElementById('lastCopiedSection');
 const landingIntroEl = document.getElementById('landingIntro');
 const lastCopiedContentEl = document.getElementById('lastCopiedContent');
@@ -124,7 +139,7 @@ function renderLastCopied() {
 // once the fetches resolve — that abrupt empty-then-everything jump is the
 // "flicker." Shown immediately, synchronously, before any awaiting starts.
 function renderSkeleton() {
-  itemListEl.innerHTML = `
+  clearItemList(`
     <div class="skeleton-card">
       <div class="skeleton-line" style="width:40%"></div>
       <div class="skeleton-line" style="width:75%"></div>
@@ -133,7 +148,7 @@ function renderSkeleton() {
     <div class="skeleton-card">
       <div class="skeleton-line" style="width:35%"></div>
       <div class="skeleton-line" style="width:60%"></div>
-    </div>`;
+    </div>`);
 }
 
 async function init() {
@@ -291,7 +306,7 @@ async function refreshFromActiveTab(force) {
     setStatus('Not logged in — log into StagePay in a normal tab first, then reopen this panel.', 'error', '🔒 Not logged in');
     landingIntroEl.hidden = false;
     currentProjectId = null;
-    itemListEl.innerHTML = '';
+    clearItemList();
     updateStageBanner();
     return;
   }
@@ -299,7 +314,7 @@ async function refreshFromActiveTab(force) {
     setStatus('Your StagePay account has been suspended. Contact support if you believe this is a mistake.', 'error', '🚫 Account suspended');
     landingIntroEl.hidden = true;
     currentProjectId = null;
-    itemListEl.innerHTML = '';
+    clearItemList();
     updateStageBanner();
     return;
   }
@@ -337,7 +352,7 @@ async function refreshFromActiveTab(force) {
     setStatus(`No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.${emailNote}`, 'error', '🔍 No project detected');
     landingIntroEl.hidden = false;
     currentProjectId = null;
-    itemListEl.innerHTML = '';
+    clearItemList();
     updateStageBanner();
     return;
   }
@@ -355,7 +370,7 @@ async function refreshFromActiveTab(force) {
 // upgrade in another tab while this panel is still open, same pattern as
 // setStatus()'s persistent modal.
 function renderNoDirectorAccessWall() {
-  itemListEl.innerHTML = `
+  clearItemList(`
     <div class="no-director-wall">
       <p class="no-director-wall-icon">🔒</p>
       <h2>Director access needed</h2>
@@ -363,7 +378,7 @@ function renderNoDirectorAccessWall() {
       <p class="no-director-wall-body">Director unlocks compiled Flow-ready prompts, auto-attached character/scene references, and structured production tools inside Google Flow.</p>
       <a class="no-director-wall-cta" href="${API_BASE}/add-ons/director" target="_blank" rel="noopener">Learn more &amp; upgrade →</a>
       <button type="button" id="noDirectorRecheckBtn">I've paid — check again</button>
-    </div>`;
+    </div>`);
   const btn = document.getElementById('noDirectorRecheckBtn');
   if (btn) btn.addEventListener('click', () => refreshFromActiveTab(true));
 }
@@ -377,7 +392,7 @@ function renderNoDirectorAccessWall() {
 async function showProjectConflictWarning(ids) {
   currentProjectId = null;
   currentItems = [];
-  itemListEl.innerHTML = '';
+  clearItemList();
   landingIntroEl.hidden = false;
   updateStageBanner();
   let names = ids;
@@ -821,24 +836,79 @@ function render() {
   renderFolderConnectModal();
   if (!currentProjectId) return;
   if (currentCompleted) {
-    itemListEl.innerHTML = `<p class="stage-empty-note">🎉 This project is completed — every stage is locked and paid. Nothing left to produce.</p>`;
+    clearItemList(`<p class="stage-empty-note">🎉 This project is completed — every stage is locked and paid. Nothing left to produce.</p>`);
     return;
   }
   if (currentStage === 1) {
-    itemListEl.innerHTML = `<p class="stage-empty-note">Stage 1 (Creative Brief) is filled in directly in StagePay itself — nothing to send to Flow yet. Once the brief is locked, reopen this panel.</p>`;
+    clearItemList(`<p class="stage-empty-note">Stage 1 (Creative Brief) is filled in directly in StagePay itself — nothing to send to Flow yet. Once the brief is locked, reopen this panel.</p>`);
     return;
   }
   const items = currentItems.filter((i) => i.stage === currentStage);
   if (!items.length) {
-    itemListEl.innerHTML = `<p class="stage-empty-note">No items yet in Stage ${currentStage} — ${escapeHtml(STAGE_NAMES[currentStage] || '')}.</p>`;
+    clearItemList(`<p class="stage-empty-note">No items yet in Stage ${currentStage} — ${escapeHtml(STAGE_NAMES[currentStage] || '')}.</p>`);
     return;
   }
   const isSingleItem = items.length === 1;
-  itemListEl.innerHTML = items.map((item) => renderItemRow(item, isSingleItem)).join('');
+  // Confirmed live: Stage 3 (up to 7 Characters/Properties/Backgrounds/
+  // Sounds) and Stage 4 (up to 8 Scenes) were a single undifferentiated
+  // flat list — no grouping, no way to jump to one without scrolling past
+  // everything before it. Groups by item_key (a section header only shows
+  // once there's more than one distinct type present, so Stage 4's
+  // all-Scene list stays header-free) and adds a jump nav + collapse-all
+  // toggle, gated on the same isSingleItem check already used for the
+  // collapse chrome itself — nothing new to gate on for a lone item.
+  const groups = [];
+  const groupsByKey = {};
+  items.forEach((item) => {
+    if (!groupsByKey[item.item_key]) {
+      groupsByKey[item.item_key] = { key: item.item_key, items: [] };
+      groups.push(groupsByKey[item.item_key]);
+    }
+    groupsByKey[item.item_key].items.push(item);
+  });
+  const showGroupHeaders = groups.length > 1;
+  const allExpanded = !isSingleItem && items.every((item) => expandedItems[item.id]);
+  // Lives in the sticky header (itemListToolbarEl), not itemListEl — see
+  // clearItemList()'s comment for why these are set separately.
+  itemListToolbarEl.innerHTML = isSingleItem ? '' : `
+    <div class="item-list-toolbar">
+      <div class="pill-row jump-nav">${items.map((item) => `<button type="button" data-jump-to="${item.id}">${escapeHtml(itemDisplayName(item))}</button>`).join('')}</div>
+      <button type="button" id="collapseAllBtn">${allExpanded ? '▾ Collapse all' : '▸ Expand all'}</button>
+    </div>`;
+  itemListEl.innerHTML = groups.map((group) => {
+    const body = group.items.map((item) => renderItemRow(item, isSingleItem)).join('');
+    if (!showGroupHeaders) return body;
+    const groupLabel = GROUP_LABELS[group.key] || (itemConfigFor(group.items[0]) || {}).label || group.key;
+    return `<div class="item-group-header">${escapeHtml(groupLabel)} (${group.items.length})</div>${body}`;
+  }).join('');
   document.querySelectorAll('[data-toggle-item]').forEach((el) => el.addEventListener('click', () => {
     const id = el.getAttribute('data-toggle-item');
     expandedItems[id] = !expandedItems[id];
     render();
+  }));
+  const collapseAllBtn = document.getElementById('collapseAllBtn');
+  if (collapseAllBtn) collapseAllBtn.addEventListener('click', () => {
+    items.forEach((item) => { expandedItems[item.id] = !allExpanded; });
+    render();
+  });
+  document.querySelectorAll('[data-jump-to]').forEach((btn) => btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-jump-to');
+    expandedItems[id] = true;
+    render();
+    const card = document.querySelector(`[data-item-id="${id}"]`);
+    if (!card) return;
+    // Plain scrollIntoView({block:'start'}) scrolls the card's top edge to
+    // scroll-position 0 — but .sticky-top visually floats over that exact
+    // position, so the card's top ends up hidden underneath it instead of
+    // sitting just below it. .sticky-top's own height isn't fixed (the
+    // expiry banner/toolbar/landing intro each show conditionally), so a
+    // static CSS scroll-margin-top would drift out of sync — reading its
+    // real offsetHeight here, right after the render() above, is what
+    // keeps this correct regardless of which of those happen to be showing.
+    const stickyTop = document.getElementById('stickyTop');
+    const clearance = (stickyTop ? stickyTop.offsetHeight : 0) + 8; // +8 for a little breathing room, not flush against the edge
+    const targetY = card.getBoundingClientRect().top + window.scrollY - clearance;
+    window.scrollTo({ top: targetY, behavior: 'smooth' });
   }));
   // Only expanded items have any of this DOM to wire or thumbnails to fetch
   // in the first place — skipping collapsed ones avoids fetching every

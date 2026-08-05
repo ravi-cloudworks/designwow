@@ -38,6 +38,10 @@ header strong { font-size: 16px; }
 .expiry-banner a { color: #a05f10; text-decoration: underline; font-weight: 700; }
 
 .item-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.item-list-toolbar { background: #fff; border-bottom: 1px solid #dbdfe2; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
+.item-list-toolbar .jump-nav button { color: #176b5e; }
+#collapseAllBtn { align-self: flex-end; border: 1px solid #dbdfe2; background: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12.5px; font-weight: 700; color: #176b5e; cursor: pointer; }
+.item-group-header { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #8b92a1; padding: 0 2px; }
 .skeleton-card { background: #fff; border: 1px solid #dbdfe2; border-radius: 8px; padding: 14px; }
 .skeleton-line {
   height: 12px; border-radius: 6px; margin-bottom: 10px;

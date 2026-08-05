@@ -28,6 +28,13 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   while scrolling a long item list instead of scrolling away.
 - Increased font sizes throughout (~15% across the board) — the panel's
   text was hard to read at its previous small, dense sizing.
+- Stage 3/4 item lists now group by type (Characters/Properties/
+  Backgrounds/Sounds) with section headers, plus a sticky jump-nav +
+  collapse-all toolbar pinned under the header — previously a single flat
+  list with no way to jump to one of several items (7 in Stage 3, 8 Scenes
+  in Stage 4) without scrolling past everything before it. Jump-nav
+  scrolling accounts for the sticky header's own height so the target
+  card lands just below it instead of partly hidden underneath.
 
 ## 0.4.0 — 2026-07-31
 
