@@ -6,6 +6,13 @@ body {
   color: #14161b;
   background: #eef1f2;
 }
+/* Groups header/landingIntro/stageBanner/expiryBanner into one sticky unit
+   instead of pinning each individually — their combined height varies by
+   state (e.g. the expiry banner only sometimes shows), so a single sticky
+   wrapper avoids needing per-element top offsets that would drift out of
+   sync with each other. Sits below every modal overlay (z-index 100-110)
+   so a status/gallery/upload-error modal still covers it, same as before. */
+.sticky-top { position: sticky; top: 0; z-index: 20; }
 header {
   padding: 12px 14px;
   background: #fff;
@@ -206,6 +213,16 @@ header strong { font-size: 14px; }
 .upload-error-modal-card .gallery-modal-head strong { color: #b23a37; }
 .upload-error-modal-body { font-size: 12.5px; line-height: 1.5; color: #14161b; margin: 0 0 14px; }
 .upload-error-modal-card button.upload-error-modal-ok { width: 100%; border: none; background: #176b5e; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+
+.desc-confirm-modal-card { max-width: 320px; }
+.desc-confirm-modal-label { margin: 0 0 3px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #8b92a1; }
+.desc-confirm-modal-quote { margin: 0 0 12px; padding: 8px 10px; background: #f5f7f7; border: 1px solid #dbdfe2; border-radius: 6px; font-size: 12.5px; line-height: 1.5; color: #14161b; }
+.desc-confirm-modal-audience { margin: 0 0 12px; font-size: 12px; line-height: 1.5; color: #4b5563; }
+.desc-confirm-modal-hint { margin: 0 0 14px; font-size: 11px; line-height: 1.5; color: #a06a12; }
+.desc-confirm-modal-actions { display: flex; flex-direction: column; gap: 8px; }
+.desc-confirm-modal-actions button { width: 100%; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+#descConfirmModalEditBtn { border: 1px solid #dbdfe2; background: #fff; color: #14161b; }
+#descConfirmModalOkBtn { border: none; background: #176b5e; color: #fff; }
 
 .last-copied { padding: 10px; background: #fbeedb; border-top: 1px solid #eccd9a; border-bottom: 1px solid #eccd9a; }
 .last-copied h2 { font-size: 12px; margin: 0 0 2px; color: #a05f10; }

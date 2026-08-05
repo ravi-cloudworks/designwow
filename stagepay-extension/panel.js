@@ -45,6 +45,14 @@ let directorAccessUntilDate = null; // raw 'YYYY-MM-DD' from GET /auth/me, or nu
 const EXPIRY_WARNING_DAYS = 7; // proactive nudge window — matches the same threshold used on the web app's own banner
 const stageConfigCache = {}; // { [stage]: parsed config JSON from GET /api/config/:stage }
 const itemDrafts = {}; // { [itemId]: { fields, prompt } } — in-memory only until "Save"
+// { [itemId]: string } — the exact description text last confirmed via the
+// pre-copy dialog (see openDescriptionConfirmModal). Compared against the
+// CURRENT description on every Copy click: unchanged since last confirm
+// skips the dialog, but any edit invalidates it and prompts again next
+// time. In-memory only, same lifetime as itemDrafts — a fresh panel open
+// re-prompts once regardless, which is fine since it's a quick glance, not
+// a heavy gate.
+const confirmedDescriptions = {};
 const stagingFiles = {}; // { [itemId]: File[] } — picked/dropped but not yet sent to StagePay
 const stagingNotes = {}; // { [itemId]: string | null } — must be real state, not an imperative DOM mutation: addToStaging calls render() right after setting it, which rebuilds the whole card from scratch and would otherwise wipe out a one-off element mutation immediately
 let lastCopied = null; // { kind: 'prompt' | 'image', label, preview, copiedAt } — the single most recent copy, not a history
@@ -319,7 +327,14 @@ async function refreshFromActiveTab(force) {
   }
   const projectId = detected;
   if (!projectId) {
-    setStatus('No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.', 'error', '🔍 No project detected');
+    // Names the signed-in account explicitly — confirmed live: without this,
+    // there's no way to tell from this panel alone whether stagepay.pages.dev
+    // needs opening under a DIFFERENT email than whichever one happens to be
+    // logged into the browser right now. checkAccountAccess() above already
+    // succeeded (returned 'ok') to even reach this branch, so currentUserEmail
+    // is already populated — nothing new to fetch for this.
+    const emailNote = currentUserEmail ? ` Signed in as ${currentUserEmail}.` : '';
+    setStatus(`No StagePay project tab found — open a project at stagepay.pages.dev, then reopen this panel.${emailNote}`, 'error', '🔍 No project detected');
     landingIntroEl.hidden = false;
     currentProjectId = null;
     itemListEl.innerHTML = '';
@@ -1503,6 +1518,42 @@ function openUploadErrorModal(message) {
   document.getElementById('uploadErrorModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'uploadErrorModalOverlay') close(); });
 }
 
+// Confirmed live: a one-line description ("woman") often doesn't carry
+// details the story actually specifies (e.g. "Indian woman" from the
+// brief's Target Audience) — a value being non-empty doesn't mean it
+// still matches the story once you've filled in 6 other Characters/
+// Backgrounds and lost track. Fires on Copy click, not as a passive
+// checkbox next to the field: a checkbox can be ticked once and never
+// re-examined even after the text changes, while this shows the exact
+// current text back to you, next to the brief's audience for a real
+// cross-check, at the one moment it actually matters — right before it's
+// pasted into Flow. Only for item types with a plain description field
+// (Character/Property/Background/Sound) — Scene/Movie/Story have their
+// own structured fields instead. See confirmedDescriptions above for why
+// this doesn't re-fire on every single copy of unchanged text.
+function openDescriptionConfirmModal(description, audience, onConfirm) {
+  const root = document.getElementById('descriptionConfirmModalRoot');
+  if (!root) { onConfirm(); return; } // never block a copy just because the modal root is somehow missing
+  root.innerHTML = `<div class="gallery-modal-overlay" id="descConfirmModalOverlay">
+    <div class="gallery-modal-card desc-confirm-modal-card">
+      <div class="gallery-modal-head"><strong>Does this match the story?</strong><button type="button" id="descConfirmModalCloseBtn">×</button></div>
+      <p class="desc-confirm-modal-label">Your description</p>
+      <p class="desc-confirm-modal-quote">${escapeHtml(description)}</p>
+      ${audience ? `<p class="desc-confirm-modal-label">Target audience (from Stage 1 brief)</p><p class="desc-confirm-modal-audience">${escapeHtml(audience)}</p>` : ''}
+      <p class="desc-confirm-modal-hint">Check details like ethnicity, age, and gender actually match — easy to lose track of across several Characters/Backgrounds.</p>
+      <div class="desc-confirm-modal-actions">
+        <button type="button" id="descConfirmModalEditBtn">✏️ Edit first</button>
+        <button type="button" id="descConfirmModalOkBtn">✅ Yes, copy prompt</button>
+      </div>
+    </div>
+  </div>`;
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('descConfirmModalCloseBtn').addEventListener('click', close);
+  document.getElementById('descConfirmModalEditBtn').addEventListener('click', close);
+  document.getElementById('descConfirmModalOkBtn').addEventListener('click', () => { close(); onConfirm(); });
+  document.getElementById('descConfirmModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'descConfirmModalOverlay') close(); });
+}
+
 const SEE_ALL_ROW_SELECTOR = {
   'must-attach': (id) => `[data-must-attach="${id}"]`,
   'thumbs': (id) => `[data-thumbs="${id}"]`,
@@ -1756,13 +1807,29 @@ function wireItemCard(item) {
     // Custom, before you've even copied it anywhere).
     const copyPromptBtn = document.querySelector(`[data-copy-prompt-btn="${item.id}"]`);
     if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => {
-      const text = currentPromptFor(item);
-      navigator.clipboard.writeText(text).then(() => {
-        setLastCopied({ kind: 'prompt', label: item.name || item.item_key, preview: text });
-        copyPromptBtn.textContent = '✓ Copied';
-        setTimeout(() => { copyPromptBtn.textContent = '📋 Copy prompt'; }, 1200);
-      });
-      saveItemDraft(item);
+      const doCopy = () => {
+        const text = currentPromptFor(item);
+        navigator.clipboard.writeText(text).then(() => {
+          setLastCopied({ kind: 'prompt', label: item.name || item.item_key, preview: text });
+          copyPromptBtn.textContent = '✓ Copied';
+          setTimeout(() => { copyPromptBtn.textContent = '📋 Copy prompt'; }, 1200);
+        });
+        saveItemDraft(item);
+      };
+      // Only Character/Property/Background/Sound have a plain description
+      // field — Scene/Movie/Story use their own structured fields instead,
+      // so this schema check (not an item_key list) is what keeps the
+      // dialog from firing somewhere it doesn't apply.
+      const fieldSchema = (itemConfigFor(item) && itemConfigFor(item).content && itemConfigFor(item).content.fieldsSchema) || [];
+      const description = (fieldSchema.some((f) => f.key === 'description') && draft.fields.description) || '';
+      if (description.trim() && confirmedDescriptions[item.id] !== description) {
+        openDescriptionConfirmModal(description, (currentBrief && currentBrief.audience) || '', () => {
+          confirmedDescriptions[item.id] = description;
+          doCopy();
+        });
+      } else {
+        doCopy();
+      }
     });
 
     const chatgptBtn = document.querySelector(`[data-chatgpt-btn="${item.id}"]`);

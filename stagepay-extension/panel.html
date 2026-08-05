@@ -6,26 +6,28 @@
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
-  <header>
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <strong>💸 StagePay Director</strong>
-      <button id="refreshBtn" title="Re-check which project is open">🔄</button>
+  <div id="stickyTop" class="sticky-top">
+    <header>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <strong>💸 StagePay Director</strong>
+        <button id="refreshBtn" title="Re-check which project is open">🔄</button>
+      </div>
+      <p id="projectStatus" class="status">Looking for an open StagePay tab…</p>
+      <p id="directorExpiryInfo" class="director-expiry-info" hidden></p>
+    </header>
+
+    <div id="landingIntro" class="landing-intro">
+      <p class="landing-tagline">AI Video Production Assistant for UGC Creators</p>
+      <p class="landing-pitch">Generate premium, client-ready UGC videos — without wasting AI credits on bad prompts.</p>
     </div>
-    <p id="projectStatus" class="status">Looking for an open StagePay tab…</p>
-    <p id="directorExpiryInfo" class="director-expiry-info" hidden></p>
-  </header>
 
-  <div id="landingIntro" class="landing-intro">
-    <p class="landing-tagline">AI Video Production Assistant for UGC Creators</p>
-    <p class="landing-pitch">Generate premium, client-ready UGC videos — without wasting AI credits on bad prompts.</p>
+    <div id="stageBanner" class="stage-banner" hidden>
+      <div class="stage-banner-project" id="stageBannerProject"></div>
+      <div class="stage-banner-stage" id="stageBannerStage"></div>
+    </div>
+
+    <div id="expiryBanner" class="expiry-banner" hidden></div>
   </div>
-
-  <div id="stageBanner" class="stage-banner" hidden>
-    <div class="stage-banner-project" id="stageBannerProject"></div>
-    <div class="stage-banner-stage" id="stageBannerStage"></div>
-  </div>
-
-  <div id="expiryBanner" class="expiry-banner" hidden></div>
 
   <main id="itemList" class="item-list"></main>
 
@@ -40,6 +42,7 @@
   <div id="uploadErrorModalRoot"></div>
   <div id="statusModalRoot"></div>
   <div id="renameFileModalRoot"></div>
+  <div id="descriptionConfirmModalRoot"></div>
 
   <script src="panel.js"></script>
 </body>

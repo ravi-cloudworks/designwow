@@ -16,6 +16,16 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
   its master prompt now asks Flow for a full-body turnaround sheet plus a
   separate close-up face/expression sheet from one paste, so both need
   somewhere to land (8b23a31).
+- Copying a Character/Property/Background/Sound prompt with a filled-in
+  description now shows a confirm dialog first (description text + the
+  brief's Target Audience for cross-reference) unless that exact text was
+  already confirmed — catches cases like a description saying "woman" when
+  the story actually specifies "Indian woman," easy to lose track of across
+  several items.
+- "No project detected" now names the signed-in email, so it's clear
+  whether stagepay.pages.dev needs opening under a different account.
+- Header (StagePay account, project, stage) is now sticky — stays visible
+  while scrolling a long item list instead of scrolling away.
 
 ## 0.4.0 — 2026-07-31
 
