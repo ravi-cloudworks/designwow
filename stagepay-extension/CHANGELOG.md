@@ -12,6 +12,10 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
 
 ## Unreleased
 
+_Nothing yet — 0.5.0 submitted 2026-08-05, pending Chrome Web Store review._
+
+## 0.5.0 — 2026-08-05
+
 - Character now allows up to 2 uploaded images (previously capped at 1) —
   its master prompt now asks Flow for a full-body turnaround sheet plus a
   separate close-up face/expression sheet from one paste, so both need

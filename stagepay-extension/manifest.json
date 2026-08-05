@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "StagePay Director - AI Video Production Assistant for UGC Creators",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Generate premium, client-ready UGC videos without wasting AI credits: compiled Flow/ChatGPT prompts, references, deliverable upload",
   "icons": {
     "16": "icons/icon16.png",
