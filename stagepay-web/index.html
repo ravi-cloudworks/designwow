@@ -7758,6 +7758,60 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const existing = document.getElementById('quickShareOverlay');
     if (existing) existing.remove();
   }
+  // Three quick-tap questions before the WhatsApp message actually sends —
+  // gives the designer real lead-qualifying context (timeline/purpose/
+  // budget) up front instead of a blank "are you available?" that tells
+  // them nothing about the job. Required (not optional): a half-filled
+  // brief is barely better than none, so the button stays disabled — a
+  // real [disabled], not just a guard-click — until all three are picked.
+  const CONTACT_TIMING_OPTIONS = ['Immediate', 'In 1 week', 'In 2 weeks'];
+  const CONTACT_PURPOSE_OPTIONS = ['Instagram Reel', 'YouTube Shorts', 'Website Hero Video'];
+  const CONTACT_BUDGET_OPTIONS = ['₹5k', '₹10k', '₹25k', '₹50k', '₹1 lakh'];
+  function openContactModal(profile, waNumber) {
+    closeContactModal();
+    // Fresh each open, not persisted — a visitor reopening this modal on a
+    // later visit shouldn't see a stale answer from a different mood/budget.
+    const selections = { timing: null, purpose: null, budget: null };
+    const pillSection = (label, options, key) => `
+      <div class="field">
+        <label>${esc(label)}</label>
+        <div class="pill-row" data-contact-pill-group="${key}">${options.map((o) => `<button type="button" class="pill" data-value="${esc(o)}">${esc(o)}</button>`).join('')}</div>
+      </div>`;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'contactModalOverlay';
+    overlay.innerHTML = `
+      <div class="modal-card" style="max-width:360px">
+        <div class="modal-head"><strong>Contact ${esc((profile.name || '').trim().split(/\s+/)[0] || 'me')}</strong><button type="button" class="modal-close" id="contactModalCloseBtn">×</button></div>
+        <p style="font-size:12px;color:var(--text-faint);margin:0 0 14px">A few quick details so they know what you need before you even say hi.</p>
+        ${pillSection('When would this start?', CONTACT_TIMING_OPTIONS, 'timing')}
+        ${pillSection("What's this for?", CONTACT_PURPOSE_OPTIONS, 'purpose')}
+        ${pillSection("What's your budget?", CONTACT_BUDGET_OPTIONS, 'budget')}
+        <button type="button" class="btn btn-primary" id="contactModalSendBtn" style="width:100%" disabled>💬 Contact me</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('contactModalCloseBtn').addEventListener('click', closeContactModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeContactModal(); });
+    const sendBtn = document.getElementById('contactModalSendBtn');
+    overlay.querySelectorAll('[data-contact-pill-group]').forEach((group) => {
+      const key = group.getAttribute('data-contact-pill-group');
+      group.querySelectorAll('.pill').forEach((btn) => btn.addEventListener('click', () => {
+        selections[key] = btn.getAttribute('data-value');
+        group.querySelectorAll('.pill').forEach((b) => b.classList.toggle('selected', b === btn));
+        sendBtn.disabled = !(selections.timing && selections.purpose && selections.budget);
+      }));
+    });
+    sendBtn.addEventListener('click', () => {
+      const firstName = (profile.name || '').trim().split(/\s+/)[0] || '';
+      const waMessage = `Hi ${firstName}! I saw your profile on StagePay and I'm interested in working together.\n\nProject start: ${selections.timing}\nThis is for: ${selections.purpose}\nBudget: ${selections.budget}\n\nAre you available to talk?`;
+      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`, '_blank', 'noopener');
+      closeContactModal();
+    });
+  }
+  function closeContactModal() {
+    const existing = document.getElementById('contactModalOverlay');
+    if (existing) existing.remove();
+  }
   async function renderPublicShowcaseSwipePage(userId) {
     const app = document.getElementById('app');
     app.innerHTML = `<div class="swipe-page"><p style="margin:auto;color:var(--text-faint)">Loading…</p></div>`;
@@ -7787,13 +7841,13 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const waNumber = whatsappNumberFromLink(profile.contact_link);
     let contactBtn = '';
     if (profile.contact_link) {
-      if (!waNumber) {
-        contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Get in touch</a>`;
-      } else {
-        const firstName = (profile.name || '').trim().split(/\s+/)[0] || '';
-        const waMessage = `Hi ${firstName}! I saw your profile on StagePay and I'm interested in working together. I'd like to talk about our next project — are you available?`;
-        contactBtn = `<a class="btn btn-sm btn-primary" href="${esc(`https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`)}" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a>`;
-      }
+      // A custom contact_link (not a WhatsApp number) has no project details
+      // to collect — nowhere for a qualifying modal to send them, so it
+      // stays a plain direct link. Only a WhatsApp number gets the modal,
+      // since that's the one destination the prebuilt message is FOR.
+      contactBtn = !waNumber
+        ? `<a class="btn btn-sm btn-primary" href="${esc(profile.contact_link)}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Get in touch</a>`
+        : `<button type="button" class="btn btn-sm btn-primary" id="contactMeBtn">💬 Contact me</button>`;
     }
 
     // Every card carries the same bottom overlay — caption (if any) plus the
@@ -7885,6 +7939,8 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       </div>`;
 
     document.getElementById('quickShareBtn').addEventListener('click', () => openQuickShareModal(profile));
+    const contactMeBtn = document.getElementById('contactMeBtn');
+    if (contactMeBtn) contactMeBtn.addEventListener('click', () => openContactModal(profile, waNumber));
 
     if (!slides.length) return;
     const root = document.getElementById('swipePageRoot');
