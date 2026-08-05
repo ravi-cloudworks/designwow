@@ -12,7 +12,10 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
 
 ## Unreleased
 
-_Nothing yet — 0.4.0 was approved 2026-08-03._
+- Character now allows up to 2 uploaded images (previously capped at 1) —
+  its master prompt now asks Flow for a full-body turnaround sheet plus a
+  separate close-up face/expression sheet from one paste, so both need
+  somewhere to land (8b23a31).
 
 ## 0.4.0 — 2026-07-31
 
