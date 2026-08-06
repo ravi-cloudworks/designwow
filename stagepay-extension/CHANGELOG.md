@@ -12,7 +12,7 @@ release commit; it can reconstruct the list from `git log` if it falls behind.
 
 ## Unreleased
 
-_Nothing yet — 0.5.0 submitted 2026-08-05, pending Chrome Web Store review._
+_Nothing queued yet — 0.5.0 approved and live on the Chrome Web Store as of 2026-08-06._
 
 ## 0.5.0 — 2026-08-05
 
