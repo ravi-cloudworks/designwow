@@ -1100,6 +1100,20 @@ Rules for every option:
   };
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  // Every modal closes on a backdrop click, but a plain 'click' listener
+  // fires wherever the mouse is RELEASED — dragging to select text in a
+  // field near the modal's edge (e.g. an amount input) and letting go past
+  // it lands the release on the backdrop, which used to read as "clicked
+  // outside" and close the modal mid-selection. Only closes when both the
+  // press and the release land on the backdrop itself.
+  function wireOverlayBackdropClose(overlay, closeFn) {
+    let downOnBackdrop = false;
+    overlay.addEventListener('mousedown', (e) => { downOnBackdrop = e.target === overlay; });
+    overlay.addEventListener('click', (e) => {
+      if (downOnBackdrop && e.target === overlay) closeFn();
+      downOnBackdrop = false;
+    });
+  }
   // Pasting from ChatGPT/Word/etc often leaves stray blank lines at the very
   // start or end of a field — strip those (and any leading/trailing
   // whitespace) on save, without touching intentional blank lines a
@@ -1272,7 +1286,7 @@ Rules for every option:
       </div>`;
     const close = () => { root.innerHTML = ''; };
     document.getElementById('stageHistoryModalCloseBtn').addEventListener('click', close);
-    document.getElementById('stageHistoryModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageHistoryModalOverlay') close(); });
+    wireOverlayBackdropClose(document.getElementById('stageHistoryModalOverlay'), close);
   }
   // A native confirm() said "Stage 3-5" but never named what's actually in
   // them, and gave no chance to grab a download first — this replaces it
@@ -1302,7 +1316,7 @@ Rules for every option:
       document.getElementById('unlockWarningCloseBtn').addEventListener('click', () => close(false));
       document.getElementById('unlockWarningCancelBtn').addEventListener('click', () => close(false));
       document.getElementById('unlockWarningConfirmBtn').addEventListener('click', () => close(true));
-      document.getElementById('unlockWarningOverlay').addEventListener('click', (e) => { if (e.target.id === 'unlockWarningOverlay') close(false); });
+      wireOverlayBackdropClose(document.getElementById('unlockWarningOverlay'), () => close(false));
     });
   }
   // Replaces the old "click again to confirm" toast (easy to miss, reads
@@ -1328,7 +1342,7 @@ Rules for every option:
       document.getElementById('confirmPaymentReceivedCloseBtn').addEventListener('click', () => close(false));
       document.getElementById('confirmPaymentReceivedCancelBtn').addEventListener('click', () => close(false));
       document.getElementById('confirmPaymentReceivedConfirmBtn').addEventListener('click', () => close(true));
-      document.getElementById('confirmPaymentReceivedOverlay').addEventListener('click', (e) => { if (e.target.id === 'confirmPaymentReceivedOverlay') close(false); });
+      wireOverlayBackdropClose(document.getElementById('confirmPaymentReceivedOverlay'), () => close(false));
     });
   }
   // Replaces the old native confirm() — same promise-resolves-true/false
@@ -1361,7 +1375,7 @@ Rules for every option:
       document.getElementById('deleteProjectCloseBtn').addEventListener('click', () => close(false));
       document.getElementById('deleteProjectCancelBtn').addEventListener('click', () => close(false));
       document.getElementById('deleteProjectConfirmBtn').addEventListener('click', () => close(true));
-      document.getElementById('deleteProjectOverlay').addEventListener('click', (e) => { if (e.target.id === 'deleteProjectOverlay') close(false); });
+      wireOverlayBackdropClose(document.getElementById('deleteProjectOverlay'), () => close(false));
     });
   }
   function itemConfigFor(item) { const sc = stageConfigFor(item.stage); return (sc && sc.items[item.item_key]) || null; }
@@ -1634,7 +1648,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('viewPromptModalCloseBtn').addEventListener('click', closeViewPromptModal);
-    document.getElementById('viewPromptModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'viewPromptModalOverlay') closeViewPromptModal(); });
+    wireOverlayBackdropClose(document.getElementById('viewPromptModalOverlay'), closeViewPromptModal);
     document.getElementById('viewPromptDoneBtn').addEventListener('click', closeViewPromptModal);
     document.getElementById('viewPromptCopyBtn').addEventListener('click', () => {
       navigator.clipboard.writeText(promptText).then(() => toast('Copied'));
@@ -1669,7 +1683,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('sceneRefsModalCloseBtn').addEventListener('click', closeSceneRefsModal);
-    document.getElementById('sceneRefsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'sceneRefsModalOverlay') closeSceneRefsModal(); });
+    wireOverlayBackdropClose(document.getElementById('sceneRefsModalOverlay'), closeSceneRefsModal);
     document.getElementById('sceneRefsCancelBtn').addEventListener('click', closeSceneRefsModal);
     document.querySelectorAll('[data-scene-ref-toggle]').forEach(el => el.addEventListener('click', () => {
       const id = el.getAttribute('data-scene-ref-toggle');
@@ -1863,7 +1877,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     wireGenModalFieldControls();
   }
   function wireGenerateModal() {
-    document.getElementById('genModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'genModalOverlay') closeGenerateModal(); });
+    wireOverlayBackdropClose(document.getElementById('genModalOverlay'), closeGenerateModal);
     document.getElementById('genModalCloseBtn').addEventListener('click', closeGenerateModal);
     document.getElementById('genModalCancelBtn').addEventListener('click', closeGenerateModal);
     wireGenModalFieldControls();
@@ -2010,7 +2024,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     wireAutoPopulateModal();
   }
   function wireAutoPopulateModal() {
-    document.getElementById('apModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'apModalOverlay') closeAutoPopulateModal(); });
+    wireOverlayBackdropClose(document.getElementById('apModalOverlay'), closeAutoPopulateModal);
     document.getElementById('apModalCloseBtn').addEventListener('click', closeAutoPopulateModal);
     document.getElementById('apModalCancelBtn').addEventListener('click', closeAutoPopulateModal);
     const confirmBtn = document.getElementById('apModalConfirmBtn');
@@ -2103,7 +2117,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('apDoneCloseBtn').addEventListener('click', closeAutoPopulateModal);
-    document.getElementById('apDoneOverlay').addEventListener('click', (e) => { if (e.target.id === 'apDoneOverlay') closeAutoPopulateModal(); });
+    wireOverlayBackdropClose(document.getElementById('apDoneOverlay'), closeAutoPopulateModal);
   }
 
   // ---------- Must-attach: what an item needs from earlier stages ----------
@@ -2151,7 +2165,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     </div>`;
     document.body.appendChild(overlay);
     renderMediaViewerBody(url, fileName, kind);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMediaViewerModal(); });
+    wireOverlayBackdropClose(overlay, closeMediaViewerModal);
     document.getElementById('mediaViewerCloseBtn').addEventListener('click', closeMediaViewerModal);
     document.addEventListener('keydown', mediaViewerKeyHandler);
     if (mediaViewerGallery) {
@@ -3071,7 +3085,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
-        if (entry) celebratePayment(entry.amountPaise);
+        if (entry && entry.amountPaise > 0) celebratePayment(entry.amountPaise);
       } else {
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
@@ -3314,7 +3328,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         renderTool();
         renderProjectInfoBar();
         toast('Marked as paid');
-        if (entry) celebratePayment(entry.amountPaise);
+        if (entry && entry.amountPaise > 0) celebratePayment(entry.amountPaise);
       } else {
         confirmPaidBtn.disabled = false; confirmPaidBtn.textContent = '✅ Confirm payment received';
       }
@@ -3686,7 +3700,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('emptyItemsModalCloseBtn').addEventListener('click', closeEmptyItemsModal);
-    document.getElementById('emptyItemsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'emptyItemsModalOverlay') closeEmptyItemsModal(); });
+    wireOverlayBackdropClose(document.getElementById('emptyItemsModalOverlay'), closeEmptyItemsModal);
     document.getElementById('emptyItemsCancelBtn').addEventListener('click', closeEmptyItemsModal);
     const deleteBtn = document.getElementById('emptyItemsDeleteBtn');
     if (deleteBtn) deleteBtn.addEventListener('click', withMutationGuard(async () => {
@@ -3750,11 +3764,16 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
           : `🎉 You've already hit your 3-month goal of ${formatRupees(summary.goalAmountPaise)}!`)
       : '';
     // Same rule as the backend: a credit is only ever needed to open a new
-    // receivable (no entry yet, or the last round was already paid) — a
-    // plain renegotiation of a still-open, unpaid amount is always free.
+    // receivable (no entry yet, or the last round was already paid) at a
+    // real (>0) amount — a plain renegotiation of a still-open, unpaid
+    // amount, or setting/keeping it at ₹0, is always free.
     const credits = (state.user && state.user.free_credits_remaining) || 0;
     const isNewReceivable = !entry || !!entry.paid;
-    const blocked = isNewReceivable && credits <= 0;
+    // Not a hard block — whether a credit is actually needed depends on the
+    // amount typed (₹0 never needs one), which isn't known until the field
+    // has a value, so the form always shows; the save handler below is what
+    // actually stops a >0 amount without credits (server enforces this too).
+    const outOfCredits = isNewReceivable && credits <= 0;
     const creditColor = credits <= 0 ? 'var(--crimson)' : credits <= 2 ? 'var(--amber)' : 'var(--teal)';
     const maskedUpi = maskUpiId(state.user && state.user.upi_id);
     root.innerHTML = `
@@ -3763,42 +3782,38 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
           <div class="modal-head"><strong>💰 Your Income — Stage ${stage}</strong><button class="modal-close" id="stageAmountModalCloseBtn">×</button></div>
           <div style="padding:16px">
             <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 14px">${maskedUpi ? `Your income goes to this UPI ID: <strong style="color:var(--text)">${esc(maskedUpi)}</strong>` : '⚠ No UPI ID set'}</p>
-            ${blocked ? `
-              <p style="font-size:13px;margin-bottom:14px">You're out of income credits — buy more to price this stage.</p>
-              <button class="btn btn-primary" id="stageAmountBuyCreditsBtn" style="width:100%">Buy Income Credits</button>
-            ` : `
-              ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
-                <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
-              </div>` : ''}
-              <div class="field">
-                <label for="stageAmountInput">Amount to charge (₹)</label>
-                <input id="stageAmountInput" type="number" min="1" step="0.01" value="${entry ? (entry.amountPaise / 100) : ''}" placeholder="e.g. 1500">
-              </div>
-              ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
-              ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
-              <p style="font-size:11px;color:var(--text-faint);margin-top:8px">${isNewReceivable ? 'Setting this amount uses 1 income credit — used once you set the price, whether or not the customer actually pays it.' : "Renegotiating this still-open amount doesn't use another credit."}</p>
-              ${isNewReceivable && credits > 0 && credits <= 2 ? `<p style="font-size:11px;color:var(--amber);margin-top:4px">⚠ Only ${credits} credit${credits === 1 ? '' : 's'} left — buy more before you run out.</p>` : ''}
-              <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update Income' : 'Set Income'}</button>
-            `}
+            ${usualPaise > 0 ? `<div class="pill-row" style="margin-bottom:10px">
+              <button type="button" class="pill" data-amount-pill="${usualPaise}">Usual for this stage — ${formatRupees(usualPaise)}</button>
+            </div>` : ''}
+            <div class="field">
+              <label for="stageAmountInput">Amount to charge (₹)</label>
+              <input id="stageAmountInput" type="number" min="0" step="0.01" value="${entry ? (entry.amountPaise / 100) : ''}" placeholder="e.g. 1500, or 0 if already paid elsewhere">
+            </div>
+            ${entry ? `<p style="font-size:12.5px;color:var(--text-faint);margin:6px 0 4px">${entry.paid ? `✅ Marked as paid${entry.paidAt ? ` on ${esc(formatIST(entry.paidAt))}` : ''}` : 'Not marked paid yet'}</p>` : ''}
+            ${goalNote ? `<p class="story-step-note" style="margin-top:6px">${goalNote}</p>` : ''}
+            <p style="font-size:11px;color:var(--text-faint);margin-top:8px">${isNewReceivable ? 'A ₹0 amount is free. Any amount above that uses 1 income credit — used once you set the price, whether or not the customer actually pays it.' : "Renegotiating this still-open amount doesn't use another credit."}</p>
+            ${outOfCredits
+              ? `<p style="font-size:11px;color:var(--crimson);margin-top:4px">⚠ You're out of income credits — ₹0 still works, but buy more to set a real amount.</p>`
+              : (isNewReceivable && credits > 0 && credits <= 2 ? `<p style="font-size:11px;color:var(--amber);margin-top:4px">⚠ Only ${credits} credit${credits === 1 ? '' : 's'} left — buy more before you run out.</p>` : '')}
+            <button class="btn btn-primary" id="stageAmountSaveBtn" style="width:100%;margin-top:8px">${entry ? 'Update Income' : 'Set Income'}</button>
+            ${outOfCredits ? `<button class="btn btn-sm" id="stageAmountBuyCreditsBtn" style="width:100%;margin-top:8px">Buy Income Credits</button>` : ''}
             <p style="font-size:11px;font-weight:700;color:${creditColor};text-align:right;margin:14px 0 0">💳 ${credits} income credit${credits === 1 ? '' : 's'} remaining</p>
           </div>
         </div>
       </div>`;
     document.getElementById('stageAmountModalCloseBtn').addEventListener('click', closeStageAmountModal);
-    document.getElementById('stageAmountModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'stageAmountModalOverlay') closeStageAmountModal(); });
-    if (blocked) {
-      document.getElementById('stageAmountBuyCreditsBtn').addEventListener('click', () => {
-        closeStageAmountModal();
-        openBuyCreditsModal();
-      });
-      return;
-    }
+    wireOverlayBackdropClose(document.getElementById('stageAmountModalOverlay'), closeStageAmountModal);
+    const buyCreditsBtn = document.getElementById('stageAmountBuyCreditsBtn');
+    if (buyCreditsBtn) buyCreditsBtn.addEventListener('click', () => {
+      closeStageAmountModal();
+      openBuyCreditsModal();
+    });
     document.querySelectorAll('[data-amount-pill]').forEach(el => el.addEventListener('click', () => {
       document.getElementById('stageAmountInput').value = (Number(el.getAttribute('data-amount-pill')) / 100).toString();
     }));
     document.getElementById('stageAmountSaveBtn').addEventListener('click', async () => {
       const amountRupees = parseFloat(document.getElementById('stageAmountInput').value);
-      if (!amountRupees || amountRupees <= 0) { toast('Enter a valid amount', true); return; }
+      if (isNaN(amountRupees) || amountRupees < 0) { toast('Enter a valid amount', true); return; }
       const saveBtn = document.getElementById('stageAmountSaveBtn');
       saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
       const amountPaise = Math.round(amountRupees * 100);
@@ -4136,7 +4151,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('settingsModalCloseBtn').addEventListener('click', closeSettingsModal);
-    document.getElementById('settingsModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'settingsModalOverlay') closeSettingsModal(); });
+    wireOverlayBackdropClose(document.getElementById('settingsModalOverlay'), closeSettingsModal);
     document.getElementById('settingsBuyCreditsBtn').addEventListener('click', () => {
       closeSettingsModal();
       openBuyCreditsModal();
@@ -4610,7 +4625,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const close = () => { root.innerHTML = ''; };
     document.getElementById('desktopOnlyCloseBtn').addEventListener('click', close);
     document.getElementById('desktopOnlyOkBtn').addEventListener('click', close);
-    document.getElementById('desktopOnlyOverlay').addEventListener('click', (e) => { if (e.target.id === 'desktopOnlyOverlay') close(); });
+    wireOverlayBackdropClose(document.getElementById('desktopOnlyOverlay'), close);
   }
 
   // ---------- Legal pages (/terms, /privacy — public, no login) ----------
@@ -5108,7 +5123,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('buyCreditsCloseBtn').addEventListener('click', closeBuyCreditsModal);
-    document.getElementById('buyCreditsOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyCreditsOverlay') closeBuyCreditsModal(); });
+    wireOverlayBackdropClose(document.getElementById('buyCreditsOverlay'), closeBuyCreditsModal);
     document.querySelectorAll('[data-credit-pack]').forEach((el) => el.addEventListener('click', () => {
       buyCreditsDraft.selectedPack = Number(el.getAttribute('data-credit-pack'));
       renderBuyCreditsModal();
@@ -5222,7 +5237,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('buyDirectorCloseBtn').addEventListener('click', closeBuyDirectorModal);
-    document.getElementById('buyDirectorOverlay').addEventListener('click', (e) => { if (e.target.id === 'buyDirectorOverlay') closeBuyDirectorModal(); });
+    wireOverlayBackdropClose(document.getElementById('buyDirectorOverlay'), closeBuyDirectorModal);
     document.querySelectorAll('[data-director-tier]').forEach((el) => el.addEventListener('click', () => {
       buyDirectorDraft.selectedMonths = Number(el.getAttribute('data-director-tier'));
       renderBuyDirectorModal();
@@ -5307,7 +5322,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('rejectReasonCloseBtn').addEventListener('click', closeRejectReasonModal);
-    document.getElementById('rejectReasonOverlay').addEventListener('click', (e) => { if (e.target.id === 'rejectReasonOverlay') closeRejectReasonModal(); });
+    wireOverlayBackdropClose(document.getElementById('rejectReasonOverlay'), closeRejectReasonModal);
     document.querySelectorAll('[data-reject-preset]').forEach((btn) => btn.addEventListener('click', () => {
       document.getElementById('rejectReasonCustom').value = btn.getAttribute('data-reject-preset');
     }));
@@ -5410,7 +5425,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         </div>
       </div>`;
     document.getElementById('approveWaitlistCloseBtn').addEventListener('click', closeApproveWaitlistModal);
-    document.getElementById('approveWaitlistOverlay').addEventListener('click', (e) => { if (e.target.id === 'approveWaitlistOverlay') closeApproveWaitlistModal(); });
+    wireOverlayBackdropClose(document.getElementById('approveWaitlistOverlay'), closeApproveWaitlistModal);
     document.querySelectorAll('[data-credits-pill]').forEach((el) => el.addEventListener('click', () => {
       document.getElementById('approveCreditsInput').value = el.getAttribute('data-credits-pill');
     }));
@@ -7287,7 +7302,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       ? projects.map(p => {
           const stage = p.current_stage || 1;
           return `<div class="project-list-item" data-open-project="${p.id}">
-          <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">updated ${esc(p.updated_at)}</div></div>
+          <div><strong>${esc(p.name)}</strong><div style="font-size:11.5px;color:var(--text-faint)">updated ${formatISTWithRelative(p.updated_at)}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
             ${p.completed
               ? `<span class="project-stage-pill completed" title="All 5 stages locked and paid">✅ Completed</span>`
@@ -7549,7 +7564,12 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   // a particular app — they can change without notice, unlike the generic one.
   function buildUpiLink({ upiId, payeeName, amountRupees, note, scheme }) {
     const params = new URLSearchParams({ pa: upiId, pn: payeeName, am: amountRupees.toFixed(2), cu: 'INR', tn: note });
-    return `${scheme || 'upi://pay'}?${params.toString()}`;
+    // URLSearchParams encodes spaces as "+" (form-urlencoding), but UPI apps
+    // parse this as a plain URI and don't convert "+" back to a space — the
+    // transaction note would show literal "+" characters to the payer. Any
+    // real "+" in the input is already escaped to %2B by this point, so this
+    // only ever touches the space encoding.
+    return `${scheme || 'upi://pay'}?${params.toString().replace(/\+/g, '%20')}`;
   }
   let payPageDraft = null;
   async function renderPublicPayPage(token) {
@@ -7653,9 +7673,13 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   function wireOpenPayStage(token, info, s) {
     const linkArgs = {
       upiId: info.upiId,
-      payeeName: info.product || info.projectName,
+      // Must match the name actually registered against the UPI ID — GPay
+      // cross-checks this against NPCI's record for the VPA, so the
+      // project/product name (which lives in the note below instead) can't
+      // stand in for it without breaking that lookup.
+      payeeName: info.designerName,
       amountRupees: s.amountPaise / 100,
-      note: `Stage ${s.stage} — ${s.stageLabel} — ${info.product || info.projectName}`,
+      note: `${info.product || info.projectName} — Stage ${s.stage} — ${s.stageLabel}`,
     };
     const upiLink = buildUpiLink(linkArgs);
     const openUpiEl = document.getElementById(`payOpenUpi-${s.stage}`);
@@ -7846,7 +7870,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       </div>`;
     document.body.appendChild(overlay);
     document.getElementById('quickShareCloseBtn').addEventListener('click', closeQuickShareModal);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeQuickShareModal(); });
+    wireOverlayBackdropClose(overlay, closeQuickShareModal);
     document.getElementById('quickShareCopyBtn').addEventListener('click', () => {
       navigator.clipboard.writeText(location.href).then(() => toast('Link copied'), () => toast('Failed to copy link', true));
     });
@@ -7893,7 +7917,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       </div>`;
     document.body.appendChild(overlay);
     document.getElementById('contactModalCloseBtn').addEventListener('click', closeContactModal);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeContactModal(); });
+    wireOverlayBackdropClose(overlay, closeContactModal);
     const sendBtn = document.getElementById('contactModalSendBtn');
     overlay.querySelectorAll('[data-contact-pill-group]').forEach((group) => {
       const key = group.getAttribute('data-contact-pill-group');

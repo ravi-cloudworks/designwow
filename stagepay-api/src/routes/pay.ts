@@ -154,7 +154,10 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   }
 
   const body = await c.req.json<{ amountPaise?: number }>().catch(() => ({}) as { amountPaise?: number });
-  if (!body.amountPaise || body.amountPaise <= 0) return c.json({ error: 'amount_required' }, 400);
+  // 0 is valid — recording a stage the customer already paid for outside
+  // this round (e.g. re-locking after an earlier-stage unlock reset it),
+  // with no new charge. Only missing/negative values are rejected.
+  if (typeof body.amountPaise !== 'number' || body.amountPaise < 0) return c.json({ error: 'amount_required' }, 400);
 
   const token = await getOrCreateLink(c.env.DB, projectId);
   const existing = await c.env.DB.prepare('SELECT amount_paise, paid FROM payment_link_stages WHERE token = ? AND stage = ?')
@@ -165,9 +168,11 @@ pay.put('/projects/:id/payment-link/:stage', async (c) => {
   // has never been priced before, or its last round was already paid and
   // this price starts a fresh one. Renegotiating a still-open, unpaid
   // amount (the common case) is free — it's the same ask, not a new one.
+  // A ₹0 amount never spends a credit either, regardless — there's no new
+  // ask being made, just recording a stage as already settled elsewhere.
   // Charged here, not at payment-confirm, so a live customer transaction
   // is never interrupted mid-sale by a designer running out of credits.
-  const isNewReceivable = !existing || !!existing.paid;
+  const isNewReceivable = (!existing || !!existing.paid) && body.amountPaise > 0;
   if (isNewReceivable) {
     const user = await c.env.DB.prepare('SELECT free_credits_remaining, stagepay_access_until FROM users WHERE id = ?')
       .bind(userId)
