@@ -311,12 +311,34 @@ pay.get('/pay/:token', async (c) => {
     }))
   );
 
+  // Opt-in (redirect_links.visible_to_customer) and only once Stage 5 (Final
+  // Ad Delivery) has an amount set — not once it's paid/locked, which
+  // freezes the project and would throw away the window where a creator can
+  // still point at live click numbers to justify a higher final price.
+  let redirectStats: { totalClicks: number; topCountries: { country: string; count: number }[] } | null = null;
+  const stage5Priced = results.some((r) => r.stage === 5);
+  if (stage5Priced) {
+    const redirectLink = await c.env.DB.prepare('SELECT token FROM redirect_links WHERE project_id = ? AND visible_to_customer = 1')
+      .bind(projectId)
+      .first<{ token: string }>();
+    if (redirectLink) {
+      const totalRow = await c.env.DB.prepare('SELECT COUNT(*) as count FROM redirect_clicks WHERE token = ?').bind(redirectLink.token).first<{ count: number }>();
+      const { results: topCountries } = await c.env.DB.prepare(
+        `SELECT country, COUNT(*) as count FROM redirect_clicks WHERE token = ? AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 3`
+      )
+        .bind(redirectLink.token)
+        .all<{ country: string; count: number }>();
+      redirectStats = { totalClicks: totalRow?.count ?? 0, topCountries };
+    }
+  }
+
   return c.json({
     projectName: project.name,
     designerName: designer?.name || '',
     upiId: designer?.upi_id || '',
     product: brief?.product || '',
     productDescription: brief?.product_description || '',
+    redirectStats,
     stages,
   });
 });

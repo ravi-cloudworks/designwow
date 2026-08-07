@@ -14,6 +14,7 @@ import earnings from './routes/earnings';
 import credits from './routes/credits';
 import director from './routes/director';
 import admin from './routes/admin';
+import redirectLinks, { redirectPublic } from './routes/redirect';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -74,5 +75,9 @@ app.route('/api', earnings);
 app.route('/api', credits);
 app.route('/api', director);
 app.route('/api', admin);
+app.route('/api', redirectLinks);
+// Unprefixed — this is the short public click-through URL itself
+// (stagepay.pages.dev/r/:token), not an /api/* call the frontend fetches.
+app.route('/', redirectPublic);
 
 export default app;

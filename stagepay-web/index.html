@@ -1,4 +1,4 @@
-<title>StagePay — Get Paid Every Stage. Never Work for Free.</title>
+<title>StagePay — Get Paid Early. Every Stage.</title>
 <style>
   :root {
     --ink: #14161b; --paper: #eef1f2; --surface: #ffffff; --surface-2: #e6e9eb;
@@ -512,8 +512,14 @@
   .landing-cta:hover { opacity: 0.9; }
   .landing-h2 { font-size: 23px; font-weight: 800; margin-bottom: 14px; text-align: center; }
   .landing-lead { font-size: 14.5px; color: var(--text-soft); line-height: 1.7; text-align: center; max-width: 600px; margin: 0 auto 20px; }
-  .landing-problem-list { list-style: none; display: flex; flex-direction: column; gap: 9px; max-width: 380px; margin: 22px auto 0; }
-  .landing-problem-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; background: var(--crimson-soft); border: 1px solid var(--crimson-line); color: var(--crimson); border-radius: 8px; padding: 10px 14px; }
+  .landing-problem-pairs { display: flex; flex-direction: column; gap: 14px; margin-top: 26px; }
+  .landing-problem-pair { display: flex; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow-card); }
+  .landing-problem-pair .landing-problem-pair-num { background: var(--crimson); }
+  .landing-problem-pair-body { flex: 1; min-width: 0; }
+  .landing-problem-pair-body h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: var(--crimson); }
+  .landing-problem-pair-body p { font-size: 13.5px; color: var(--text-soft); line-height: 1.55; margin-bottom: 10px; }
+  .landing-problem-pair-body .solution { font-size: 13.5px; color: var(--moss); background: var(--moss-soft); border: 1px solid var(--moss-line); border-radius: 8px; padding: 10px 12px; line-height: 1.5; }
+  .landing-problem-pair-body .solution strong { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
   .landing-flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 30px auto 0; max-width: 420px; }
   .landing-flow-step { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; text-align: center; box-shadow: var(--shadow-card); }
   .landing-flow-step strong { display: block; font-size: 14.5px; margin-bottom: 2px; }
@@ -873,6 +879,35 @@ Rules for every option:
     },
     async confirmPaid(projectId, stage) {
       const r = await fetch(`${API_BASE}/api/projects/${projectId}/payment-link/${stage}/confirm-paid`, { method: 'POST', credentials: 'include' });
+      return r.json();
+    },
+    // One trackable click-through link per project — separate from the
+    // payment link, points at the CLIENT's own website (e.g. for an
+    // Instagram bio link), and counts clicks so a designer has a real
+    // number for negotiating future pricing.
+    async getRedirectLink(projectId) {
+      const r = await fetch(`${API_BASE}/api/projects/${projectId}/redirect-link`, { credentials: 'include' });
+      if (!r.ok) return { link: null };
+      return r.json();
+    },
+    async setRedirectLink(projectId, destinationUrl) {
+      const r = await fetch(`${API_BASE}/api/projects/${projectId}/redirect-link`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ destinationUrl }),
+      });
+      return r.json();
+    },
+    async renewRedirectLink(projectId) {
+      const r = await fetch(`${API_BASE}/api/projects/${projectId}/redirect-link/renew`, { method: 'POST', credentials: 'include' });
+      return r.json();
+    },
+    async deleteRedirectLink(projectId) {
+      const r = await fetch(`${API_BASE}/api/projects/${projectId}/redirect-link`, { method: 'DELETE', credentials: 'include' });
+      return r.json();
+    },
+    async setRedirectLinkVisibility(projectId, visible) {
+      const r = await fetch(`${API_BASE}/api/projects/${projectId}/redirect-link/visibility`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible }),
+      });
       return r.json();
     },
     async getStageLocks(projectId) {
@@ -3734,6 +3769,128 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const root = document.getElementById('modalRoot');
     if (root) root.innerHTML = '';
   }
+
+  // ---------- Trackable click-through link (separate from the payment link
+  // — points at the CLIENT's own website, e.g. for an Instagram bio link,
+  // and counts clicks so a designer has a real clickthrough number to show
+  // when negotiating the next project's price) ----------
+  // ISO 3166-1 alpha-2 -> flag emoji: each letter maps to a Unicode
+  // "regional indicator symbol" a fixed offset from its ASCII code — no
+  // lookup table or external service needed.
+  function countryFlagEmoji(code) {
+    if (!code || code.length !== 2) return '';
+    const base = 0x1f1e6 - 'A'.charCodeAt(0);
+    return String.fromCodePoint(base + code.charCodeAt(0), base + code.charCodeAt(1));
+  }
+  let redirectLinkDraft = null; // { projectId, link } — link is null until one's been created
+  async function openRedirectLinkModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root) return;
+    redirectLinkDraft = { projectId: state.project.id, link: null, loading: true };
+    renderRedirectLinkModal();
+    const { link } = await api.getRedirectLink(state.project.id);
+    if (!redirectLinkDraft) return; // closed while the fetch was in flight
+    redirectLinkDraft = { projectId: state.project.id, link, loading: false };
+    renderRedirectLinkModal();
+  }
+  function closeRedirectLinkModal() {
+    redirectLinkDraft = null;
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+  }
+  function renderRedirectLinkModal() {
+    const root = document.getElementById('modalRoot');
+    if (!root || !redirectLinkDraft) return;
+    const { link, loading } = redirectLinkDraft;
+    const shortUrl = link ? `${location.origin}/r/${link.token}` : '';
+    root.innerHTML = `
+      <div class="modal-overlay" id="redirectLinkModalOverlay">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-head"><strong>🔗 Trackable Client Link</strong><button class="modal-close" id="redirectLinkModalCloseBtn">×</button></div>
+          <div style="padding:16px">
+            ${loading ? '<p style="font-size:13px;color:var(--text-faint)">Loading…</p>' : `
+              <p style="font-size:12.5px;color:var(--text-faint);margin:0 0 14px">A short link that redirects to the client's website — put it in the Reel's bio/caption to count how many people click through.</p>
+              <div class="field">
+                <label for="redirectLinkUrlInput">Client's website URL</label>
+                <input id="redirectLinkUrlInput" type="text" placeholder="https://example.com/product" value="${esc(link ? link.destinationUrl : '')}">
+              </div>
+              <button class="btn btn-primary" id="redirectLinkSaveBtn" style="width:100%;margin-top:8px">${link ? 'Update Link' : 'Create Trackable Link'}</button>
+              ${link ? `
+                <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line-soft)">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <code style="flex:1;font-size:13px;background:var(--surface-2);border-radius:8px;padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(shortUrl)}</code>
+                    <button class="btn btn-sm" id="redirectLinkCopyBtn">Copy</button>
+                  </div>
+                  <p style="font-size:12px;color:${link.expired ? 'var(--crimson)' : 'var(--text-faint)'};margin-top:8px">
+                    ${link.expired ? 'Expired' : 'Expires'} ${formatIST(link.expiresAt)}
+                    ${link.expired ? ' — new clicks won\'t redirect until renewed.' : ''}
+                  </p>
+                  <button class="btn btn-sm" id="redirectLinkRenewBtn" style="margin-top:6px">${link.expired ? 'Renew for 30 more days' : 'Extend 30 days from today'}</button>
+                  <div style="margin-top:14px;padding:12px;background:var(--surface-2);border-radius:10px">
+                    <div style="font-size:22px;font-weight:800">${link.totalClicks}</div>
+                    <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:${link.topCountries.length ? '8px' : '0'}">total click${link.totalClicks === 1 ? '' : 's'}</div>
+                    ${link.topCountries.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap">${link.topCountries.map((tc) => `<span style="font-size:13px;font-weight:600">${countryFlagEmoji(tc.country)} ${tc.count}</span>`).join('')}</div>` : ''}
+                  </div>
+                  <label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;cursor:pointer">
+                    <input type="checkbox" id="redirectLinkVisibleCheckbox" style="margin-top:2px" ${link.visibleToCustomer ? 'checked' : ''}>
+                    <span style="font-size:12.5px;color:var(--text-soft)">Show these click stats to your customer, once Stage 5's amount is set — off by default. Keeps working even before the stage is paid or locked.</span>
+                  </label>
+                  <button class="btn btn-sm btn-danger" id="redirectLinkDeleteBtn" style="width:100%;margin-top:12px" title="Also permanently deletes its click history">Delete Link &amp; Click History</button>
+                </div>
+              ` : ''}
+            `}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('redirectLinkModalCloseBtn').addEventListener('click', closeRedirectLinkModal);
+    wireOverlayBackdropClose(document.getElementById('redirectLinkModalOverlay'), closeRedirectLinkModal);
+    if (loading) return;
+    document.getElementById('redirectLinkSaveBtn').addEventListener('click', withMutationGuard(async () => {
+      const destinationUrl = document.getElementById('redirectLinkUrlInput').value.trim();
+      if (!destinationUrl) { toast('Enter a valid URL', true); return; }
+      const saveBtn = document.getElementById('redirectLinkSaveBtn');
+      saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+      const res = await api.setRedirectLink(redirectLinkDraft.projectId, destinationUrl);
+      if (!res.token) { toast(res.message || 'Could not save link', true); saveBtn.disabled = false; saveBtn.textContent = link ? 'Update Link' : 'Create Trackable Link'; return; }
+      const { link: fresh } = await api.getRedirectLink(redirectLinkDraft.projectId);
+      redirectLinkDraft.link = fresh;
+      toast(link ? 'Link updated' : 'Trackable link created');
+      renderRedirectLinkModal();
+    }));
+    if (!link) return;
+    const copyBtn = document.getElementById('redirectLinkCopyBtn');
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(shortUrl).then(() => toast('Link copied'), () => toast('Failed to copy link', true));
+    });
+    const visibleCheckbox = document.getElementById('redirectLinkVisibleCheckbox');
+    if (visibleCheckbox) visibleCheckbox.addEventListener('change', withMutationGuard(async () => {
+      const checked = visibleCheckbox.checked;
+      visibleCheckbox.disabled = true;
+      const res = await api.setRedirectLinkVisibility(redirectLinkDraft.projectId, checked);
+      visibleCheckbox.disabled = false;
+      if (res.error) { toast('Could not update — try again', true); visibleCheckbox.checked = !checked; return; }
+      redirectLinkDraft.link.visibleToCustomer = checked;
+      toast(checked ? 'Now visible to your customer' : 'Hidden from your customer');
+    }));
+    const renewBtn = document.getElementById('redirectLinkRenewBtn');
+    if (renewBtn) renewBtn.addEventListener('click', withMutationGuard(async () => {
+      renewBtn.disabled = true; renewBtn.textContent = 'Renewing…';
+      const res = await api.renewRedirectLink(redirectLinkDraft.projectId);
+      if (!res.expiresAt) { toast('Could not renew link', true); renewBtn.disabled = false; return; }
+      const { link: fresh } = await api.getRedirectLink(redirectLinkDraft.projectId);
+      redirectLinkDraft.link = fresh;
+      toast('Link renewed for 30 days');
+      renderRedirectLinkModal();
+    }));
+    const deleteBtn = document.getElementById('redirectLinkDeleteBtn');
+    if (deleteBtn) deleteBtn.addEventListener('click', withMutationGuard(async () => {
+      deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…';
+      await api.deleteRedirectLink(redirectLinkDraft.projectId);
+      redirectLinkDraft.link = null;
+      toast('Trackable link deleted');
+      renderRedirectLinkModal();
+    }));
+  }
   // A glanceable "is this still set, and roughly right" check right where a
   // designer is about to price a stage — never the full value, same
   // reasoning as the Show/Hide toggle in Settings.
@@ -3992,7 +4149,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     document.getElementById('topbar').innerHTML = `
       <div class="topbar-title" id="topbarHomeLink" style="cursor:pointer">
         <span class="mark">💸</span>
-        <div><h1>StagePay <span class="beta-badge">Beta</span></h1><p>Get paid every stage. Never work for free.</p></div>
+        <div><h1>StagePay <span class="beta-badge">Beta</span></h1><p>Get paid early. Every stage.</p></div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         ${state.project ? `<button class="btn btn-sm" id="backToProjectsBtn">All Projects</button>` : ''}
@@ -4069,6 +4226,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         ${total > 0 ? `<span class="project-earned-pill lg">💰 ${formatRupees(total)} earned</span>` : ''}
         <button type="button" class="btn btn-sm" id="projectInfoRefreshBtn" title="Pull the latest — e.g. a file just added via the StagePay Director extension">🔄 Refresh</button>
         <button type="button" class="btn btn-sm" id="projectInfoMoodboardBtn">🖼 Moodboard</button>
+        <button type="button" class="btn btn-sm" id="projectInfoRedirectLinkBtn">🔗 Trackable link</button>
         <button type="button" class="btn btn-sm btn-primary" id="projectInfoPayLinkBtn">💳 Open customer payment link</button>
       </div>`;
     if (state.renamingProject) {
@@ -4095,6 +4253,8 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     }
     const payLinkBtn = document.getElementById('projectInfoPayLinkBtn');
     if (payLinkBtn) payLinkBtn.addEventListener('click', openCustomerPaymentLink);
+    const redirectLinkBtn = document.getElementById('projectInfoRedirectLinkBtn');
+    if (redirectLinkBtn) redirectLinkBtn.addEventListener('click', openRedirectLinkModal);
     const refreshBtn = document.getElementById('projectInfoRefreshBtn');
     if (refreshBtn) refreshBtn.addEventListener('click', async () => {
       refreshBtn.disabled = true; refreshBtn.textContent = 'Refreshing…';
@@ -4205,22 +4365,29 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   // are never translated — they're brand names, identical in every language.
   const LANDING_I18N = {
     en: {
-      headerTagline: 'Get paid early, every stage. Never work for free.', login: 'Login',
-      eyebrow: 'The Income Engine for UGC Creators',
+      headerTagline: 'Get paid early. Every stage.', login: 'Login',
+      eyebrow: 'The Income Workflow for UGC Creators',
       heroH1: 'Get Paid Early. Every Stage.<br>Never Work for Free.',
       heroSub: 'The UGC production workflow that protects your time, your money, and your creative work — whether you generate it with AI or shoot it yourself. Get paid in days, not months — start every project with confidence.',
       heroCta: 'Sign in with Google →',
-      problemTitle: 'The Problem',
-      problemLead: "Creating UGC videos — with AI, or filming it yourself — costs you real time before you ever see a rupee. Because clients disappear. Because revisions never end. Because you generate scenes that are never approved. Because you finish the entire project... ...and only then find out the client doesn't want it.",
-      problemResultLabel: 'The result?',
-      problemBullet1: '❌ Unpaid hours', problemBullet2: '❌ Wasted AI credits', problemBullet3: '❌ Endless revisions', problemBullet4: '❌ Scope creep', problemBullet5: '❌ Client ghosting',
+      problemTitle: '7 Problems That Stop Your Income',
+      problemIntro: 'You know how to write prompts. You know how to create AI videos. But do you have a system to turn that into consistent income?',
+      problem1Title: 'Payment only after the project ends', problem1Desc: 'You work for weeks or months without getting paid. Late payment or price negotiation at the end puts all your effort at risk.', problem1Solution: "Collect payment at every completed stage. Don't wait months — start earning within days.",
+      problem2Title: 'Chasing clients for payment', problem2Desc: 'Sending your UPI ID, reminding them of the amount, asking for screenshots... payment gets delayed or forgotten.', problem2Solution: 'One link. They scan the QR code and pay in seconds.',
+      problem3Title: 'Deliverable in one place, payment somewhere else', problem3Desc: 'Your work is in email, WhatsApp, or Drive while payment is chased elsewhere. Confusion and disputes follow.', problem3Solution: 'One link per stage — deliverable and payment together, in one place.',
+      problem4Title: 'Which stage has been paid?', problem4Desc: "Which one's paid? Which is pending? Who needs a follow-up? Tracking it by hand gets messy fast.", problem4Solution: 'See the complete payment history for every stage, in one place.',
+      problem5Title: 'More scope, same payment', problem5Desc: '"It\'s just one small revision..." slowly becomes a much bigger ask — but your payment never changes.', problem5Solution: 'Update the price for any stage whenever scope changes, and charge separately for extra work.',
+      problem6Title: 'Hesitating when quoting', problem6Desc: 'Creators often quote less than they meant to, feeling pressured mid-conversation with a client.', problem6Solution: "Set your usual price for each stage once — it's suggested instantly the next time you quote.",
+      problem7Title: "Losing track of what you've earned", problem7Desc: "Most freelancers can't say whether they're on track for their income goals — they just move project to project.", problem7Solution: "Set an income goal and watch your progress every time you get paid.",
+      problemSolutionLabel: 'StagePay Solution',
       problemClosing: 'Every project becomes a gamble. StagePay changes the workflow.',
-      flowTitle: 'Instead of creating an entire video first...', flowSub: '...you build it one paid stage at a time — approved and paid in days, not months.',
+      flowTitle: 'You Have a Workflow to Create Videos. Do You Have One to Get Paid?', flowSub: 'Instead of creating the entire video first and hoping for the best, build it one paid stage at a time — approved and paid in days, not months.',
       flowClientBrief: 'Creative Brief', flowStoryboard: 'Story &amp; Script', flowCustomerApproves: '↓ Customer approves ↓', flowYouGetPaid: 'You get paid',
       flowCharactersMusic: 'Creative Direction', flowSceneBlueprint: 'Production Blueprint', flowFinalMovie: 'Final Ad Delivery', flowYouGetPaidFinal: 'You get paid — project complete',
       flowNote: 'No approval. No payment. No generation.',
-      poorTitle: 'Why This Keeps You From Staying Poor',
-      poorLead: "Most creators build hours of work — AI generations or full shoots — before the client even approves the idea. StagePay flips that: every next stage only starts once the last one is approved and paid. Generating with AI? Your prompts stay aligned from start to finish — no rebuilding, no burned credits. Filming it yourself? No reshoots for a version nobody signed off on. Either way, you're never working past what's already been approved and paid for.",
+      poorTitle: 'Small Leaks Sink Big Boats',
+      poorLead: "Most creators build hours of work — AI generations or full shoots — before the client even approves the idea. Payment delays, endless follow-ups, scope creep, and fuzzy tracking all quietly leak income, one project at a time. StagePay flips the order: the next stage only starts once the last one is approved and paid. Generating with AI? Your prompts stay aligned start to finish — no rebuilding, no burned credits. Filming it yourself? No reshoots for a version nobody signed off on.",
+      poorClosing: 'If your videos have a workflow, shouldn\'t your income have one too?',
       howTitle: 'How it Works',
       step1Title: 'Creative Brief', step1Desc: 'Collect everything once. Brand. Product. Campaign. Goals.',
       step2Title: 'Story &amp; Script', step2Desc: 'Write it, generate it, or upload one you built elsewhere. Customer approves it. Lock it.', step2Tag: 'Get paid',
@@ -4242,17 +4409,17 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       pricingStat4Value: '₹0', pricingStat4Label: 'subscription or app usage fee',
       pricingNote: 'Your income goes straight to your own UPI ID — we never touch, hold, or route your money.',
       faqTitle: 'Frequently Asked Questions',
-      faqTab1: 'Get New Customers Faster', faqTab2: 'Deliver UGC Faster', faqTab3: 'Earn Income Faster',
-      faqQ1_1: 'I already have a Canva/Instagram link — why do I need this?',
-      faqA1_1: 'Canva only shows what you last uploaded. Your Showcase pulls straight from real, paid client work already inside StagePay — add or remove pieces in seconds, so it’s never stale and never needs separate upkeep.',
-      faqQ1_2: 'What if I want to change what clients see before a big pitch?',
-      faqA1_2: 'That’s the point — add or remove your best work in seconds. It’s built to present the best version of yourself, exactly as you want, any time, not a page you set up once and forget.',
-      faqQ1_3: 'Will this actually look good on my clients’ phones?',
-      faqA1_3: 'Yes — mobile-optimized from the ground up, since that’s how almost every client will actually open your link, not a desktop page squeezed onto a small screen.',
+      faqTab1: 'Get Paid Faster', faqTab2: 'Stop Chasing Payments', faqTab3: 'Trust &amp; Fees',
+      faqQ1_1: 'Won’t clients feel pressured being asked to pay stage by stage?',
+      faqA1_1: 'It’s the opposite — an agreed price per stage upfront is less awkward than negotiating one lump sum at the end. Clients know exactly what they’re paying for and when.',
+      faqQ1_2: 'What if I don’t know what to charge for a stage?',
+      faqA1_2: 'Set your usual price for each stage once — it’s suggested instantly the next time you quote, so you stop under-quoting just because you’re put on the spot mid-conversation.',
+      faqQ1_3: 'What if the client asks for more after I’ve already priced a stage?',
+      faqA1_3: 'Update that stage’s price any time scope changes, and charge separately for the extra work — you’re never stuck doing more for the same money.',
       faqQ2_1: 'I already just send files over WhatsApp or email — why change?',
       faqA2_1: 'Those get buried in chat history and lost across devices. One link per project keeps everything — the work and the payment — in one place your client can always find again.',
-      faqQ2_2: 'Won’t this be confusing to explain to my client?',
-      faqA2_2: 'No explaining needed — you send one link, they see what’s ready to download and what’s left to pay. It’s simpler for them than digging through a WhatsApp thread.',
+      faqQ2_2: 'How do I keep track of which stage is paid and which is still pending?',
+      faqA2_2: 'One place shows the complete payment history for every stage — no more scrolling through chat threads trying to remember who paid for what.',
       faqQ2_3: 'What if I have several projects going — will the links get mixed up?',
       faqA2_3: 'Each project has exactly one link, permanently. Nothing to recreate, nothing to mislabel, nothing to accidentally send the wrong client.',
       faqQ3_1: 'How do I know StagePay won’t just hold onto my money?',
@@ -4419,15 +4586,18 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
 
         <div class="landing-section">
           <h2 class="landing-h2">${t('problemTitle')}</h2>
-          <p class="landing-lead">${esc(t('problemLead'))}</p>
-          <p class="landing-lead" style="margin-bottom:6px"><strong>${t('problemResultLabel')}</strong></p>
-          <ul class="landing-problem-list">
-            <li>${t('problemBullet1')}</li>
-            <li>${t('problemBullet2')}</li>
-            <li>${t('problemBullet3')}</li>
-            <li>${t('problemBullet4')}</li>
-            <li>${t('problemBullet5')}</li>
-          </ul>
+          <p class="landing-lead">${esc(t('problemIntro'))}</p>
+          <div class="landing-problem-pairs">
+            ${[1, 2, 3, 4, 5, 6, 7].map((n) => `
+              <div class="landing-problem-pair">
+                <div class="landing-step-num landing-problem-pair-num">${n}</div>
+                <div class="landing-problem-pair-body">
+                  <h3>${t(`problem${n}Title`)}</h3>
+                  <p>${t(`problem${n}Desc`)}</p>
+                  <div class="solution"><strong>${t('problemSolutionLabel')}</strong>${t(`problem${n}Solution`)}</div>
+                </div>
+              </div>`).join('')}
+          </div>
           <p class="landing-lead" style="margin-top:20px">${t('problemClosing')}</p>
         </div>
 
@@ -4459,6 +4629,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         <div class="landing-section">
           <h2 class="landing-h2">${t('poorTitle')}</h2>
           <p class="landing-lead">${esc(t('poorLead'))}</p>
+          <p class="landing-lead" style="font-weight:800;color:var(--ink);margin-top:20px">${esc(t('poorClosing'))}</p>
         </div>
 
         <div class="landing-section">
@@ -5854,7 +6025,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
 
     ctx.fillStyle = '#8b92a1';
     ctx.font = SHARE_F(500, 22);
-    ctx.fillText('Get paid every stage. Never work for free.', 64, 128);
+    ctx.fillText('Get paid early. Every stage.', 64, 128);
 
     ctx.fillStyle = '#eef1f2';
     ctx.font = SHARE_F(800, 52);
@@ -7603,11 +7774,20 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
 
     app.innerHTML = `
       <div class="pay-page">
-        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></div>
+        <div class="pay-brand-bar"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid early. Every stage.</span></div></div>
         <div class="pay-card">
           <p class="pay-designer">${esc(info.designerName)}</p>
           <h1>${esc(info.projectName)}</h1>
           ${info.product ? `<p class="pay-sub"><strong>${esc(info.product)}</strong>${info.productDescription ? ` — ${esc(info.productDescription)}` : ''}</p>` : ''}
+
+          ${info.redirectStats ? `
+            <div class="showcase-link-hero" style="text-align:left">
+              <div class="showcase-link-hero-label">📈 Ad performance</div>
+              <div style="font-size:22px;font-weight:800">${info.redirectStats.totalClicks} click${info.redirectStats.totalClicks === 1 ? '' : 's'}</div>
+              <div style="font-size:12px;color:var(--text-faint)">from people clicking through to your website</div>
+              ${info.redirectStats.topCountries.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">${info.redirectStats.topCountries.map((tc) => `<span style="font-size:13px;font-weight:600">${countryFlagEmoji(tc.country)} ${tc.count}</span>`).join('')}</div>` : ''}
+            </div>
+          ` : ''}
 
           <div class="pay-stage-row" style="margin-bottom:14px">
             <div class="pay-stage-head" style="cursor:default">
@@ -7774,7 +7954,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     app.innerHTML = `
       <div class="showcase-page">
         <div class="showcase-page-inner">
-          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid every stage. Never work for free.</span></div></a>
+          <a class="showcase-page-brand" href="https://stagepay.pages.dev/" style="text-decoration:none;color:inherit"><span class="pay-brand-mark">💸</span><div class="pay-brand-text"><span class="pay-brand-name">StagePay <span class="beta-badge">Beta</span></span><span class="pay-brand-tagline">Get paid early. Every stage.</span></div></a>
           ${profile.hasCover ? `<img class="showcase-cover" src="${esc(api.showcaseCoverUrl(profile.id))}" alt="">` : ''}
           ${(() => {
             let contactBtn = '';
