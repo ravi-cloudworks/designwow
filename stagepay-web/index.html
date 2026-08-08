@@ -4189,7 +4189,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       document.getElementById('backToProjectsBtn').addEventListener('click', goToProjectsScreen);
     }
     if (state.user) {
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
+      document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        e.currentTarget.innerHTML = '<span class="btn-spinner"></span>Logging out…';
         await api.logout();
         // state.project (and everything scoped to it) was never cleared here —
         // renderTopbar() only keys off state.project, not state.user, so the
@@ -5127,7 +5129,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         <p style="color:var(--text-faint);font-size:13.5px;margin:0 0 20px">Your StagePay account has been suspended. Contact support if you believe this is a mistake.</p>
         <button class="btn btn-primary" id="suspendedLogoutBtn">Log out</button>
       </div>`;
-    document.getElementById('suspendedLogoutBtn').addEventListener('click', async () => {
+    document.getElementById('suspendedLogoutBtn').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      e.currentTarget.innerHTML = '<span class="btn-spinner"></span>Logging out…';
       await api.logout();
       state.user = null;
       history.replaceState(null, '', location.pathname);
@@ -5260,6 +5264,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     });
     document.getElementById('waitlistLogoutLink').addEventListener('click', async (e) => {
       e.preventDefault();
+      // A plain <a> — no [disabled], so pointer-events:none stands in for it.
+      e.currentTarget.style.pointerEvents = 'none';
+      e.currentTarget.textContent = 'Logging out…';
       await api.logout();
       state.user = null;
       state.screen = 'login';
