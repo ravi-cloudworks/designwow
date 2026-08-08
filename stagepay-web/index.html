@@ -536,6 +536,10 @@
   .landing-step-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
   .landing-step-card p { font-size: 13.5px; color: var(--text-soft); line-height: 1.55; }
   .landing-step-card .paid-tag { display: inline-block; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: var(--moss); background: var(--moss-soft); border: 1px solid var(--moss-line); border-radius: 999px; padding: 2px 10px; }
+  .landing-share-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 480px; margin: 26px auto 0; }
+  .landing-share-card { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .landing-share-card img { width: 100%; border-radius: 10px; border: 1px solid var(--line); box-shadow: var(--shadow-card); }
+  @media (max-width: 560px) { .landing-share-grid { grid-template-columns: 1fr; max-width: 280px; } }
   .landing-tools-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 22px 0 20px; }
   .landing-tool-chip { font-size: 13px; font-weight: 600; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
   .landing-result-list { list-style: none; display: flex; flex-direction: column; gap: 9px; max-width: 380px; margin: 22px auto 0; }
@@ -4425,6 +4429,9 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       faqA3_2: 'That’s exactly what this prevents — every stage is priced and approved before the next one starts, so you’re never building work nobody’s committed to paying for.',
       faqQ3_3: 'Isn’t ₹49 a lot to pay every time I charge my income?',
       faqA3_3: 'You only pay when you charge your income — whether it’s ₹1,000, ₹5,000, or ₹50,000, it’s just ₹49. No extra fees, no percentage of your income, no subscription.',
+      shareTitle: 'Spread the Word',
+      shareLead: 'Know a fellow creator who’s tired of chasing payments? Download and share these with your community — WhatsApp groups, Instagram, wherever your fellow creators hang out.',
+      shareMessage: 'Get paid early. Every stage. Never work for free. 💸 If you make AI/UGC videos, check out StagePay — it’s built for exactly this: https://stagepay.pages.dev',
     },
     /* hi/ta temporarily disabled while the English hero/flow copy is still
        being iterated on (paid-early positioning) — re-enable once English
@@ -4705,6 +4712,22 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
 
         <div class="landing-section" id="landingFaqRoot"></div>
 
+        <div class="landing-section">
+          <h2 class="landing-h2">${t('shareTitle')}</h2>
+          <p class="landing-lead">${t('shareLead')}</p>
+          <div class="landing-share-grid">
+            <div class="landing-share-card">
+              <a href="/posters/7-problems-eng.png" target="_blank" rel="noopener"><img src="/posters/7-problems-eng.png" alt="7 Problems That Stop Your Income — poster" loading="lazy"></a>
+              <a class="btn btn-sm" href="/posters/7-problems-eng.png" download>⬇ Download</a>
+            </div>
+            <div class="landing-share-card">
+              <a href="/posters/income-workflow-eng.png" target="_blank" rel="noopener"><img src="/posters/income-workflow-eng.png" alt="You Have a Workflow to Create Videos — poster" loading="lazy"></a>
+              <a class="btn btn-sm" href="/posters/income-workflow-eng.png" download>⬇ Download</a>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm" id="landingCopyShareMsgBtn" style="display:block;margin:18px auto 0">📋 Copy a message to share alongside it</button>
+        </div>
+
         <div class="landing-final">
           <p class="landing-punch">${t('punchline')}</p>
           <h2 class="landing-h2">${t('heroH1')}</h2>
@@ -4775,6 +4798,11 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         try { localStorage.setItem('stagepayLandingLang', state.landingLang); } catch {}
         renderLoginScreen();
       });
+    });
+    const copyShareMsgBtn = document.getElementById('landingCopyShareMsgBtn');
+    if (copyShareMsgBtn) copyShareMsgBtn.addEventListener('click', () => {
+      const lang = LANDING_I18N[state.landingLang] ? state.landingLang : 'en';
+      navigator.clipboard.writeText(LANDING_I18N[lang].shareMessage).then(() => toast('Message copied'), () => toast('Failed to copy', true));
     });
   }
   function showDesktopOnlyModal() {
