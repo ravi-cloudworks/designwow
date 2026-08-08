@@ -7590,7 +7590,25 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   }
 
   async function openProject(id) {
-    const full = await api.getProject(id);
+    // Immediate feedback the instant this is called — everything below is
+    // 4-5 sequential-feeling API round-trips, which used to leave the
+    // screen looking frozen with no indication anything was happening.
+    document.getElementById('app').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;font-weight:600;color:var(--text-faint)">Opening project…</div>';
+    // These four don't depend on each other's results, so they run together
+    // — total wait is however long the slowest one takes, not the sum of
+    // all four (they used to be awaited one after another).
+    const [full, configEntries, paymentLinkRes, stageLocksRes, earningsSummary] = await Promise.all([
+      api.getProject(id),
+      // Stage configs (fieldsSchema/geminiInstruction/outputInstructions) are
+      // D1-backed, not hardcoded — fetch once per project open, before render.
+      Promise.all([2, 3, 4, 5].map(async (stage) => [stage, await api.getStageConfig(stage)])),
+      api.getProjectPaymentLink(id),
+      api.getStageLocks(id),
+      // Goal Tracker data — used by the Set Amount modal to suggest this
+      // designer's own usual price for the stage and show progress toward
+      // their goal, not just fetched lazily inside that modal.
+      api.getEarningsSummary(),
+    ]);
     state.project = full.project; state.brief = full.brief; state.items = full.items;
     state.expandedItems = {};
     state.briefSampleKey = '';
@@ -7599,20 +7617,12 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     // collapsed card.
     const story = state.items.find(i => i.stage === 2 && i.item_key === 'story');
     if (story) state.expandedItems[story.id] = true;
-    // Stage configs (fieldsSchema/geminiInstruction/outputInstructions) are
-    // D1-backed, not hardcoded — fetch once per project open, before render.
-    const configEntries = await Promise.all([2, 3, 4, 5].map(async (stage) => [stage, await api.getStageConfig(stage)]));
     state.stageConfigs = Object.fromEntries(configEntries.filter(([, cfg]) => cfg));
-    const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
     state.paymentLinks = paymentLinkRes.stages || [];
     if (state.user && paymentLinkRes.freeCreditsRemaining !== undefined) state.user.free_credits_remaining = paymentLinkRes.freeCreditsRemaining;
-    const stageLocksRes = await api.getStageLocks(id);
     state.stageLocks = stageLocksRes.locks || [];
-    // Goal Tracker data — used by the Set Amount modal to suggest this
-    // designer's own usual price for the stage and show progress toward
-    // their goal, not just fetched lazily inside that modal.
-    state.earningsSummary = await api.getEarningsSummary();
+    state.earningsSummary = earningsSummary;
     state.screen = 'tool';
     // Puts the project id in the URL so a page refresh reopens the same
     // project instead of always landing back on the projects list.
