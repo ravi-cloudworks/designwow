@@ -7572,10 +7572,18 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     });
   }
   async function renderProjectsScreen() {
-    const projectList = await api.listProjects();
+    // Immediate feedback the instant this is called — whatever screen was
+    // showing before (e.g. a project workspace) used to just sit there
+    // frozen with no indication anything was happening until both fetches
+    // below finished.
+    document.getElementById('app').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;font-weight:600;color:var(--text-faint)">Loading projects…</div>';
+    // These two don't depend on each other's results, so they run together
+    // — total wait is however long the slower one takes, not the sum of
+    // both (they used to be awaited one after another).
+    const [projectList, earningsSummary] = await Promise.all([api.listProjects(), api.getEarningsSummary()]);
     state.projects = projectList.projects;
     state.projectsMax = projectList.max;
-    state.earningsSummary = await api.getEarningsSummary();
+    state.earningsSummary = earningsSummary;
     document.getElementById('app').innerHTML = `
       <div id="topbar" class="topbar"></div>
       <div class="container">
