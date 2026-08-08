@@ -156,7 +156,12 @@
   .btn-primary { background: var(--teal); border-color: var(--teal); color: #f0f6f4; }
   .btn-sm { padding: 5px 9px; font-size: 11.5px; }
   .btn-danger { color: var(--crimson); }
-  .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .btn[disabled] { opacity: 0.75; cursor: not-allowed; }
+  /* A dimmed, static "Uploading…" label alone is easy to miss, especially
+     on a large file that takes a while — this gets prepended to the button
+     text so there's motion, not just a color change. */
+  .btn-spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: btn-spin 0.6s linear infinite; vertical-align: -1px; margin-right: 4px; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
   /* Looks disabled but is NOT the native [disabled] attribute — used for the
      "previous stage isn't locked yet" guard rail, where clicking should still
      fire so the handler can explain why via a toast. A real [disabled]
@@ -2578,7 +2583,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         }
         const file = files[0];
         if (!checkFileSize(file, maxUploadMb(item.item_key))) { uploadInput.value = ''; return; }
-        uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
+        uploadBtn.disabled = true; uploadBtn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
         mutationsInFlight++;
         try {
           const mediaFiles = [...existingFiles];
@@ -2810,7 +2815,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       const file = logoInput.files[0];
       if (!file) return;
       if (!checkFileSize(file, DEFAULT_MEDIA_MAX_MB)) { logoInput.value = ''; return; }
-      chooseLogoBtn.disabled = true; chooseLogoBtn.textContent = 'Uploading…';
+      chooseLogoBtn.disabled = true; chooseLogoBtn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
       mutationsInFlight++;
       try {
         const uploaded = await api.uploadMedia(state.project.id, file, cleanBriefFileName('logo', file.name));
@@ -2832,7 +2837,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       if (!files.length) return;
       const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
       if (oversized) { photosInput.value = ''; return; }
-      choosePhotosBtn.disabled = true; choosePhotosBtn.textContent = 'Uploading…';
+      choosePhotosBtn.disabled = true; choosePhotosBtn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
       mutationsInFlight++;
       try {
         const photos = [...(state.brief.product_photos || [])];
@@ -3074,7 +3079,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         }
         const oversized = files.find(f => !checkFileSize(f, DEFAULT_MEDIA_MAX_MB));
         if (oversized) { uploadInput.value = ''; return; }
-        uploadBtn.disabled = true; uploadBtn.textContent = 'Uploading…';
+        uploadBtn.disabled = true; uploadBtn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
         mutationsInFlight++;
         try {
           for (const file of files) {
@@ -4072,6 +4077,11 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     renderApp();
   }
   function goToProjectsScreen() {
+    // Navigating away mid-upload/save used to leave the mutation finishing
+    // in the background and re-rendering into whatever screen the user had
+    // since moved to — confusing at best, a stale/wrong-context render at
+    // worst. Block until it settles rather than let that happen.
+    if (mutationsInFlight > 0) { toast('Please wait for the current upload/save to finish', true); return; }
     history.replaceState(null, '', location.pathname);
     state.screen = 'projects';
     renderApp();
@@ -7320,7 +7330,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       if (!['image/png', 'image/jpeg'].includes(file.type)) { toast('Cover must be a JPEG or PNG image', true); return; }
       if (file.size > 5 * 1024 * 1024) { toast('Cover image must be under 5MB', true); return; }
       const btn = document.getElementById('showcaseCoverBtn');
-      btn.disabled = true; btn.textContent = 'Uploading…';
+      btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
       // The cover is the very first thing that loads on the showcase page —
       // same compression as candidate-add/promo upload, so it's not serving
       // an uncompressed original either.
@@ -7467,7 +7477,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         return;
       }
       if (!checkFileSize(file, 50)) return;
-      promoBtn.disabled = true; promoBtn.textContent = 'Uploading…';
+      promoBtn.disabled = true; promoBtn.innerHTML = '<span class="btn-spinner"></span>Uploading…';
       // Compress a promo image the same way candidate-add does — this file
       // is going straight to R2 uncompressed otherwise. Video is untouched.
       let uploadFile = file;
@@ -7545,6 +7555,10 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     }));
     document.querySelectorAll('[data-open-project]').forEach(el => el.addEventListener('click', (e) => {
       if (e.target.closest('[data-delete-project]')) return;
+      // Belt-and-suspenders alongside goToProjectsScreen's own guard — this
+      // screen shouldn't normally be reachable mid-upload/save at all, but
+      // block here too rather than assume that's the only path to it.
+      if (mutationsInFlight > 0) { toast('Please wait for the current upload/save to finish', true); return; }
       openProject(el.getAttribute('data-open-project'));
     }));
     document.querySelectorAll('[data-delete-project]').forEach(el => el.addEventListener('click', async (e) => {
@@ -7647,24 +7661,38 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   async function refreshProjectData() {
     if (!state.project) return;
     const id = state.project.id;
-    // Captured before the fetch starts — compared after it resolves, below.
+    // Captured before the fetches start — compared after they all resolve,
+    // below. All four run together, not one after another: partly so this
+    // isn't unnecessarily slow, but mainly so there's only ONE window where
+    // a mutation could race this refresh, not four sequential ones (a
+    // second/third/fourth un-guarded await after an earlier check used to
+    // let a mutation slip through — see the fix that added this).
     const generationAtStart = stateGeneration;
-    const full = await api.getProject(id);
+    const [full, paymentLinkRes, stageLocksRes, earningsSummary] = await Promise.all([
+      api.getProject(id),
+      api.getProjectPaymentLink(id),
+      api.getStageLocks(id),
+      api.getEarningsSummary(),
+    ]);
     // Two checks, not one, catching two different orderings — a mutation
     // (upload, delete, save, lock, etc.) can affect this refresh's outcome
     // whether it's still running or has already finished:
-    //  - mutationsInFlight > 0: a mutation started WHILE this fetch was in
-    //    flight and hasn't settled yet (confirmed live for uploads: a
+    //  - mutationsInFlight > 0: a mutation started WHILE these fetches were
+    //    in flight and hasn't settled yet (confirmed live for uploads: a
     //    window-focus-triggered refresh started, then the file input's own
-    //    change handler incremented the flag before this fetch resolved).
+    //    change handler incremented the flag before the fetches resolved).
     //  - stateGeneration !== generationAtStart: a mutation started AND
-    //    fully finished (mutationsInFlight back to 0) while this fetch was
-    //    still in flight, if the fetch just took longer than the mutation's
-    //    whole round-trip — the first check alone misses this (confirmed
-    //    live: an upload's "Saved" toast fires immediately, but the file
-    //    doesn't visually appear until the next focus event triggers a
-    //    second, un-raced refresh — this fetch's response was already
-    //    stale by the time it arrived, silently reverting the upload).
+    //    fully finished (mutationsInFlight back to 0) while these fetches
+    //    were still in flight, if the fetches just took longer than the
+    //    mutation's whole round-trip — the first check alone misses this
+    //    (confirmed live: an upload's "Saved" toast fires immediately, but
+    //    the file doesn't visually appear until the next focus event
+    //    triggers a second, un-raced refresh — this fetch's response was
+    //    already stale by the time it arrived, silently reverting the
+    //    upload). Checked once, right before ANY state is applied — not
+    //    after just the first of several fetches — so nothing here can
+    //    still be mid-flight when the mutation's own render already showed
+    //    the correct result.
     // Either way, continuing past this point would replace state.items/
     // brief with data fetched before that mutation's own write committed,
     // detaching the object reference it's about to mutate — so its own
@@ -7672,13 +7700,11 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     // is strictly safer than finishing with data that's already out of date.
     if (mutationsInFlight > 0 || stateGeneration !== generationAtStart) return;
     state.project = full.project; state.brief = full.brief; state.items = full.items;
-    const paymentLinkRes = await api.getProjectPaymentLink(id);
     state.paymentLink = paymentLinkRes.token ? { token: paymentLinkRes.token, url: paymentLinkRes.url, totalEarnedPaise: paymentLinkRes.totalEarnedPaise || 0 } : null;
     state.paymentLinks = paymentLinkRes.stages || [];
     if (state.user && paymentLinkRes.freeCreditsRemaining !== undefined) state.user.free_credits_remaining = paymentLinkRes.freeCreditsRemaining;
-    const stageLocksRes = await api.getStageLocks(id);
     state.stageLocks = stageLocksRes.locks || [];
-    state.earningsSummary = await api.getEarningsSummary();
+    state.earningsSummary = earningsSummary;
     await renderTool();
     renderProjectInfoBar();
   }
