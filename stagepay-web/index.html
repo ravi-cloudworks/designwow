@@ -584,46 +584,43 @@
 
   .pay-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; background: var(--paper); gap: 18px; }
   .pay-brand-bar { display: flex; align-items: center; gap: 8px; color: var(--text); }
-  .pay-brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .pay-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
   .pay-brand-text { display: flex; flex-direction: column; gap: 1px; }
-  .pay-brand-name { font-size: 14px; font-weight: 800; }
-  .pay-brand-tagline { font-size: 10.5px; font-weight: 500; color: var(--text-faint); }
-  .pay-card { max-width: 440px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 26px; text-align: center; }
-  .pay-designer { font-size: 12.5px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-  .pay-card h1 { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
-  .pay-sub { font-size: 13px; color: var(--text-soft); margin-bottom: 16px; }
-  .pay-desc { font-size: 12.5px; color: var(--text-faint); line-height: 1.5; margin-bottom: 16px; }
-  .pay-stage-list { display: flex; flex-direction: column; gap: 10px; text-align: left; }
-  .pay-stage-row { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
-  .pay-stage-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; }
+  .pay-brand-name { font-size: 16px; font-weight: 800; }
+  .pay-brand-tagline { font-size: 12px; font-weight: 500; color: var(--text-faint); }
+  .pay-card { max-width: 580px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 38px 36px; text-align: center; }
+  .pay-designer { font-size: 14px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .pay-card h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .pay-sub { font-size: 15.5px; color: var(--text-soft); margin-bottom: 20px; }
+  .pay-desc { font-size: 15px; color: var(--text-faint); line-height: 1.5; margin-bottom: 18px; }
+  .pay-stage-list { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .pay-stage-row { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+  .pay-stage-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; cursor: pointer; }
   .pay-stage-head:hover { background: var(--surface-2); }
-  .pay-stage-title { flex: 1; font-size: 13.5px; font-weight: 700; }
-  .pay-stage-badge { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-soft); white-space: nowrap; }
+  .pay-stage-title { flex: 1; font-size: 16px; font-weight: 700; }
+  .pay-stage-badge { font-size: 13.5px; font-weight: 800; padding: 4px 12px; border-radius: 999px; background: var(--surface-2); color: var(--text-soft); white-space: nowrap; }
   .pay-stage-badge.paid { background: var(--moss-soft); color: var(--moss); }
-  .pay-stage-row .chevron { color: var(--text-faint); font-size: 13px; transition: transform 0.15s; }
+  .pay-stage-row .chevron { color: var(--text-faint); font-size: 15px; transition: transform 0.15s; }
   .pay-stage-row.expanded .chevron { transform: rotate(90deg); }
-  .pay-stage-body { display: none; padding: 4px 16px 18px; text-align: center; border-top: 1px solid var(--line-soft); }
-  .pay-stage-row.expanded .pay-stage-body { display: block; padding-top: 14px; }
-  .pay-download { display: inline-block; width: 100%; box-sizing: border-box; margin: 0 0 16px; }
-  .pay-amount { font-size: 30px; font-weight: 800; margin-bottom: 16px; }
-  .pay-qr-wrap { display: flex; align-items: center; justify-content: center; min-height: 220px; margin-bottom: 10px; }
+  .pay-stage-body { display: none; padding: 4px 20px 22px; text-align: center; border-top: 1px solid var(--line-soft); }
+  .pay-stage-row.expanded .pay-stage-body { display: block; padding-top: 18px; }
+  .pay-cta-btn { display: inline-block; width: 100%; box-sizing: border-box; margin: 0 0 20px; padding: 15px 20px; font-size: 16.5px; font-weight: 800; border-radius: 10px; }
+  .pay-amount { font-size: 36px; font-weight: 800; margin-bottom: 20px; }
+  .pay-qr-wrap { display: flex; align-items: center; justify-content: center; min-height: 220px; margin-bottom: 12px; }
   .pay-qr-wrap img { border-radius: 8px; border: 1px solid var(--line); }
-  .pay-open-upi { display: block; font-size: 12.5px; font-weight: 700; color: var(--teal); margin-bottom: 10px; }
-  .pay-app-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
-  .pay-app-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 7px 13px 7px 7px; border-radius: 999px; text-decoration: none; border: 1px solid transparent; }
-  .pay-app-mark { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
-  .pay-app-btn.gpay { background: #fff; border-color: #dadce0; color: #3c4043; }
-  .pay-app-btn.gpay .pay-app-mark { background: conic-gradient(#4285F4 0deg 90deg, #34A853 90deg 180deg, #FBBC05 180deg 270deg, #EA4335 270deg 360deg); color: #fff; }
-  .pay-app-btn.phonepe { background: #5f259f; color: #fff; }
-  .pay-app-btn.phonepe .pay-app-mark { background: #fff; color: #5f259f; }
-  .pay-app-btn.paytm { background: #00baf2; color: #002e6e; }
-  .pay-app-btn.paytm .pay-app-mark { background: #002e6e; color: #00baf2; }
-  .pay-qr-hint { font-size: 11px; color: var(--text-faint); line-height: 1.5; margin: 0 0 10px; }
-  .pay-confirm-check { display: flex; align-items: center; gap: 7px; justify-content: center; font-size: 12.5px; font-weight: 600; color: var(--text-soft); margin-top: 16px; cursor: pointer; }
-  .pay-confirm-check input { width: 16px; height: 16px; cursor: pointer; }
-  .pay-prior-payments { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
-  .pay-prior-payment { font-size: 12px; font-weight: 600; color: var(--moss); background: var(--moss-soft); border: 1px solid var(--moss-line); border-radius: 8px; padding: 8px 10px; }
-  .pay-paid-banner { margin-top: 4px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); border-radius: 8px; padding: 12px; font-weight: 700; font-size: 13.5px; }
+  .pay-qr-hint { font-size: 13px; color: var(--text-faint); line-height: 1.5; margin: 0 0 12px; }
+  .pay-manual-fallback { margin: 12px 0; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .pay-manual-fallback code { font-size: 15.5px; font-weight: 700; background: var(--surface-2); border-radius: 8px; padding: 7px 12px; }
+  .pay-confirm-check { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 14.5px; font-weight: 600; color: var(--text-soft); margin-top: 18px; cursor: pointer; }
+  .pay-confirm-check input { width: 18px; height: 18px; cursor: pointer; }
+  .pay-prior-payments { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .pay-prior-payment { font-size: 13.5px; font-weight: 600; color: var(--moss); background: var(--moss-soft); border: 1px solid var(--moss-line); border-radius: 8px; padding: 9px 11px; }
+  .pay-paid-banner { margin-top: 6px; background: var(--moss-soft); color: var(--moss); border: 1px solid var(--moss-line); border-radius: 8px; padding: 14px; font-weight: 700; font-size: 15.5px; }
+  /* Scoped to this page only — the base .btn/.btn-sm sizing elsewhere is
+     tuned for the dense internal app UI, not this larger public page. */
+  .pay-page .btn { font-size: 14.5px; padding: 9px 14px; }
+  .pay-page .btn-sm { font-size: 13.5px; padding: 7px 12px; }
+  .pay-page .btn.pay-cta-btn { font-size: 16.5px; padding: 15px 20px; }
 </style>
 
 <div id="app"></div>
@@ -7770,7 +7767,6 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
   function renderPayPage() {
     const { token, info, stages, expandedStage } = payPageDraft;
     const app = document.getElementById('app');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     app.innerHTML = `
       <div class="pay-page">
@@ -7797,7 +7793,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
           </div>
 
           ${stages.length ? `<div class="pay-stage-list">
-            ${stages.map(s => payStageRowHtml(s, s.stage === expandedStage, isMobile)).join('')}
+            ${stages.map(s => payStageRowHtml(s, s.stage === expandedStage)).join('')}
           </div>` : `<p class="pay-desc">Nothing to pay yet — the designer hasn't set an amount for any stage.</p>`}
         </div>
       </div>`;
@@ -7811,7 +7807,7 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
     const expanded = stages.find(s => s.stage === expandedStage);
     if (expanded && !expanded.paid && info.upiId) wireOpenPayStage(token, info, expanded);
   }
-  function payStageRowHtml(s, isExpanded, isMobile) {
+  function payStageRowHtml(s, isExpanded) {
     const amountRupees = s.amountPaise / 100;
     return `<div class="pay-stage-row ${isExpanded ? 'expanded' : ''}">
       <div class="pay-stage-head" data-pay-stage-head="${s.stage}">
@@ -7820,34 +7816,35 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
         <span class="chevron">›</span>
       </div>
       <div class="pay-stage-body">
-        <a class="btn btn-primary pay-download" href="${API_BASE}/api/pay/${payPageDraft.token}/download/${s.stage}">⬇ Download deliverable</a>
+        <a class="btn btn-primary pay-cta-btn" href="${API_BASE}/api/pay/${payPageDraft.token}/download/${s.stage}">⬇ Download deliverable</a>
         ${s.priorPayments && s.priorPayments.length ? `<div class="pay-prior-payments">
           ${s.priorPayments.map(p => `<div class="pay-prior-payment">✓ Previously paid ₹${(p.amountPaise / 100).toFixed(2)} on ${esc(formatIST(p.paidAt))}</div>`).join('')}
         </div>` : ''}
         ${s.paid
           ? `<div class="pay-paid-banner">✅ Paid ₹${amountRupees.toFixed(2)}${s.paidAt ? ` on ${esc(formatIST(s.paidAt))}` : ''}</div>`
-          : payStagePayHtml(s, isMobile)}
+          : payStagePayHtml(s)}
       </div>
     </div>`;
   }
-  function payStagePayHtml(s, isMobile) {
+  function payStagePayHtml(s) {
     if (!payPageDraft.info.upiId) return `<p class="pay-desc">The designer hasn't set up a UPI ID yet — contact them directly to pay.</p>`;
     return `
       <div class="pay-amount">₹${(s.amountPaise / 100).toFixed(2)}</div>
       <div id="payQrWrap-${s.stage}" class="pay-qr-wrap"><p>Generating QR…</p></div>
-      <p class="pay-qr-hint">Scan with your UPI app on mobile.</p>
-      ${isMobile ? `
-        <a href="" id="payOpenUpi-${s.stage}" class="pay-open-upi">Open in UPI app</a>
-        <div class="pay-app-row">
-          <a href="" id="payGpay-${s.stage}" class="pay-app-btn gpay"><span class="pay-app-mark">G</span>Google Pay</a>
-          <a href="" id="payPhonepe-${s.stage}" class="pay-app-btn phonepe"><span class="pay-app-mark">P</span>PhonePe</a>
-          <a href="" id="payPaytm-${s.stage}" class="pay-app-btn paytm"><span class="pay-app-mark">P</span>Paytm</a>
-        </div>` : `<p class="pay-qr-hint">Payment link is only shown on mobile.</p>`}
+      <p class="pay-qr-hint">Scan with your UPI app.</p>
+      <div class="pay-manual-fallback">
+        <p class="pay-qr-hint">Can't scan? Open your UPI app, choose "Pay to UPI ID," and enter:</p>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center">
+          <code>${esc(payPageDraft.info.upiId)}</code>
+          <button type="button" class="btn btn-sm" id="payCopyUpiBtn-${s.stage}">Copy</button>
+        </div>
+        <p class="pay-qr-hint">Amount: ₹${(s.amountPaise / 100).toFixed(2)}</p>
+      </div>
       <label class="pay-confirm-check">
         <input type="checkbox" id="payConfirmCheckbox-${s.stage}">
         I have paid this amount using UPI
       </label>
-      <button class="btn btn-primary" id="markPaidBtn-${s.stage}" style="width:100%;margin-top:8px" disabled>✅ Payment complete</button>
+      <button class="btn btn-primary pay-cta-btn" id="markPaidBtn-${s.stage}" style="margin-top:8px;margin-bottom:0" disabled>✅ Payment complete</button>
     `;
   }
   function wireOpenPayStage(token, info, s) {
@@ -7861,15 +7858,17 @@ If anything above is genuinely ambiguous or missing (e.g. a blank placeholder li
       amountRupees: s.amountPaise / 100,
       note: `${info.product || info.projectName} — Stage ${s.stage} — ${s.stageLabel}`,
     };
+    // Deep-link tap-to-pay buttons (Open in UPI app / Google Pay / PhonePe /
+    // Paytm) were removed from this page — extensive testing traced a
+    // consistent "exceeded bank limit" decline to browser-initiated UPI
+    // intents specifically (content-independent: wrong even with the note
+    // and amount stripped out), while QR scanning and manual "pay to UPI
+    // ID" both worked in every test. Only building what's proven to work.
     const upiLink = buildUpiLink(linkArgs);
-    const openUpiEl = document.getElementById(`payOpenUpi-${s.stage}`);
-    if (openUpiEl) openUpiEl.href = upiLink;
-    const gpayEl = document.getElementById(`payGpay-${s.stage}`);
-    if (gpayEl) gpayEl.href = buildUpiLink({ ...linkArgs, scheme: 'tez://upi/pay' });
-    const phonepeEl = document.getElementById(`payPhonepe-${s.stage}`);
-    if (phonepeEl) phonepeEl.href = buildUpiLink({ ...linkArgs, scheme: 'phonepe://pay' });
-    const paytmEl = document.getElementById(`payPaytm-${s.stage}`);
-    if (paytmEl) paytmEl.href = buildUpiLink({ ...linkArgs, scheme: 'paytmmp://pay' });
+    const copyUpiBtn = document.getElementById(`payCopyUpiBtn-${s.stage}`);
+    if (copyUpiBtn) copyUpiBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(info.upiId).then(() => toast('UPI ID copied'), () => toast('Failed to copy', true));
+    });
 
     const qrWrap = document.getElementById(`payQrWrap-${s.stage}`);
     // The `qrcode` npm package ships no plain-browser global build (it's
